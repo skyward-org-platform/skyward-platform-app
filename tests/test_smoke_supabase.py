@@ -34,3 +34,8 @@ def test_client_table_exists(admin_client):
 def test_team_member_table_exists(admin_client):
     res = admin_client.table("team_member").select("user_id").limit(1).execute()
     assert res.data == []
+
+
+def test_property_table_exists(admin_client):
+    res = admin_client.table("property").select("id").limit(1).execute()
+    assert res.data == []
