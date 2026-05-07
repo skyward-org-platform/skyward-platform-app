@@ -23,3 +23,14 @@ def test_pgvector_enabled(admin_client):
 def test_uuid_ossp_enabled(admin_client):
     rpc = admin_client.rpc("pg_ext_check", {"ext_name": "uuid-ossp"}).execute()
     assert rpc.data is True
+
+
+def test_client_table_exists(admin_client):
+    """client table is the contractual entity; should accept queries."""
+    res = admin_client.table("client").select("id").limit(1).execute()
+    assert res.data == []  # empty is fine, but query must succeed
+
+
+def test_team_member_table_exists(admin_client):
+    res = admin_client.table("team_member").select("user_id").limit(1).execute()
+    assert res.data == []
