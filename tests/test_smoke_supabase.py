@@ -53,3 +53,13 @@ def test_page_embedding_column_is_vector(admin_client):
         {"table_name_in": "page", "column_name_in": "embedding"},
     ).execute()
     assert "vector" in (res.data or "").lower()
+
+
+def test_brand_dna_section_table_exists(admin_client):
+    res = admin_client.table("brand_dna_section").select("id").limit(1).execute()
+    assert res.data == []
+
+
+def test_project_brain_entry_table_exists(admin_client):
+    res = admin_client.table("project_brain_entry").select("id").limit(1).execute()
+    assert res.data == []
