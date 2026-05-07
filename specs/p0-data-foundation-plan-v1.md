@@ -335,7 +335,7 @@ create index on team_member (active);
 
 -- Contractual entity: SOW signer
 create table client (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   slug text unique not null,
   name text not null,
   legal_name text,
@@ -418,7 +418,7 @@ def test_property_table_exists(admin_client):
 
 ```sql
 create table property (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   client_id uuid not null references client(id) on delete cascade,
   slug text unique not null,
   name text not null,
@@ -504,7 +504,7 @@ def test_page_embedding_column_is_vector(admin_client):
 
 ```sql
 create table page (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   property_id uuid not null references property(id) on delete cascade,
   url text not null,
   url_hash text generated always as (md5(url)) stored,
@@ -616,7 +616,7 @@ def test_project_brain_entry_table_exists(admin_client):
 
 ```sql
 create table brand_dna_section (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   property_id uuid not null references property(id) on delete cascade,
   section text not null check (section in (
     'identity','offerings','personas','future_audience','brand_terms',
@@ -636,7 +636,7 @@ create table brand_dna_section (
 create index on brand_dna_section (property_id);
 
 create table project_brain_entry (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   property_id uuid not null references property(id) on delete cascade,
   type text not null check (type in ('issue','working','research','preference','strategy','insight')),
   title text not null,
@@ -1081,7 +1081,8 @@ Append to `operations/seo-platform/tests/test_smoke_supabase.py`:
 
 ```python
 def test_phil_lasry_pages_present(admin_client):
-    """After backfill, phil-lasry has at least 50 pages with audit_action set."""
+    """After backfill, phil-lasry has its WQA-decided pages.
+    Threshold is 30 because phil-lasry is a photography portfolio (~42 URLs total)."""
     prop = admin_client.table("property").select("id").eq("slug", "phil-lasry").single().execute().data
     pages = (
         admin_client.table("page")
@@ -1178,24 +1179,27 @@ import pytest
 SAMPLE_PAGES = [
     {
         "url": "https://plasry.com/",
-        "title": "Phil Lasry - Personal Injury Lawyer NYC",
-        "h1": "Get the compensation you deserve",
+        "title": "Philippe Lasry Photography — NYC Portrait & Editorial Photographer",
+        "h1": "Photography that tells your story",
         "content_text": (
-            "Phil Lasry is a personal injury attorney in New York City representing clients in "
-            "spinal cord injury, medical malpractice, and serious car accident cases. With over "
-            "$50M recovered for clients, Phil takes pride in personal attention and aggressive "
-            "advocacy. Free consultation. No fee unless we win."
+            "Philippe Lasry is a New York City portrait and editorial photographer working with "
+            "executives, founders, and creative professionals. With a background in editorial "
+            "magazine work, Philippe brings a documentary eye to brand portraits, headshots, and "
+            "long-form commissioned projects. Past clients include national publications, "
+            "corporate boards, and growing tech companies needing imagery that respects the "
+            "subject and earns the camera. Studio in Brooklyn; on-location anywhere."
         ),
     },
     {
-        "url": "https://plasry.com/services/spinal-cord-injury",
-        "title": "Spinal Cord Injury Lawyer NYC",
-        "h1": "Spinal Cord Injury Cases",
+        "url": "https://plasry.com/services/executive-portraits",
+        "title": "Executive Portraits NYC — Philippe Lasry",
+        "h1": "Executive portraits with presence",
         "content_text": (
-            "Spinal cord injuries change lives in an instant. Our firm has recovered over $20M "
-            "for clients with spinal cord injuries from car accidents, falls, and medical "
-            "malpractice. We work with leading neurologists and life-care planners to document "
-            "the full impact."
+            "Executive portraits should look like the people who run the room. Philippe shoots "
+            "boards, C-suites, and founder profiles for annual reports, leadership pages, "
+            "investor decks, and press features. Sessions are unhurried, lit with natural light "
+            "where possible, and produced with retouching that respects the subject. Available "
+            "at the studio in Brooklyn or on-site at your office."
         ),
     },
 ]
@@ -1267,9 +1271,9 @@ def test_voice_tone_inference_returns_required_fields(sample_pages):
 def test_voice_tone_reflects_page_content(sample_pages):
     result = infer_voice_tone(pages=sample_pages)
     descriptors = " ".join(result.tone_descriptors).lower()
-    # Personal injury content should not come back as "playful" or "casual humor"
-    assert "playful" not in descriptors
-    assert "humor" not in descriptors
+    # Editorial photography content should NOT come back as something blatantly off-brand
+    # (e.g., 'aggressive', 'salesy', 'over-the-top'). Be lenient — inference varies.
+    assert all(bad not in descriptors for bad in ["aggressive", "salesy", "over-the-top"])
 ```
 
 - [ ] **Step 2: Run, see fail**
@@ -1371,8 +1375,8 @@ def test_brand_terms_returns_lists(sample_pages):
 def test_brand_terms_reflects_actual_phrases(sample_pages):
     result = infer_brand_terms(pages=sample_pages)
     joined = " ".join(result.always_use).lower()
-    # phil-lasry pages mention spinal cord, medical malpractice, etc.
-    assert any(term in joined for term in ["spinal", "injury", "personal injury"])
+    # phil-lasry pages are about photography, portraits, executives, editorial
+    assert any(term in joined for term in ["photograph", "portrait", "editorial", "executive"])
 ```
 
 - [ ] **Step 2: Run, see fail**
