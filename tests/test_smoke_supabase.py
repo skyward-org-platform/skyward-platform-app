@@ -63,3 +63,22 @@ def test_brand_dna_section_table_exists(admin_client):
 def test_project_brain_entry_table_exists(admin_client):
     res = admin_client.table("project_brain_entry").select("id").limit(1).execute()
     assert res.data == []
+
+
+def test_phil_lasry_pages_present(admin_client):
+    """After backfill, phil-lasry has pages with audit_action set.
+
+    plasry.com is a small photographer site — 42 URLs in the 2026-04-14 workbook.
+    Threshold is 30 to allow for re-runs against subsets while confirming real data loaded.
+    """
+    prop = admin_client.table("property").select("id").eq("slug", "phil-lasry").single().execute().data
+    pages = (
+        admin_client.table("page")
+        .select("audit_action")
+        .eq("property_id", prop["id"])
+        .execute()
+        .data
+    )
+    assert len(pages) >= 30
+    decided = [p for p in pages if p["audit_action"] not in (None, "undecided")]
+    assert len(decided) > 0
