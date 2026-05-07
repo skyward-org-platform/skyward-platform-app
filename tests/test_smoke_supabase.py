@@ -39,3 +39,17 @@ def test_team_member_table_exists(admin_client):
 def test_property_table_exists(admin_client):
     res = admin_client.table("property").select("id").limit(1).execute()
     assert res.data == []
+
+
+def test_page_table_exists(admin_client):
+    res = admin_client.table("page").select("id").limit(1).execute()
+    assert res.data == []
+
+
+def test_page_embedding_column_is_vector(admin_client):
+    """Verify the embedding column has vector type via pg_typeof_column helper RPC."""
+    res = admin_client.rpc(
+        "pg_typeof_column",
+        {"table_name_in": "page", "column_name_in": "embedding"},
+    ).execute()
+    assert "vector" in (res.data or "").lower()
