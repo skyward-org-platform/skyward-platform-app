@@ -65,6 +65,27 @@ def test_project_brain_entry_table_exists(admin_client):
     assert res.data == []
 
 
+def test_phil_lasry_content_backfilled(admin_client):
+    """After the BQ content pull, phil-lasry has content + embeddings."""
+    prop = admin_client.table("property").select("id").eq("slug", "phil-lasry").single().execute().data
+    with_content = (
+        admin_client.table("page")
+        .select("id", count="exact")
+        .eq("property_id", prop["id"])
+        .not_.is_("content_text", "null")
+        .execute()
+    )
+    with_embedding = (
+        admin_client.table("page")
+        .select("id", count="exact")
+        .eq("property_id", prop["id"])
+        .not_.is_("embedding", "null")
+        .execute()
+    )
+    assert with_content.count >= 5, f"only {with_content.count} pages have content"
+    assert with_embedding.count >= 5, f"only {with_embedding.count} pages have embeddings"
+
+
 def test_phil_lasry_pages_present(admin_client):
     """After backfill, phil-lasry has pages with audit_action set.
 
