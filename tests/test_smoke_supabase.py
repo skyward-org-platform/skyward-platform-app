@@ -103,3 +103,17 @@ def test_phil_lasry_pages_present(admin_client):
     assert len(pages) >= 30
     decided = [p for p in pages if p["audit_action"] not in (None, "undecided")]
     assert len(decided) > 0
+
+
+def test_phil_lasry_brand_dna_complete(admin_client):
+    prop = admin_client.table("property").select("id").eq("slug", "phil-lasry").single().execute().data
+    sections = (
+        admin_client.table("brand_dna_section")
+        .select("section")
+        .eq("property_id", prop["id"])
+        .execute()
+        .data
+    )
+    section_names = {s["section"] for s in sections}
+    required = {"identity", "voice_tone", "brand_terms", "proof", "future_audience", "brand_story"}
+    assert required.issubset(section_names), f"Missing: {required - section_names}"
