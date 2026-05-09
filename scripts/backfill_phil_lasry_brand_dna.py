@@ -4,12 +4,22 @@ Skips re-running inference if a section already exists in brand_dna_section unle
 """
 from __future__ import annotations
 
-from inference.brand_story import infer_brand_story
-from inference.brand_terms import infer_brand_terms
-from inference.future_audience import infer_future_audience
-from inference.proof import infer_proof
-from inference.voice_tone import infer_voice_tone
-from scripts.supabase_client import get_admin_client
+import sys
+from pathlib import Path
+
+# Make sibling packages (`inference`, `scripts`) importable when this script is run
+# directly via `python scripts/backfill_phil_lasry_brand_dna.py` from the
+# `operations/seo-platform/` directory.
+_SEO_PLATFORM_DIR = Path(__file__).resolve().parent.parent
+if str(_SEO_PLATFORM_DIR) not in sys.path:
+    sys.path.insert(0, str(_SEO_PLATFORM_DIR))
+
+from inference.brand_story import infer_brand_story  # noqa: E402
+from inference.brand_terms import infer_brand_terms  # noqa: E402
+from inference.future_audience import infer_future_audience  # noqa: E402
+from inference.proof import infer_proof  # noqa: E402
+from inference.voice_tone import infer_voice_tone  # noqa: E402
+from scripts.supabase_client import get_admin_client  # noqa: E402
 
 
 PROPERTY_SLUG = "phil-lasry"
