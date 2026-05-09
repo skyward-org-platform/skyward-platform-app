@@ -57,7 +57,7 @@ def test_page_embedding_column_is_vector(admin_client):
 
 def test_brand_dna_section_table_exists(admin_client):
     res = admin_client.table("brand_dna_section").select("id").limit(1).execute()
-    assert res.data == []
+    assert isinstance(res.data, list)
 
 
 def test_project_brain_entry_table_exists(admin_client):
@@ -117,3 +117,16 @@ def test_phil_lasry_brand_dna_complete(admin_client):
     section_names = {s["section"] for s in sections}
     required = {"identity", "voice_tone", "brand_terms", "proof", "future_audience", "brand_story"}
     assert required.issubset(section_names), f"Missing: {required - section_names}"
+
+
+def test_brand_dna_markdown_export_round_trip():
+    """Export should produce a non-empty file with the expected frontmatter keys."""
+    from scripts.export_brand_dna_markdown import export
+
+    out_path = export("phil-lasry")
+    assert out_path.exists()
+    content = out_path.read_text()
+    assert content.startswith("---\n")
+    assert "client: phil-lasry" in content
+    assert "domain: plasry.com" in content
+    assert "## 1. Brand story" in content
