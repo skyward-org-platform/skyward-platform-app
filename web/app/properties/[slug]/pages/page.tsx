@@ -1,17 +1,8 @@
 import { supabase } from "@/lib/supabase";
-
-const ACTION_COLORS: Record<string, string> = {
-  optimize: "bg-blue-100 text-blue-700",
-  restore: "bg-emerald-100 text-emerald-700",
-  redirect: "bg-amber-100 text-amber-800",
-  consolidate: "bg-slate-200 text-slate-700",
-  remove: "bg-red-100 text-red-700",
-  keep: "bg-slate-100 text-slate-600",
-  no_action: "bg-slate-100 text-slate-500",
-  undecided: "bg-yellow-100 text-yellow-800",
-};
+import { AuditActionChip } from "@/components/AuditActionChip";
 
 type Page = {
+  id: string;
   url: string;
   page_type: string | null;
   status_code: number | null;
@@ -19,19 +10,19 @@ type Page = {
   word_count: number | null;
 };
 
-async function getPages(slug: string): Promise<Page[]> {
+async function getPages(slug: string): Promise<{ pages: Page[]; slug: string }> {
   const { data: prop } = await supabase
     .from("property")
     .select("id")
     .eq("slug", slug)
     .single();
-  if (!prop) return [];
+  if (!prop) return { pages: [], slug };
   const { data } = await supabase
     .from("page")
-    .select("url, page_type, status_code, audit_action, word_count")
+    .select("id, url, page_type, status_code, audit_action, word_count")
     .eq("property_id", prop.id)
     .order("audit_action", { ascending: true });
-  return (data ?? []) as Page[];
+  return { pages: (data ?? []) as Page[], slug };
 }
 
 export default async function PagesTab({
@@ -40,7 +31,7 @@ export default async function PagesTab({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const pages = await getPages(slug);
+  const { pages } = await getPages(slug);
 
   if (pages.length === 0) {
     return (
@@ -63,8 +54,8 @@ export default async function PagesTab({
             </tr>
           </thead>
           <tbody>
-            {pages.map((p, i) => (
-              <tr key={i} className="border-t hover:bg-slate-50">
+            {pages.map((p) => (
+              <tr key={p.id} className="border-t hover:bg-slate-50">
                 <td
                   className="px-3 py-2 font-mono text-xs truncate max-w-md"
                   title={p.url}
@@ -74,13 +65,11 @@ export default async function PagesTab({
                 <td className="px-3 py-2 text-slate-600">{p.page_type ?? "—"}</td>
                 <td className="px-3 py-2">{p.status_code ?? "—"}</td>
                 <td className="px-3 py-2">
-                  <span
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
-                      ACTION_COLORS[p.audit_action ?? ""] ?? "bg-slate-100"
-                    }`}
-                  >
-                    {p.audit_action ?? "—"}
-                  </span>
+                  <AuditActionChip
+                    pageId={p.id}
+                    initialAction={p.audit_action}
+                    propertySlug={slug}
+                  />
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-slate-600">
                   {p.word_count ?? "—"}
