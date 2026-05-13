@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { BrandDnaBodyEditor } from "@/components/BrandDnaBodyEditor";
+import { BrandDnaContentEditor } from "@/components/BrandDnaContentEditor";
 
 type BrandDnaSection = {
   id: string;
@@ -60,8 +61,8 @@ export default async function BrandDnaTab({
     );
   }
 
-  const hasBody = (s: BrandDnaSection) =>
-    s.body !== null || (s.content === null || Object.keys(s.content).length === 0);
+  const useBodyEditor = (s: BrandDnaSection) =>
+    s.body !== null || s.content === null || Object.keys(s.content).length === 0;
 
   return (
     <div className="p-8 grid gap-4 max-w-4xl">
@@ -77,16 +78,18 @@ export default async function BrandDnaTab({
             </div>
           </CardHeader>
           <CardContent>
-            {hasBody(s) ? (
+            {useBodyEditor(s) ? (
               <BrandDnaBodyEditor
                 sectionId={s.id}
                 initialBody={s.body ?? ""}
                 propertySlug={slug}
               />
             ) : (
-              <pre className="text-xs bg-slate-50 p-3 rounded overflow-x-auto whitespace-pre-wrap">
-                {JSON.stringify(s.content, null, 2)}
-              </pre>
+              <BrandDnaContentEditor
+                sectionId={s.id}
+                initialContent={s.content}
+                propertySlug={slug}
+              />
             )}
           </CardContent>
         </Card>
