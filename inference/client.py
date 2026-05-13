@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Type, TypeVar
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
 
-load_dotenv("/Users/paulskirbe/agency/.env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 MODEL = "gpt-4o-2024-08-06"  # supports structured outputs
 TEMPERATURE = 0.2

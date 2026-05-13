@@ -22,7 +22,7 @@ import openpyxl
 from dotenv import load_dotenv
 from supabase import create_client
 
-load_dotenv("/Users/paulskirbe/agency/.env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 TRIAGE_SHEET_NAME = "URL Triage"
 

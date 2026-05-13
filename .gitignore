@@ -1,0 +1,42 @@
+# Credentials — NEVER commit
+.env
+.env.*
+!.env.example
+**/credentials/
+**/api-keys*
+**/secrets/
+
+# GCP service account JSON keys — never commit, even by accident
+**/data-hub-*.json
+**/*-service-account*.json
+**/*sa-key*.json
+**/google-credentials*.json
+specs/data-hub-*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Node / Next.js (subdir gitignore covers web/, but belt-and-suspenders)
+node_modules/
+.next/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*

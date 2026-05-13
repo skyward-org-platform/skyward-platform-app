@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from pathlib import Path
 from typing import Iterable
 
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ from openai import OpenAI
 
 from scripts.supabase_client import get_admin_client
 
-load_dotenv("/Users/paulskirbe/agency/.env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 PROPERTY_SLUG = "phil-lasry"
 BQ_PROJECT = "data-hub-468216"

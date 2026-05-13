@@ -1,10 +1,12 @@
 """Smoke tests that the Supabase project is reachable and extensions are enabled."""
 import os
+from pathlib import Path
+
 import pytest
 from dotenv import load_dotenv
 from supabase import create_client
 
-load_dotenv("/Users/paulskirbe/agency/.env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 @pytest.fixture
