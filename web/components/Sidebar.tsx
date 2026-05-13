@@ -60,6 +60,9 @@ export default async function Sidebar() {
         <Link href="/" className="block px-2 py-1.5 rounded hover:bg-slate-100">
           🏠 Home
         </Link>
+        <Link href="/clients" className="block px-2 py-1.5 rounded hover:bg-slate-100">
+          👥 Clients
+        </Link>
         <div className="block px-2 py-1.5 text-slate-400">⚡ Signals</div>
         <div className="block px-2 py-1.5 text-slate-400">▶ Runs</div>
       </nav>

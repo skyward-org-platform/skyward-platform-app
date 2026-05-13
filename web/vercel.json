@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 30,
+      "memory": 1024,
+      "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,**/fixtures/**,**/__pycache__/**,**/locales/**,**/*.dist-info/**,docs/**}"
+    }
+  }
+}
