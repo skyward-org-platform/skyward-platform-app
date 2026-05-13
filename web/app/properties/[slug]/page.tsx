@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
+import { BrandDnaBodyEditor } from "@/components/BrandDnaBodyEditor";
 
 type BrandDnaSection = {
+  id: string;
   section: string;
   content: Record<string, unknown> | null;
   body: string | null;
@@ -18,7 +20,7 @@ async function getBrandDna(slug: string): Promise<BrandDnaSection[]> {
   if (!prop) return [];
   const { data } = await supabase
     .from("brand_dna_section")
-    .select("section, content, body, source, confidence")
+    .select("id, section, content, body, source, confidence")
     .eq("property_id", prop.id);
   return (data ?? []) as BrandDnaSection[];
 }
@@ -58,10 +60,13 @@ export default async function BrandDnaTab({
     );
   }
 
+  const hasBody = (s: BrandDnaSection) =>
+    s.body !== null || (s.content === null || Object.keys(s.content).length === 0);
+
   return (
     <div className="p-8 grid gap-4 max-w-4xl">
       {ordered.map((s) => (
-        <Card key={s.section}>
+        <Card key={s.id}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="capitalize text-base">
               {s.section.replace(/_/g, " ")}
@@ -72,10 +77,12 @@ export default async function BrandDnaTab({
             </div>
           </CardHeader>
           <CardContent>
-            {s.body ? (
-              <div className="prose prose-sm whitespace-pre-wrap text-slate-700 text-sm">
-                {s.body}
-              </div>
+            {hasBody(s) ? (
+              <BrandDnaBodyEditor
+                sectionId={s.id}
+                initialBody={s.body ?? ""}
+                propertySlug={slug}
+              />
             ) : (
               <pre className="text-xs bg-slate-50 p-3 rounded overflow-x-auto whitespace-pre-wrap">
                 {JSON.stringify(s.content, null, 2)}
