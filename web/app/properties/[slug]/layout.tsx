@@ -27,8 +27,7 @@ export default async function PropertyLayout({
     { href: `/properties/${slug}/pages`, label: "Pages" },
   ];
 
-  // Type assertion for the joined client relation
-  const client = prop.client as { name: string; slug: string } | null;
+  const client = prop.client as unknown as { name: string; slug: string } | null;
 
   return (
     <div>
