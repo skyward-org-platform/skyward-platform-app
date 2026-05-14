@@ -16,7 +16,7 @@ _HERE = Path(__file__).resolve().parent.parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-load_dotenv("/Users/paulskirbe/agency/.env")
+load_dotenv(_HERE / ".env")
 
 
 @lru_cache(maxsize=1)
