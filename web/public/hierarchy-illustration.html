@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Skyward Platform — App Hierarchy</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    padding: 48px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  h2 { font-size: 16px; margin: 48px 0 16px; color: #334155; letter-spacing: -0.01em; }
+  h3 { font-size: 13px; margin: 0 0 12px; color: #0f172a; }
+  .sub { color: #64748b; font-size: 13px; margin: 0 0 24px; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+
+  /* Hierarchy tower */
+  .tower { text-align: center; margin: 24px 0 0; }
+  .tier {
+    display: inline-block;
+    padding: 14px 28px;
+    border-radius: 10px;
+    border: 2px solid;
+    min-width: 360px;
+    text-align: left;
+  }
+  .tier .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+  .tier .name { font-weight: 600; font-size: 16px; margin: 2px 0 0; }
+  .tier .desc { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+  .tier-client   { background: #eff6ff; border-color: #60a5fa; color: #1e3a8a; }
+  .tier-property { background: #fefce8; border-color: #facc15; color: #713f12; }
+  .tier-project  { background: #ecfdf5; border-color: #34d399; color: #14532d; }
+  .down { width: 2px; height: 22px; background: #cbd5e1; margin: 4px auto; }
+  .cross {
+    margin: 28px auto 0;
+    display: inline-block;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 12px;
+    color: #475569;
+  }
+  .cross strong { color: #0f172a; }
+  .cross-rel { display: inline-block; margin: 0 12px; }
+
+  /* Examples grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 16px;
+  }
+  .card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card h3 { font-size: 13px; margin: 0 0 14px; line-height: 1.4; }
+  .card .num {
+    display: inline-block;
+    background: #0f172a;
+    color: white;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    margin-right: 6px;
+    font-weight: 600;
+  }
+  .row {
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 4px 0;
+    font-size: 12px;
+  }
+  .row strong { font-size: 13px; }
+  .row .meta { font-size: 10px; opacity: 0.65; margin-top: 1px; }
+  .row-client   { background: #eff6ff; }
+  .row-property { background: #fefce8; }
+  .row-project  { background: #ecfdf5; }
+  .lvl-1 { margin-left: 0; }
+  .lvl-2 { margin-left: 14px; border-left: 2px solid #fde68a; padding-left: 14px; }
+  .lvl-3 { margin-left: 28px; border-left: 2px solid #86efac; padding-left: 14px; }
+
+  .affinity, .inherits {
+    margin: 8px 0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+  }
+  .affinity { background: #fdf2f8; border-left: 3px solid #ec4899; color: #831843; }
+  .inherits { background: #f5f3ff; border-left: 3px solid #8b5cf6; color: #4c1d95; }
+
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.7;
+  }
+  .footer strong { color: #0f172a; }
+
+  .footnote { font-size: 11px; color: #64748b; margin-top: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>Skyward Platform — App Hierarchy</h1>
+<p class="sub">client → property → project. The conceptual model and how it plays out in three scenarios.</p>
+
+<h2>The model</h2>
+<div class="tower">
+  <div class="tier tier-client">
+    <div class="lbl">Client</div>
+    <div class="name">Commercial entity</div>
+    <div class="desc">The legal counterparty who signs the SOW. Phil Lasry LLC, TNA Pty Ltd, Tacoma Legacy Partners LLC.</div>
+  </div>
+  <div class="down"></div>
+  <div class="tier tier-property">
+    <div class="lbl">Property · has 1+</div>
+    <div class="name">Operational unit</div>
+    <div class="desc">Brand + website + pipeline state. Owns Brand DNA, pages, audits. One client can have many. <code>(primary_domain, url_prefix)</code> uniquely identifies.</div>
+  </div>
+  <div class="down"></div>
+  <div class="tier tier-project">
+    <div class="lbl">Project · has 1+</div>
+    <div class="name">Playbook execution</div>
+    <div class="desc">A channel-scoped run. <code>type ∈ { seo, paid_search, paid_social }</code>. Project type determines which tabs render on the property page.</div>
+  </div>
+</div>
+
+<div style="text-align: center;">
+  <div class="cross">
+    <strong>Cross-relationships:</strong>
+    <span class="cross-rel">client ↔ client via <code>related_clients[]</code> (soft affinity)</span>
+    <span class="cross-rel">property ↔ property via <code>parent_property_id</code> (Brand DNA inheritance)</span>
+    <span class="cross-rel">SOW funds projects (lives in Scope Builder)</span>
+  </div>
+</div>
+
+<h2>Three scenarios in context</h2>
+
+<div class="grid">
+
+  <!-- Example 1: Phil Lasry -->
+  <div class="card">
+    <h3><span class="num">1</span> Phil Lasry — single SEO engagement</h3>
+
+    <div class="row row-client lvl-1">
+      <strong>Phil Lasry</strong>
+      <div class="meta">client · legal: Phil Lasry LLC · active</div>
+    </div>
+    <div class="row row-property lvl-2">
+      <strong>plasry.com</strong>
+      <div class="meta">property · phase 3 · 42 pages</div>
+    </div>
+    <div class="row row-project lvl-3">
+      <strong>SEO</strong>
+      <div class="meta">project · type=seo · phase: keyword analysis</div>
+    </div>
+
+    <p class="footnote">
+      The vanilla case. One client, one site, one playbook running. Brand DNA, Pages, Keywords tabs all render on the property page because there's an active SEO project.
+    </p>
+  </div>
+
+  <!-- Example 2: TNA portfolio -->
+  <div class="card">
+    <h3><span class="num">2</span> TNA — portfolio of brands under one client</h3>
+
+    <div class="row row-client lvl-1">
+      <strong>TNA</strong>
+      <div class="meta">client · legal: TNA Pty Ltd · active</div>
+    </div>
+
+    <div class="row row-property lvl-2">
+      <strong>buscharter.com.au</strong>
+      <div class="meta">property · phase 2 · 1,096 pages</div>
+    </div>
+    <div class="row row-project lvl-3">
+      <strong>SEO</strong> <span class="meta" style="display:inline">· phase 2</span>
+    </div>
+
+    <div class="row row-property lvl-2">
+      <strong>tnabushire.com.au</strong>
+      <div class="meta">property · phase 3 · 608 pages</div>
+    </div>
+    <div class="row row-project lvl-3">
+      <strong>SEO</strong> <span class="meta" style="display:inline">· phase 3</span>
+    </div>
+
+    <div class="row row-property lvl-2">
+      <strong>minibushire.com.au</strong>
+      <div class="meta">property · phase 1 · 199 pages</div>
+    </div>
+    <div class="row row-project lvl-3">
+      <strong>SEO</strong> <span class="meta" style="display:inline">· phase 1</span>
+    </div>
+
+    <p class="footnote">
+      One SOW funds all three properties. Each runs its own pipeline independently at its own pace. The client page shows an aggregate portfolio summary derived from the three property states; no umbrella project entity needed.
+    </p>
+  </div>
+
+  <!-- Example 3: Kitchen Guard ecosystem -->
+  <div class="card">
+    <h3><span class="num">3</span> Kitchen Guard ecosystem — affinity, shared domain, inheritance</h3>
+
+    <div class="row row-client lvl-1">
+      <strong>Kitchen Guard</strong>
+      <div class="meta">client · legal: Kitchen Guard Inc · prospect</div>
+    </div>
+    <div class="row row-property lvl-2">
+      <strong>kitchenguard.com</strong>
+      <div class="meta">property · url_prefix=NULL (root)</div>
+    </div>
+    <div class="row row-project lvl-3">
+      <strong>SEO</strong>
+      <div class="meta">project (corporate-funded, once engaged)</div>
+    </div>
+
+    <div class="affinity">related_clients[] ↔ Kitchen Services of Provo</div>
+
+    <div class="row row-client lvl-1">
+      <strong>Kitchen Services of Provo</strong>
+      <div class="meta">client · legal: Tacoma Legacy Partners LLC · prospect</div>
+    </div>
+    <div class="row row-property lvl-2">
+      <strong>kitchenguard.com / provo</strong>
+      <div class="meta">property · url_prefix=/provo · shares domain ↑</div>
+    </div>
+    <div class="inherits">parent_property_id → KG Corporate (Brand DNA inheritance)</div>
+    <div class="row row-project lvl-3">
+      <strong>Paid Search</strong>
+      <div class="meta">project · type=paid_search · franchisee-funded</div>
+    </div>
+
+    <p class="footnote">
+      Two distinct clients (separate SOW signers) sharing one domain. KS Provo's site lives at <code>kitchenguard.com/provo</code>. Brand DNA inherits from KG Corporate via <code>parent_property_id</code> — crosses the client boundary via the <code>related_clients[]</code> affinity. Different project types lighting up different UI on each property page (SEO tabs on KG root, Campaigns tabs on KS Provo).
+    </p>
+  </div>
+
+</div>
+
+<div class="footer">
+  <strong>What lives where (interim, 2026-05-14):</strong>
+  &nbsp;Client + property + brand DNA + pages → <strong>Supabase</strong> (this app owns).
+  &nbsp;Project list + project↔domain mapping → <strong>BigQuery Meta</strong> (Adam owns; surfaced via skyward-common).
+  &nbsp;SOW + line items → <strong>Scope Builder</strong> (separate SQLite, future read-only sync).
+  <br><br>
+  Schema additions applied 2026-05-14: <code>property.url_prefix</code>, <code>property.parent_property_id</code>, <code>property.status += 'inactive'</code>, <code>client.related_clients uuid[]</code>. Data pre-population deferred — scenarios 3's KG Corp + KS Provo are NOT yet seeded.
+</div>
+
+</body>
+</html>
