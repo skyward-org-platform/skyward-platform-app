@@ -115,7 +115,7 @@ export default async function ClientDetailPage({
     );
   }
 
-  const { client, owned_domains, competitor_domains, projects } = data;
+  const { client, owned_domains, projects } = data;
 
   return (
     <div className="p-8 max-w-4xl">
@@ -189,30 +189,9 @@ export default async function ClientDetailPage({
         )}
       </Section>
 
-      <Section title="Competitor domains" count={competitor_domains.length}>
-        {competitor_domains.length === 0 ? (
-          <div className="text-sm text-slate-500">No competitor domains.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500 uppercase">
-              <tr>
-                <th className="text-left py-1">Domain</th>
-                <th className="text-left py-1">Name</th>
-                <th className="text-left py-1">Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              {competitor_domains.map((d) => (
-                <tr key={d.domain_id} className="border-t">
-                  <td className="py-1.5">{d.domain}</td>
-                  <td className="py-1.5 text-slate-600">{d.domain_name ?? "—"}</td>
-                  <td className="py-1.5 text-slate-600">{d.priority ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Section>
+      {/* Competitor domains moved to property/Brand DNA view per the
+          2026-05-14 hierarchy framework — they're brand-relative, not
+          client-relative. See /properties/[slug]. */}
 
       <Section title="Projects" count={projects.length}>
         {projects.length === 0 ? (
