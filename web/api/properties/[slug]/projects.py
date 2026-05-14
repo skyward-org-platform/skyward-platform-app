@@ -41,7 +41,10 @@ def _get_bq():
 
 def _fetch_property(slug: str) -> dict | None:
     """Fetch property by slug via Supabase REST API (PostgREST)."""
-    base = os.environ["SUPABASE_URL"].rstrip("/")
+    base = (
+        os.environ.get("SUPABASE_URL")
+        or os.environ["NEXT_PUBLIC_SUPABASE_URL"]
+    ).rstrip("/")
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     query = urllib.parse.urlencode({
         "slug": f"eq.{slug}",
