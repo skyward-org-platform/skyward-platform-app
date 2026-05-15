@@ -566,6 +566,183 @@
     margin-bottom: 14px;
   }
   .icon { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; }
+
+  /* ──── Brand DNA subnav ──── */
+  .subnav {
+    display: flex;
+    gap: 2px;
+    padding: 8px 32px;
+    background: #fafafa;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    font-size: 12.5px;
+  }
+  .subnav-item {
+    padding: 5px 12px;
+    color: var(--text-muted);
+    border-radius: 5px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .subnav-item:hover { color: var(--text); background: white; }
+  .subnav-item.active {
+    color: var(--text);
+    background: white;
+    font-weight: 600;
+    box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  /* ──── Chat bubbles (Brand DNA Assistant) ──── */
+  .chat { padding: 4px 0 0; }
+  .chat-msg { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-start; }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .chat-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .chat-avatar.user { background: #18181b; color: white; }
+  .chat-avatar.assistant {
+    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+    color: var(--violet);
+    font-size: 14px;
+  }
+  .chat-bubble {
+    padding: 9px 13px; border-radius: 14px;
+    font-size: 13px; line-height: 1.55;
+    max-width: 78%;
+  }
+  .chat-bubble.user {
+    background: #18181b; color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.assistant {
+    background: var(--violet-bg); color: #2e1065;
+    border-bottom-left-radius: 4px;
+  }
+  .chat-input {
+    display: flex; gap: 8px; margin-top: 14px;
+    padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .chat-input input {
+    flex: 1; border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 12px;
+    font-size: 13px; font-family: inherit;
+    outline: none;
+  }
+  .chat-input input:focus { border-color: var(--text); }
+  .typing {
+    display: inline-flex; gap: 4px; align-items: center;
+    padding: 8px 12px;
+    background: var(--violet-bg);
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+  }
+  .typing .dot {
+    width: 5px; height: 5px;
+    background: var(--violet);
+    border-radius: 50%;
+    opacity: 0.4;
+    animation: typing-dot 1.2s ease-in-out infinite;
+  }
+  .typing .dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-dot {
+    0%, 60%, 100% { opacity: 0.4; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(-2px); }
+  }
+
+  /* ──── Progress bar (indeterminate sweep) ──── */
+  .progress {
+    height: 4px; background: var(--surface-alt);
+    border-radius: 2px; overflow: hidden;
+    position: relative; margin: 14px 0;
+  }
+  .progress-fill {
+    position: absolute; top: 0; left: -30%;
+    width: 30%; height: 100%;
+    background: linear-gradient(90deg, transparent, var(--indigo), transparent);
+    animation: sweep 1.5s ease-in-out infinite;
+  }
+  @keyframes sweep {
+    0% { left: -30%; } 100% { left: 100%; }
+  }
+
+  /* Step list (Research & Fill) */
+  .steps { font-size: 13px; line-height: 1.8; }
+  .step { display: flex; gap: 10px; align-items: center; padding: 3px 0; }
+  .step-icon {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; flex-shrink: 0;
+  }
+  .step.done .step-icon { background: var(--emerald-bg); color: var(--emerald); }
+  .step.current .step-icon {
+    background: var(--indigo-bg); color: var(--indigo);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .step.pending { color: var(--text-subtle); }
+  .step.pending .step-icon {
+    background: var(--surface-alt); color: var(--text-subtle);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .step-meta { font-size: 11px; color: var(--text-subtle); margin-left: auto; }
+
+  /* ──── Completeness gauge ──── */
+  .gauge {
+    position: relative;
+    width: 140px; height: 140px;
+    flex-shrink: 0;
+  }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge .pct {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .gauge .pct-num {
+    font-family: 'Lora', 'Iowan Old Style', 'Apple Garamond', Georgia, serif;
+    font-weight: 500;
+    font-size: 36px; letter-spacing: -0.025em;
+    color: var(--text); line-height: 1;
+  }
+  .gauge .pct-sign {
+    font-size: 18px; font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 1px;
+  }
+  .gauge .pct-sub {
+    font-size: 9px; color: var(--text-subtle);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-top: 4px; font-weight: 500;
+  }
+
+  /* Completeness chips */
+  .compl-row {
+    display: flex; flex-wrap: wrap; gap: 5px;
+  }
+  .compl-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 5px;
+    font-size: 11px; font-weight: 500;
+  }
+  .compl-chip-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+  .compl-chip.filled { background: var(--emerald-bg); color: var(--emerald); }
+  .compl-chip.filled .compl-chip-dot { background: var(--emerald); }
+  .compl-chip.inherited { background: var(--violet-bg); color: var(--violet); }
+  .compl-chip.inherited .compl-chip-dot { background: var(--violet); }
+  .compl-chip.empty {
+    background: transparent; color: var(--text-subtle);
+    border: 1px dashed var(--border);
+  }
+  .compl-chip.empty .compl-chip-dot { background: var(--text-subtle); }
 </style>
 </head>
 <body>
@@ -1421,115 +1598,186 @@
         <div class="tab">Projects</div>
       </div>
 
+      <!-- Subnav: 13 peer items, left-aligned to the main tabstrip -->
+      <div class="subnav">
+        <div class="subnav-item active">Overview</div>
+        <div class="subnav-item">Voice signature</div>
+        <div class="subnav-item">Identity</div>
+        <div class="subnav-item">Brand story</div>
+        <div class="subnav-item">Brand terms</div>
+        <div class="subnav-item">Personas</div>
+        <div class="subnav-item">Offerings</div>
+        <div class="subnav-item">Proof</div>
+        <div class="subnav-item">Goals</div>
+        <div class="subnav-item">Future audience</div>
+        <div class="subnav-item">Positioning</div>
+        <div class="subnav-item">Site structure</div>
+        <div class="subnav-item">Competitors</div>
+      </div>
+
       <div class="page" style="max-width: 880px; margin: 0 auto;">
-        <div class="inherit-banner">
-          <span>⟜</span>
-          <span>Inheriting <strong>7 sections</strong> from <strong>Kitchen Guard Corporate</strong>. Edit any to override locally.</span>
-          <span style="margin-left: auto; font-size: 11px; cursor: pointer; text-decoration: underline;">View inherited</span>
-        </div>
 
-        <div class="dna-section">
-          <div class="dna-h-flex">
-            <h4>Identity</h4>
-            <div class="h-meta meta-right">
-              <span class="src">gpt-4o</span> · conf 0.91 · edited
+        <!-- ── 1. Brand DNA Assistant ── -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-h">
+            <h3>Brand DNA Assistant</h3>
+            <span class="src">Claude · primed with this property's voice, personas, goals</span>
+          </div>
+          <div class="card-b">
+            <div class="chat">
+
+              <div class="chat-msg assistant">
+                <div class="chat-avatar assistant">✦</div>
+                <div class="chat-bubble assistant">
+                  Hey — I've got buscharter's brand DNA loaded (voice, 3 personas, current goals, and the 13-competitor set). Ask me to draft, critique, compare, or fill gaps.
+                </div>
+              </div>
+
+              <div class="chat-msg user">
+                <div class="chat-avatar user">PS</div>
+                <div class="chat-bubble user">
+                  Draft 3 Meta ad headlines for Brisbane airport transfers in our voice
+                </div>
+              </div>
+
+              <div class="chat-msg assistant">
+                <div class="chat-avatar assistant">✦</div>
+                <div class="chat-bubble assistant">
+                  Brisbane airport transfers is a growth segment for buscharter — and your voice is no-nonsense, trade-fluent, allergic to "premium." Three drafts:
+                  <ol style="margin: 8px 0 4px 18px; padding: 0;">
+                    <li>Brisbane Airport to anywhere. Same crew, no surprises.</li>
+                    <li>15–55 seats. On time to Brisbane Airport, every time.</li>
+                    <li>Charter buses for Brisbane Airport. We've been doing this since 1995.</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="chat-msg user">
+                <div class="chat-avatar user">PS</div>
+                <div class="chat-bubble user">
+                  Where do we beat bankstownbushire?
+                </div>
+              </div>
+
+              <div class="chat-msg assistant">
+                <div class="chat-avatar assistant">✦</div>
+                <div class="typing">
+                  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="chat-input">
+              <input type="text" placeholder="Ask anything about buscharter's brand…">
+              <button class="btn btn-primary">Send</button>
             </div>
           </div>
-          <div class="dna-field">
-            <div class="k">Brand name</div>
-            <div class="v">Kitchen Services of Provo (a Kitchen Guard franchise)</div>
-          </div>
-          <div class="dna-field">
-            <div class="k">Category</div>
-            <div class="v">Commercial kitchen exhaust cleaning</div>
-          </div>
-          <div class="dna-field">
-            <div class="k">Location</div>
-            <div class="v">Provo, UT (Utah County + surrounding)</div>
-          </div>
-          <div class="dna-field">
-            <div class="k">Founded</div>
-            <div class="v">2024 (franchise founding date)</div>
-          </div>
         </div>
 
-        <div class="dna-section">
-          <div class="dna-h-flex">
-            <h4>Voice & tone</h4>
-            <div class="h-meta meta-right" style="color: var(--violet);">⟜ inherited from Kitchen Guard</div>
+        <!-- ── 2. Research & Fill ── -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-h">
+            <h3>Research &amp; Fill</h3>
+            <span class="src">in progress · started 8 min ago</span>
           </div>
-          <div class="dna-field">
-            <div class="k">Traits</div>
-            <div class="dna-chips">
-              <span class="dna-chip">no-nonsense</span>
-              <span class="dna-chip">code-compliant</span>
-              <span class="dna-chip">safety-first</span>
-              <span class="dna-chip">trade-fluent</span>
+          <div class="card-b">
+            <p style="font-size: 13px; line-height: 1.7; color: var(--text-muted); margin: 0 0 8px;">
+              Run the full Brand DNA pipeline. We'll crawl the site, research the competitive landscape, draft personas from your offerings, and fill the 12 sections in your voice. Fire and forget — navigate away, we'll surface results in <strong style="color: var(--text);">Signals</strong> as each step completes.
+            </p>
+
+            <div class="progress"><div class="progress-fill"></div></div>
+
+            <div class="steps">
+              <div class="step done">
+                <span class="step-icon">✓</span>
+                <span>Crawling site</span>
+                <span class="step-meta">1,096 pages indexed · 2:14</span>
+              </div>
+              <div class="step done">
+                <span class="step-icon">✓</span>
+                <span>Researching competitive landscape</span>
+                <span class="step-meta">13 competitors profiled · 3:08</span>
+              </div>
+              <div class="step current">
+                <span class="step-icon">⋯</span>
+                <span>Drafting personas</span>
+                <span class="step-meta">in progress…</span>
+              </div>
+              <div class="step pending">
+                <span class="step-icon">·</span>
+                <span>Filling sections</span>
+                <span class="step-meta">queued</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 16px; display: flex; gap: 8px;">
+              <button class="btn">Pause</button>
+              <button class="btn">Cancel</button>
+              <button class="btn" style="margin-left: auto;">Run again →</button>
             </div>
           </div>
-          <div class="dna-field">
-            <div class="k">Avoid</div>
-            <div class="dna-chips">
-              <span class="dna-chip">fluffy marketing speak</span>
-              <span class="dna-chip">"premium"</span>
-              <span class="dna-chip">"luxury"</span>
+        </div>
+
+        <!-- ── 3. Brand DNA Completeness ── -->
+        <div class="card">
+          <div class="card-h">
+            <h3>Brand DNA Completeness</h3>
+            <span class="src">last updated 12 min ago</span>
+          </div>
+          <div class="card-b">
+            <div style="display: flex; gap: 32px; align-items: center;">
+
+              <div class="gauge">
+                <svg width="140" height="140" viewBox="0 0 140 140">
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="#f0f0f2" stroke-width="10"/>
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="#18181b" stroke-width="10"
+                          stroke-dasharray="377" stroke-dashoffset="64" stroke-linecap="round"/>
+                </svg>
+                <div class="pct">
+                  <div class="pct-num">83<span class="pct-sign">%</span></div>
+                  <div class="pct-sub">10 of 12</div>
+                </div>
+              </div>
+
+              <div style="flex: 1;">
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px; display: flex; gap: 16px;">
+                  <span><span style="display: inline-block; width: 8px; height: 8px; background: var(--emerald); border-radius: 50%; vertical-align: 1px; margin-right: 5px;"></span>Filled locally</span>
+                  <span><span style="display: inline-block; width: 8px; height: 8px; background: var(--violet); border-radius: 50%; vertical-align: 1px; margin-right: 5px;"></span>Inherited from KG Corporate</span>
+                  <span><span style="display: inline-block; width: 8px; height: 8px; background: transparent; border: 1px dashed var(--border-strong); border-radius: 50%; vertical-align: 1px; margin-right: 5px;"></span>Empty</span>
+                </div>
+
+                <div class="compl-row">
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Voice signature</span>
+                  <span class="compl-chip filled"><span class="compl-chip-dot"></span>Identity</span>
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Brand story</span>
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Brand terms</span>
+                  <span class="compl-chip filled"><span class="compl-chip-dot"></span>Personas</span>
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Offerings</span>
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Proof</span>
+                  <span class="compl-chip empty"><span class="compl-chip-dot"></span>Goals</span>
+                  <span class="compl-chip empty"><span class="compl-chip-dot"></span>Future audience</span>
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Positioning</span>
+                  <span class="compl-chip inherited"><span class="compl-chip-dot"></span>Site structure</span>
+                  <span class="compl-chip filled"><span class="compl-chip-dot"></span>Competitors</span>
+                </div>
+
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 14px;">
+                  Next up: <strong style="color: var(--text);">Goals</strong> and <strong style="color: var(--text);">Future audience</strong>. The Brand DNA Assistant can draft both from the existing context if you want to fast-start.
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="dna-section">
-          <div class="dna-h-flex">
-            <h4>Personas</h4>
-            <div class="h-meta meta-right">
-              <span class="src">gpt-4o</span> · conf 0.83 · edited locally
-            </div>
-          </div>
-          <div class="dna-field">
-            <div class="k">Primary: Restaurant GM (Brian, 42)</div>
-            <div class="v">Manages 2–4 location restaurant group in Utah County. Cares about compliance, downtime minimization, and being able to text the cleaner directly when something's off. Hates corporate vendors that send him to a portal.</div>
-          </div>
-          <div class="dna-field">
-            <div class="k">Secondary: Multi-unit franchise ops (Megan, 38)</div>
-            <div class="v">Oversees kitchen vendor relationships across 8 quick-service restaurants statewide. Wants standardized service, monthly reporting, predictable billing.</div>
-          </div>
-        </div>
-
-        <div class="dna-section">
-          <div class="dna-h-flex">
-            <h4>Competitors</h4>
-            <div class="h-meta meta-right">BQ Meta · read-only · 4 competitors</div>
-          </div>
-          <table class="tbl" style="margin-top: 8px;">
-            <thead><tr><th>Domain</th><th>Notes</th></tr></thead>
-            <tbody>
-              <tr><td class="mono">hoodclean.com</td><td class="sec">national chain · franchise-owned</td></tr>
-              <tr><td class="mono">utahkitchenclean.com</td><td class="sec">local independent</td></tr>
-              <tr><td class="mono">mountainstateshood.com</td><td class="sec">regional · 4 states</td></tr>
-              <tr><td class="mono">crystalcleankitchen.com</td><td class="sec">SLC-based</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="dna-section" style="background: var(--surface-alt); border-style: dashed;">
-          <div class="dna-h-flex">
-            <h4 style="color: var(--text-muted);">Proof <span class="h-meta">⟜ inherited from Kitchen Guard</span></h4>
-            <div class="h-meta meta-right" style="font-size: 11px; cursor: pointer;">Override locally →</div>
-          </div>
-          <div class="dna-field" style="opacity: 0.7;">
-            <div class="k">Case studies</div>
-            <div class="v">12 multi-location restaurant groups under contract for 2+ years.</div>
-          </div>
-          <div class="dna-field" style="opacity: 0.7;">
-            <div class="k">Certifications</div>
-            <div class="v">IKECA-certified · NFPA 96 compliant · insured to $5M.</div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
 
   <p class="rationale">
-    <strong>What's new:</strong> a sustained-width content column (880px) makes the Brand DNA actually feel like a brand document, not a settings panel. Each section header has clear <strong>source attribution</strong> (gpt-4o · conf 0.91 · edited) so it's obvious what's machine-generated vs. human-touched. The <strong>inheritance banner</strong> at the top tells the user "you inherit 7 sections from KG Corporate" — and inherited sections render with a dashed border and muted appearance, with an explicit "Override locally" affordance. Competitors render inline as a real Brand DNA section, BQ-sourced.
+    <strong>What's new:</strong> Brand DNA gets a <strong>13-item subnav</strong> below the main tabstrip — peer items, no icons, no counts, ordered by editing journey (Overview · Voice signature → Identity → Brand story · Brand terms · Personas → Offerings → Proof · Goals → Future audience · Positioning → Site structure → Competitors). The active item gets an elevated white pill; everything else stays muted text.
+    <br><br>
+    <strong>Overview</strong> is the strategist's first move when opening Brand DNA. Three full-width cards stacked: <strong>Assistant</strong> (live Claude primed with this property's voice + personas + goals; monogram bubbles for the user, sparkle + soft violet bubbles for the assistant, typing indicator while thinking), <strong>Research &amp; Fill</strong> (descriptive copy + animated sweeping progress bar + 4-step status list with checkmarks for done / pulsing dots for current / muted for pending — fire-and-forget pipeline), and <strong>Completeness</strong> (circular gauge with serif % in the middle and the 12-section status checklist as colored chips — green for filled locally, violet for inherited, dashed-outline for empty — plus a "next up" recommendation).
   </p>
 </section>
 
