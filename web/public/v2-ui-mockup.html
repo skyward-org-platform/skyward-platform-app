@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1340">
+<title>Skyward Platform — v2 UI/UX</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --surface: #ffffff;
+    --surface-alt: #fafafa;
+    --border: #e7e7ea;
+    --border-strong: #d4d4d8;
+    --text: #18181b;
+    --text-muted: #71717a;
+    --text-subtle: #a1a1aa;
+    --accent: #18181b;
+    --accent-hover: #3f3f46;
+    --emerald: #059669;
+    --emerald-bg: #ecfdf5;
+    --amber: #d97706;
+    --amber-bg: #fffbeb;
+    --rose: #dc2626;
+    --rose-bg: #fef2f2;
+    --sky: #0284c7;
+    --sky-bg: #f0f9ff;
+    --indigo: #4f46e5;
+    --indigo-bg: #eef2ff;
+    --violet: #7c3aed;
+    --violet-bg: #f5f3ff;
+    --slate: #64748b;
+    --slate-bg: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -0.011em;
+  }
+
+  /* ──── Doc shell ──── */
+  .doc-header {
+    background: linear-gradient(180deg, #0a0a0b 0%, #18181b 100%);
+    color: #fafafa;
+    padding: 48px 56px 32px;
+    margin-bottom: 48px;
+  }
+  .doc-header h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.025em; }
+  .doc-header p { color: #a1a1aa; margin: 0; font-size: 14px; max-width: 760px; line-height: 1.6; }
+  .doc-nav {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .doc-nav a {
+    color: #a1a1aa;
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .doc-nav a:hover { background: #27272a; color: #fafafa; }
+
+  .doc-section { padding: 0 56px 80px; }
+  .screen-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-subtle);
+    margin-bottom: 8px; font-weight: 600;
+  }
+  .screen-title {
+    font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 4px;
+  }
+  .screen-desc { color: var(--text-muted); margin: 0 0 20px; font-size: 14px; max-width: 760px; line-height: 1.6; }
+  .rationale {
+    background: var(--surface);
+    border-left: 3px solid var(--indigo);
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    border-radius: 4px;
+  }
+  .rationale strong { color: var(--text); font-weight: 600; }
+
+  /* ──── App frame (the actual mockup) ──── */
+  .app {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 248px 1fr;
+    min-height: 760px;
+    box-shadow: 0 8px 32px -16px rgba(0,0,0,0.12);
+  }
+
+  /* ──── Sidebar ──── */
+  .sb {
+    background: #fafafa;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    min-height: 760px;
+  }
+  .sb-brand {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sb-logo {
+    width: 28px; height: 28px;
+    background: #18181b;
+    color: white;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .sb-name { font-weight: 600; font-size: 14px; }
+  .sb-ver { color: var(--text-subtle); font-size: 10px; letter-spacing: 0.02em; }
+
+  .sb-search {
+    margin: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    color: var(--text-subtle);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sb-search .kbd {
+    margin-left: auto;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+  }
+
+  .sb-group { padding: 4px 8px; }
+  .sb-heading {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-subtle);
+    padding: 12px 8px 6px;
+    font-weight: 600;
+  }
+  .sb-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .sb-item:hover { background: #f0f0f2; }
+  .sb-item.active { background: #18181b; color: white; }
+  .sb-item.active .sb-icon { color: white; }
+  .sb-icon { width: 14px; color: var(--text-muted); display: inline-flex; }
+  .sb-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sb-client {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 8px 10px 4px;
+    font-weight: 500;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sb-client-chevron { color: var(--text-subtle); font-size: 9px; }
+  .sb-property {
+    display: flex; align-items: center;
+    padding: 5px 10px 5px 22px;
+    font-size: 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .sb-property:hover { background: #f0f0f2; }
+  .sb-property.active { background: #f0f0f2; font-weight: 500; }
+  .sb-property .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    margin-right: 8px;
+  }
+  .sb-property .dot.active { background: var(--emerald); }
+  .sb-property .dot.prospect { background: var(--sky); }
+  .sb-property .dot.inactive { background: var(--text-subtle); }
+  .sb-property .phase {
+    margin-left: auto;
+    font-size: 9px;
+    color: var(--text-subtle);
+    font-variant-numeric: tabular-nums;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+
+  .sb-foot {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px;
+  }
+  .sb-avatar {
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, #4f46e5, #ec4899);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 11px;
+  }
+  .sb-user-meta { font-size: 10px; color: var(--text-muted); }
+
+  /* ──── Main content ──── */
+  .main {
+    display: flex; flex-direction: column;
+    min-width: 0;
+  }
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+    background: var(--surface);
+  }
+  .crumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text-muted);
+  }
+  .crumb a { color: var(--text-muted); text-decoration: none; }
+  .crumb a:hover { color: var(--text); }
+  .crumb .sep { color: var(--text-subtle); }
+  .crumb .here { color: var(--text); font-weight: 500; }
+  .topbar-spacer { flex: 1; }
+  .topbar-action {
+    font-size: 12px; color: var(--text-muted);
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .topbar-action:hover { background: var(--bg); }
+
+  .page { padding: 28px 32px; overflow: auto; }
+  .page-header {
+    display: flex; align-items: flex-start; gap: 16px;
+    margin-bottom: 28px;
+  }
+  .page-header h2 {
+    font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .page-header p { color: var(--text-muted); font-size: 13px; margin: 4px 0 0; }
+  .page-actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12px; font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn:hover { background: var(--bg); border-color: var(--border-strong); }
+  .btn-primary {
+    background: #18181b; border-color: #18181b; color: white;
+  }
+  .btn-primary:hover { background: #3f3f46; }
+
+  /* ──── Status pills ──── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .pill .pill-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+  .pill-active   { background: var(--emerald-bg); color: var(--emerald); }
+  .pill-active   .pill-dot { background: var(--emerald); }
+  .pill-prospect { background: var(--sky-bg);     color: var(--sky); }
+  .pill-prospect .pill-dot { background: var(--sky); }
+  .pill-paused   { background: var(--amber-bg);   color: var(--amber); }
+  .pill-paused   .pill-dot { background: var(--amber); }
+  .pill-inactive { background: var(--slate-bg);   color: var(--slate); }
+  .pill-inactive .pill-dot { background: var(--slate); }
+  .pill-completed { background: var(--indigo-bg); color: var(--indigo); }
+  .pill-completed .pill-dot { background: var(--indigo); }
+
+  /* ──── Action pills (page triage) ──── */
+  .action {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .action-optimize    { background: var(--sky-bg);    color: var(--sky); }
+  .action-restore     { background: var(--emerald-bg); color: var(--emerald); }
+  .action-redirect    { background: var(--amber-bg);  color: var(--amber); }
+  .action-consolidate { background: var(--violet-bg); color: var(--violet); }
+  .action-remove      { background: var(--rose-bg);   color: var(--rose); }
+  .action-keep        { background: var(--slate-bg);  color: var(--slate); }
+  .action-undecided   { background: #f4f4f5; color: #71717a; }
+
+  /* ──── Cards ──── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-h {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+  }
+  .card-h h3 { margin: 0; font-size: 13px; font-weight: 600; }
+  .card-h .src { margin-left: auto; font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.05em; }
+  .card-b { padding: 18px; }
+
+  /* ──── Stat tile ──── */
+  .stat-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat-tile .lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+  .stat-tile .num { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat-tile .sub { font-size: 11px; color: var(--text-subtle); margin-top: 2px; }
+  .stat-trend { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; margin-left: 6px; }
+  .stat-up { color: var(--emerald); }
+  .stat-down { color: var(--rose); }
+
+  /* ──── Property/client card on a grid ──── */
+  .prop-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .prop-card:hover { border-color: var(--border-strong); box-shadow: 0 2px 8px -2px rgba(0,0,0,0.04); }
+  .prop-card .name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+  .prop-card .domain { font-size: 12px; color: var(--text-muted); margin-top: 1px; font-family: ui-monospace, monospace; }
+  .prop-card .meta-row { display: flex; gap: 12px; margin-top: 12px; font-size: 11px; color: var(--text-muted); }
+  .prop-card .meta-row strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ──── Phase progress strip ──── */
+  .phase-strip {
+    display: flex; gap: 3px;
+    margin-top: 10px;
+  }
+  .phase-cell {
+    flex: 1;
+    height: 5px;
+    background: #f0f0f2;
+    border-radius: 1px;
+    position: relative;
+  }
+  .phase-cell.done { background: #18181b; }
+  .phase-cell.current { background: var(--indigo); }
+  .phase-cell-labels {
+    display: flex; gap: 3px;
+    margin-top: 6px;
+    font-size: 9px; color: var(--text-subtle);
+    letter-spacing: 0.04em;
+  }
+  .phase-cell-labels span { flex: 1; text-align: center; }
+
+  /* ──── Big property header ──── */
+  .prop-hero {
+    padding: 32px;
+    background: linear-gradient(180deg, #fafafa 0%, var(--surface) 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .prop-hero .client-line {
+    font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .prop-hero h2 {
+    font-size: 26px; font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .prop-hero .domain {
+    font-family: ui-monospace, 'SF Mono', monospace;
+    font-size: 13px; color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .prop-hero-meta {
+    display: flex; gap: 32px;
+    margin-top: 24px;
+  }
+  .prop-hero-meta .item .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+  .prop-hero-meta .item .val { font-size: 14px; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ──── Tabs ──── */
+  .tabstrip {
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    background: var(--surface);
+    display: flex; gap: 0;
+    align-items: stretch;
+  }
+  .tab {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    margin-bottom: -1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: #18181b;
+    font-weight: 500;
+  }
+  .tab-badge {
+    background: var(--bg); color: var(--text-muted);
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tab.active .tab-badge { background: #18181b; color: white; }
+  .tab-cluster-sep {
+    width: 1px; height: 20px; background: var(--border);
+    margin: auto 8px;
+  }
+
+  /* ──── Tables ──── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl thead { background: var(--surface-alt); }
+  .tbl th {
+    text-align: left; font-weight: 500;
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tbl td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+  .tbl tr:hover td { background: #fafafa; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl td .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text); }
+  .tbl td .sec { font-size: 11px; color: var(--text-subtle); }
+
+  /* ──── Action histogram (Pages tab) ──── */
+  .histo {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .histo-cell {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+    cursor: pointer;
+  }
+  .histo-cell:hover { border-color: var(--border-strong); }
+  .histo-cell.selected { background: #18181b; color: white; border-color: #18181b; }
+  .histo-cell .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
+  .histo-cell.selected .lbl { color: #d4d4d8; }
+  .histo-cell .num { font-size: 22px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+  /* ──── Brand DNA section card ──── */
+  .dna-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+  }
+  .dna-section h4 {
+    margin: 0 0 4px;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: -0.005em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dna-section .h-meta { font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.05em; }
+  .dna-section .h-meta .src { color: var(--violet); font-weight: 600; }
+  .dna-h-flex { display: flex; align-items: center; }
+  .dna-h-flex .meta-right { margin-left: auto; }
+
+  .dna-field { margin-top: 12px; }
+  .dna-field .k { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
+  .dna-field .v { font-size: 13px; line-height: 1.55; }
+  .dna-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .dna-chip {
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 3px 9px; border-radius: 12px;
+    font-size: 11px; color: var(--text);
+  }
+
+  /* ──── Activity feed ──── */
+  .activity-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 12px;
+    font-size: 12px;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-subtle);
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .activity-dot.edit { background: var(--indigo); }
+  .activity-dot.decision { background: var(--sky); }
+  .activity-dot.rank { background: var(--emerald); }
+  .activity-meta { color: var(--text-muted); margin-top: 1px; }
+
+  /* ──── Misc ──── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .grid-stat-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  .grid-stat-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .split-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+
+  .muted { color: var(--text-muted); }
+  .small { font-size: 12px; }
+  .xsmall { font-size: 11px; }
+
+  /* Bars for pages action distribution */
+  .stack-bar {
+    height: 8px; border-radius: 4px; overflow: hidden; display: flex;
+    margin-top: 8px;
+  }
+  .stack-bar > div { height: 100%; }
+
+  /* Sparkline placeholder */
+  .spark { height: 32px; width: 100%; }
+
+  /* Inheritance indicator */
+  .inherit-banner {
+    background: var(--violet-bg);
+    border: 1px dashed #c4b5fd;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #5b21b6;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .icon { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; }
+</style>
+</head>
+<body>
+
+<!-- ───────────────── Header ───────────────── -->
+<div class="doc-header">
+  <h1>Skyward Platform — v2 UI/UX</h1>
+  <p>Independent reimagining of the entire frontend. Mock data only — no backend changes. Eight screens covering the full operational surface area. Visual style is intentional: heavier typographic hierarchy, refined neutral palette with one accent, denser information without feeling cluttered. Inspirations: Linear, Vercel, Stripe.</p>
+  <nav class="doc-nav">
+    <a href="#s1">1 · Dashboard</a>
+    <a href="#s2">2 · Clients list</a>
+    <a href="#s3">3 · Client detail (TNA)</a>
+    <a href="#s4">4 · Property overview</a>
+    <a href="#s5">5 · Brand DNA</a>
+    <a href="#s6">6 · Pages triage</a>
+    <a href="#s7">7 · Projects</a>
+    <a href="#s8">8 · Keywords (future)</a>
+    <a href="#change">Change log</a>
+  </nav>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 1 · Workspace Dashboard                                          -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s1">
+  <div class="screen-label">Screen 1</div>
+  <h2 class="screen-title">Workspace Dashboard</h2>
+  <p class="screen-desc">Replaces today's "Welcome." Surfaces the things a strategist needs to see when they open the app: who's active, what's progressing, what needs attention.</p>
+
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sb">
+      <div class="sb-brand">
+        <div class="sb-logo">S</div>
+        <div>
+          <div class="sb-name">Skyward Platform</div>
+          <div class="sb-ver">v2 prototype</div>
+        </div>
+      </div>
+      <div class="sb-search">
+        <span>🔍</span> Search clients, properties…
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item active"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients <span class="sb-count">16</span></div>
+        <div class="sb-item"><span class="sb-icon">≈</span>Activity</div>
+        <div class="sb-item"><span class="sb-icon">⚡</span>Signals <span class="sb-count">3</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">Phil Lasry <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot active"></span>plasry.com <span class="phase">P3</span></div>
+        <div class="sb-client">TNA <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+        <div class="sb-property"><span class="dot active"></span>minibushire <span class="phase">P1</span></div>
+        <div class="sb-client">Kitchen Services of San Diego <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot active"></span>kssd-sd <span class="phase">P0</span></div>
+        <div class="sb-property"><span class="dot active"></span>kssd-dfw <span class="phase">P0</span></div>
+        <div class="sb-client">Kitchen Guard <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot prospect"></span>kitchenguard.com <span class="phase">P0</span></div>
+        <div class="sb-property"><span class="dot prospect"></span>kg.com/provo <span class="phase">P0</span></div>
+      </div>
+      <div class="sb-foot">
+        <div class="sb-avatar">PS</div>
+        <div>
+          <div>Paul Skirbe</div>
+          <div class="sb-user-meta">Managing Partner</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><span class="here">Dashboard</span></div>
+        <div class="topbar-spacer"></div>
+        <div class="topbar-action">Last 30 days ▾</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Workspace</h2>
+            <p>Good morning, Paul. 8 active engagements, 3 signals worth a look.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Export</button>
+            <button class="btn btn-primary">New brief</button>
+          </div>
+        </div>
+
+        <div class="grid-stat-4">
+          <div class="stat-tile">
+            <div class="lbl">Active clients</div>
+            <div class="num">9 <span class="stat-trend stat-up">↑ 2</span></div>
+            <div class="sub">7 SEO · 1 paid · 1 mixed</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Properties in pipeline</div>
+            <div class="num">12</div>
+            <div class="sub">5 in P3+, 7 in P0–P2</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Pages triaged this month</div>
+            <div class="num">347 <span class="stat-trend stat-up">↑ 89</span></div>
+            <div class="sub">2,156 decisions outstanding</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Brand DNA edits</div>
+            <div class="num">23</div>
+            <div class="sub">17 inferred · 6 hand-edited</div>
+          </div>
+        </div>
+
+        <div class="split-2">
+          <div class="card">
+            <div class="card-h">
+              <h3>Active engagements</h3>
+              <span class="src">8 of 16 clients</span>
+            </div>
+            <div class="card-b" style="padding: 0;">
+              <table class="tbl">
+                <thead>
+                  <tr><th>Client</th><th>Properties</th><th>Pipeline</th><th>Last activity</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Phil Lasry</strong></td>
+                    <td>1</td>
+                    <td>
+                      <div class="phase-strip" style="width: 120px;">
+                        <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+                      </div>
+                    </td>
+                    <td class="sec">42 pages triaged · 2h ago</td>
+                  </tr>
+                  <tr>
+                    <td><strong>TNA</strong><div class="sec">3 properties</div></td>
+                    <td>3</td>
+                    <td>
+                      <div class="phase-strip" style="width: 120px;">
+                        <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+                      </div>
+                    </td>
+                    <td class="sec">tnabushire P3 keyword review · today</td>
+                  </tr>
+                  <tr>
+                    <td><strong>BusBank</strong></td>
+                    <td>1</td>
+                    <td>
+                      <div class="phase-strip" style="width: 120px;">
+                        <div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+                      </div>
+                    </td>
+                    <td class="sec">technical audit kickoff · yesterday</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Dental Shop</strong></td>
+                    <td>1</td>
+                    <td><span class="pill pill-active"><span class="pill-dot"></span>Paid Media</span></td>
+                    <td class="sec">Meta ad refresh · 3d ago</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Manhattan Eye</strong></td>
+                    <td>1</td>
+                    <td>
+                      <div class="phase-strip" style="width: 120px;">
+                        <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+                      </div>
+                    </td>
+                    <td class="sec">technical SEO in progress · 1d ago</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-h">
+                <h3>Signals</h3>
+                <span class="src">Need attention</span>
+              </div>
+              <div class="card-b">
+                <div class="activity-item">
+                  <div class="activity-dot rank"></div>
+                  <div>
+                    <div>buscharter "brisbane airport bus transfers" → #11</div>
+                    <div class="activity-meta">Was #15 last week. SV 1,300/mo. Worth a brief.</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot decision"></div>
+                  <div>
+                    <div>tnabushire — 19 pages awaiting triage decision</div>
+                    <div class="activity-meta">From 2026-04-30 v2 audit refresh.</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div>Phil Lasry Brand DNA — Voice & Tone overridden</div>
+                    <div class="activity-meta">Paul changed inferred output. Approved.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-h">
+                <h3>Recent activity</h3>
+              </div>
+              <div class="card-b">
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>Brand DNA: <strong>buscharter</strong> · voice_tone edited<div class="activity-meta">12 min ago by Paul</div></div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot decision"></div>
+                  <div>23 pages on <strong>tnabushire</strong> marked Optimize<div class="activity-meta">2h ago by Paul</div></div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>Project added: <strong>Kitchen Guard</strong> · seo<div class="activity-meta">yesterday by Adam</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> three big-number stats anchor the page (active clients · properties · pages triaged · brand DNA edits). The <strong>active engagements</strong> table shows where every client sits on the 7-phase pipeline as a visual strip. <strong>Signals</strong> finally has data — pulled from ranking deltas, stale audits, and Brand DNA changes that need approval. The two-column lower split keeps "what's active" wide and supplementary feeds narrow.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 2 · Clients list                                                  -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s2">
+  <div class="screen-label">Screen 2</div>
+  <h2 class="screen-title">Clients</h2>
+  <p class="screen-desc">From plain table to scannable engagement-aware list. Same data, more context.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search clients, properties… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item active"><span class="sb-icon">◉</span>Clients <span class="sb-count">16</span></div>
+        <div class="sb-item"><span class="sb-icon">≈</span>Activity</div>
+        <div class="sb-item"><span class="sb-icon">⚡</span>Signals <span class="sb-count">3</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">Phil Lasry</div>
+        <div class="sb-property"><span class="dot active"></span>plasry.com <span class="phase">P3</span></div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+        <div class="sb-property"><span class="dot active"></span>minibushire <span class="phase">P1</span></div>
+        <div class="sb-client">Dental Shop</div>
+        <div class="sb-property"><span class="dot active"></span>thedentalshop.com</div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>Workspace</a> <span class="sep">/</span> <span class="here">Clients</span></div>
+        <div class="topbar-spacer"></div>
+        <div class="topbar-action">All statuses ▾</div>
+        <div class="topbar-action">All channels ▾</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Clients</h2>
+            <p>16 clients · sourced from BigQuery Meta · edits live in the admin portal.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">↗ Open admin portal</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-b" style="padding: 0;">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Abbr</th>
+                  <th>Properties</th>
+                  <th>Active channels</th>
+                  <th>Pipeline coverage</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Phil Lasry</strong><div class="sec">Phil Lasry LLC</div></td>
+                  <td class="sec">PL</td>
+                  <td><strong>1</strong></td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>SEO</span></td>
+                  <td>
+                    <div class="stack-bar" style="width: 140px;">
+                      <div style="background: #18181b; width: 50%"></div>
+                      <div style="background: var(--indigo); width: 14%"></div>
+                      <div style="background: #f0f0f2; width: 36%"></div>
+                    </div>
+                    <div class="xsmall muted" style="margin-top: 4px;">3 of 7 phases · P3 active</div>
+                  </td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td>
+                </tr>
+                <tr>
+                  <td><strong>TNA</strong><div class="sec">TNA Pty Ltd</div></td>
+                  <td class="sec">TNA</td>
+                  <td><strong>3</strong> <span class="sec">portfolio</span></td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>SEO ×3</span></td>
+                  <td>
+                    <div class="stack-bar" style="width: 140px;">
+                      <div style="background: #18181b; width: 38%"></div>
+                      <div style="background: var(--indigo); width: 14%"></div>
+                      <div style="background: #f0f0f2; width: 48%"></div>
+                    </div>
+                    <div class="xsmall muted" style="margin-top: 4px;">avg P2 · range P1–P3</div>
+                  </td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Global Charter Services</strong></td>
+                  <td class="sec">GCS</td>
+                  <td><strong>5</strong></td>
+                  <td>
+                    <span class="pill pill-active"><span class="pill-dot"></span>SEO</span>
+                    <span class="pill pill-active" style="margin-left: 4px;"><span class="pill-dot"></span>Paid Search</span>
+                  </td>
+                  <td>
+                    <div class="stack-bar" style="width: 140px;">
+                      <div style="background: #18181b; width: 28%"></div>
+                      <div style="background: var(--indigo); width: 14%"></div>
+                      <div style="background: #f0f0f2; width: 58%"></div>
+                    </div>
+                    <div class="xsmall muted" style="margin-top: 4px;">P1 active</div>
+                  </td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Dental Shop</strong></td>
+                  <td class="sec">DS</td>
+                  <td><strong>1</strong></td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>Paid Social</span></td>
+                  <td><div class="xsmall muted">No SEO project</div></td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Kitchen Services of San Diego</strong></td>
+                  <td class="sec">KSSD</td>
+                  <td><strong>2</strong></td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>SEO</span></td>
+                  <td>
+                    <div class="stack-bar" style="width: 140px;">
+                      <div style="background: var(--indigo); width: 14%"></div>
+                      <div style="background: #f0f0f2; width: 86%"></div>
+                    </div>
+                    <div class="xsmall muted" style="margin-top: 4px;">P0 onboarding</div>
+                  </td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td>
+                </tr>
+                <tr style="background: #fafafa;">
+                  <td><strong>Kitchen Guard</strong> <span class="sec">corporate</span></td>
+                  <td class="sec">KG</td>
+                  <td><strong>1</strong></td>
+                  <td class="sec">—</td>
+                  <td class="sec">Not yet engaged</td>
+                  <td><span class="pill pill-prospect"><span class="pill-dot"></span>Prospect</span></td>
+                </tr>
+                <tr style="background: #fafafa;">
+                  <td><strong>Kitchen Services of Provo</strong><div class="sec">Tacoma Legacy Partners, LLC</div></td>
+                  <td class="sec">—</td>
+                  <td><strong>1</strong> <span class="sec">on kg.com/provo</span></td>
+                  <td class="sec">Considering paid search</td>
+                  <td class="sec">Not yet engaged</td>
+                  <td><span class="pill pill-prospect"><span class="pill-dot"></span>Prospect</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> the "Active channels" column shows which project types are live (SEO / Paid Search / Paid Social), so you can see at-a-glance which clients are multi-channel. The <strong>Pipeline coverage</strong> column visualizes how far through the 7-phase pipeline each client is via a small stacked bar. Prospects get a muted row treatment so they're clearly distinct from active. Filter dropdowns in the topbar replace today's lack of filtering.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 3 · Client detail (TNA portfolio)                                  -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s3">
+  <div class="screen-label">Screen 3</div>
+  <h2 class="screen-title">Client detail — multi-property portfolio</h2>
+  <p class="screen-desc">TNA as the test case. Today's client page is three stacked tables. v2 makes the portfolio visible as a thing — properties as cards, not rows.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search clients, properties… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients <span class="sb-count">16</span></div>
+        <div class="sb-item"><span class="sb-icon">≈</span>Activity</div>
+        <div class="sb-item"><span class="sb-icon">⚡</span>Signals <span class="sb-count">3</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">Phil Lasry</div>
+        <div class="sb-property"><span class="dot active"></span>plasry.com <span class="phase">P3</span></div>
+        <div class="sb-client" style="color: var(--text); font-weight: 600;">TNA <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+        <div class="sb-property"><span class="dot active"></span>minibushire <span class="phase">P1</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>Workspace</a> <span class="sep">/</span> <a>Clients</a> <span class="sep">/</span> <span class="here">TNA</span></div>
+        <div class="topbar-spacer"></div>
+        <div class="topbar-action">↗ Open in admin portal</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <div class="muted xsmall" style="margin-bottom: 4px;">CLIENT</div>
+            <h2>TNA <span class="pill pill-active" style="vertical-align: middle; margin-left: 8px;"><span class="pill-dot"></span>Active</span></h2>
+            <p>TNA Pty Ltd · Primary contact: Wade · SOW v2 active since 2026-03-30</p>
+          </div>
+        </div>
+
+        <div class="grid-stat-5">
+          <div class="stat-tile">
+            <div class="lbl">Properties</div>
+            <div class="num">3</div>
+            <div class="sub">all active</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Pages in scope</div>
+            <div class="num">1,903</div>
+            <div class="sub">426 optimize · 1,477 other</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Avg pipeline</div>
+            <div class="num">P2</div>
+            <div class="sub">P1–P3 range</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Active projects</div>
+            <div class="num">3</div>
+            <div class="sub">all SEO</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Competitors tracked</div>
+            <div class="num">13</div>
+            <div class="sub">shared across portfolio</div>
+          </div>
+        </div>
+
+        <h3 style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 8px 0 12px;">Properties</h3>
+        <div class="grid-3">
+          <div class="prop-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <div class="name">BusCharter</div>
+                <div class="domain">buscharter.com.au</div>
+              </div>
+              <span class="pill pill-active"><span class="pill-dot"></span>Active</span>
+            </div>
+            <div class="phase-strip" style="margin-top: 14px;">
+              <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+            </div>
+            <div class="phase-cell-labels">
+              <span>P0</span><span>P1</span><span>P2</span><span>P3</span><span>P4</span><span>P5</span><span>P6</span>
+            </div>
+            <div class="meta-row">
+              <div><strong>1,096</strong> pages</div>
+              <div><strong>334</strong> optimize</div>
+              <div><strong>3</strong> projects</div>
+            </div>
+          </div>
+          <div class="prop-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <div class="name">TNA Bus Hire</div>
+                <div class="domain">tnabushire.com.au</div>
+              </div>
+              <span class="pill pill-active"><span class="pill-dot"></span>Active</span>
+            </div>
+            <div class="phase-strip" style="margin-top: 14px;">
+              <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+            </div>
+            <div class="phase-cell-labels">
+              <span>P0</span><span>P1</span><span>P2</span><span>P3</span><span>P4</span><span>P5</span><span>P6</span>
+            </div>
+            <div class="meta-row">
+              <div><strong>608</strong> pages</div>
+              <div><strong>71</strong> optimize</div>
+              <div><strong>1</strong> project</div>
+            </div>
+          </div>
+          <div class="prop-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <div class="name">Mini Bus Hire AU</div>
+                <div class="domain">minibushire.com.au</div>
+              </div>
+              <span class="pill pill-active"><span class="pill-dot"></span>Active</span>
+            </div>
+            <div class="phase-strip" style="margin-top: 14px;">
+              <div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+            </div>
+            <div class="phase-cell-labels">
+              <span>P0</span><span>P1</span><span>P2</span><span>P3</span><span>P4</span><span>P5</span><span>P6</span>
+            </div>
+            <div class="meta-row">
+              <div><strong>199</strong> pages</div>
+              <div><strong>21</strong> optimize</div>
+              <div><strong>1</strong> project</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 32px;" class="split-2">
+          <div class="card">
+            <div class="card-h">
+              <h3>Owned domains</h3>
+              <span class="src">BQ Meta</span>
+            </div>
+            <div class="card-b" style="padding: 0;">
+              <table class="tbl">
+                <thead><tr><th>Domain</th><th>Priority</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">buscharter.com.au</td><td class="sec">HIGH</td><td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td></tr>
+                  <tr><td class="mono">tnabushire.com.au</td><td class="sec">HIGH</td><td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td></tr>
+                  <tr><td class="mono">minibushire.com.au</td><td class="sec">NORMAL</td><td><span class="pill pill-active"><span class="pill-dot"></span>Active</span></td></tr>
+                  <tr><td class="mono">tna.com.au</td><td class="sec">LOW</td><td><span class="pill pill-inactive"><span class="pill-dot"></span>Parked</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-h">
+                <h3>Active projects</h3>
+                <span class="src">BQ Meta</span>
+              </div>
+              <div class="card-b">
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div><strong>SEO · BusCharter</strong> · phase 2</div>
+                    <div class="activity-meta">Started 2026-04-27 by Adam</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div><strong>SEO · TNA Bus Hire</strong> · phase 3</div>
+                    <div class="activity-meta">Started 2026-04-27</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div><strong>SEO · Mini Bus Hire AU</strong> · phase 1</div>
+                    <div class="activity-meta">Started 2026-04-30</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-h"><h3>Related clients</h3></div>
+              <div class="card-b">
+                <div class="sec">No affinity recorded.</div>
+                <div class="xsmall muted" style="margin-top: 8px;">Franchisor↔franchisee and similar relationships appear here when set.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> the portfolio finally <em>looks</em> like a portfolio. Five top-line stats summarize the engagement at a glance (3 properties, 1,903 pages, P2 avg, 3 projects, 13 competitors). Properties become <strong>cards</strong> with their own pipeline strip — visually obvious which is leading (TNA Bus Hire P3) vs. lagging (Mini Bus Hire P1). The Owned-domains and Active-projects tables stay; competitor section is gone (moved to property level per the framework). A placeholder for related clients sits where it'll matter for Kitchen Guard later.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 4 · Property overview                                              -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s4">
+  <div class="screen-label">Screen 4</div>
+  <h2 class="screen-title">Property overview <span class="muted xsmall" style="margin-left: 6px; font-weight: 400;">NEW default route</span></h2>
+  <p class="screen-desc">Today, <code>/properties/[slug]</code> lands on Brand DNA. v2 lands on a real overview — the story of this property in one screen.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search clients, properties… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+        <div class="sb-item"><span class="sb-icon">≈</span>Activity</div>
+        <div class="sb-item"><span class="sb-icon">⚡</span>Signals <span class="sb-count">3</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property active"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+        <div class="sb-property"><span class="dot active"></span>minibushire <span class="phase">P1</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>Workspace</a> <span class="sep">/</span> <a>TNA</a> <span class="sep">/</span> <span class="here">BusCharter</span></div>
+        <div class="topbar-spacer"></div>
+        <div class="topbar-action">⌃P phase</div>
+        <div class="topbar-action">Share ↗</div>
+      </div>
+
+      <div class="prop-hero">
+        <div class="client-line">TNA · TNA Pty Ltd</div>
+        <h2>BusCharter <span class="pill pill-active"><span class="pill-dot"></span>Active</span></h2>
+        <div class="domain">buscharter.com.au</div>
+
+        <div style="display: flex; gap: 48px; align-items: flex-end; margin-top: 24px;">
+          <div style="flex: 1; max-width: 480px;">
+            <div class="xsmall muted" style="margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Pipeline · phase 2 (technical SEO)</div>
+            <div class="phase-strip">
+              <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+            </div>
+            <div class="phase-cell-labels">
+              <span>Onboard</span><span>WQA</span><span>Tech SEO</span><span>Keywords</span><span>Content</span><span>Authority</span><span>Tracking</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 32px;">
+            <div class="item">
+              <div class="lbl xsmall muted" style="text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Pages</div>
+              <div class="val" style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px;">1,096</div>
+            </div>
+            <div class="item">
+              <div class="lbl xsmall muted" style="text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Optimize</div>
+              <div class="val" style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px;">334</div>
+            </div>
+            <div class="item">
+              <div class="lbl xsmall muted" style="text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Brand DNA</div>
+              <div class="val" style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px;">8/12</div>
+            </div>
+            <div class="item">
+              <div class="lbl xsmall muted" style="text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Projects</div>
+              <div class="val" style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px;">3</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabstrip">
+        <div class="tab active">Overview</div>
+        <div class="tab">Brand DNA <span class="tab-badge">8</span></div>
+        <div class="tab">Pages <span class="tab-badge">1,096</span></div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Keywords</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Projects <span class="tab-badge">3</span></div>
+      </div>
+
+      <div class="page">
+        <div class="split-2">
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-h"><h3>Brand snapshot</h3><span class="src">5 of 12 sections</span></div>
+              <div class="card-b">
+                <div class="dna-field">
+                  <div class="k">Identity</div>
+                  <div class="v">Bus charter operator covering Sydney, Brisbane, and major metro Australia. Mid-tier fleet (15–55 seater), B2B-focused, contract and one-off both.</div>
+                </div>
+                <div class="dna-field">
+                  <div class="k">Voice & tone</div>
+                  <div class="dna-chips">
+                    <span class="dna-chip">straightforward</span>
+                    <span class="dna-chip">trustworthy</span>
+                    <span class="dna-chip">practical</span>
+                    <span class="dna-chip">avoid: corporate jargon</span>
+                  </div>
+                </div>
+                <div class="dna-field">
+                  <div class="k">Future audience</div>
+                  <div class="v">Event planners booking charters for tourism groups, corporate retreats, school excursions. Brisbane airport transfers as a growth segment.</div>
+                </div>
+                <a class="btn" style="margin-top: 16px; display: inline-block; text-decoration: none;">Open Brand DNA →</a>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-h"><h3>Pages — action distribution</h3><span class="src">Last audit 2026-04-27</span></div>
+              <div class="card-b">
+                <div class="histo" style="grid-template-columns: repeat(6, 1fr); margin-bottom: 12px;">
+                  <div class="histo-cell"><div class="lbl">Optimize</div><div class="num">334</div></div>
+                  <div class="histo-cell"><div class="lbl">Restore</div><div class="num">12</div></div>
+                  <div class="histo-cell"><div class="lbl">Redirect</div><div class="num">410</div></div>
+                  <div class="histo-cell"><div class="lbl">Consolidate</div><div class="num">38</div></div>
+                  <div class="histo-cell"><div class="lbl">Remove</div><div class="num">22</div></div>
+                  <div class="histo-cell"><div class="lbl">Review</div><div class="num">179</div></div>
+                </div>
+                <div class="xsmall muted">1,096 pages total · 179 undecided.</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-h"><h3>Active projects</h3></div>
+              <div class="card-b">
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div><strong>seo · qa_test_001</strong></div>
+                    <div class="activity-meta">Phase 2 · Adam · active</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div><strong>seo · e2e_test_001</strong></div>
+                    <div class="activity-meta">Phase 2 · Adam · active</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>
+                    <div><strong>seo · zz_qa_test_kga</strong></div>
+                    <div class="activity-meta">Phase 1 · Adam · active</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card-h"><h3>Competitors</h3><span class="src">BQ Meta · 13</span></div>
+              <div class="card-b">
+                <div class="dna-chips">
+                  <span class="dna-chip">bankstownbushire.com.au</span>
+                  <span class="dna-chip">bigbusco.com.au</span>
+                  <span class="dna-chip">coachhire.com.au</span>
+                  <span class="dna-chip">+10 more</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-h"><h3>Recent activity</h3></div>
+              <div class="card-b">
+                <div class="activity-item">
+                  <div class="activity-dot rank"></div>
+                  <div>Keyword <strong>brisbane airport bus transfers</strong> → #11<div class="activity-meta">SV 1,300 · up from #15 · 1d ago</div></div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot decision"></div>
+                  <div>23 pages marked Optimize<div class="activity-meta">2h ago by Paul</div></div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-dot edit"></div>
+                  <div>Brand DNA · voice_tone edited<div class="activity-meta">12 min ago by Paul</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> a full Property hero (client breadcrumb, name, status, domain, phase-strip with labeled phases, 4 key metrics) replaces today's small left-aligned header. The default tab is <strong>Overview</strong>, not Brand DNA — Brand DNA, Pages, etc. become explicit destinations. The overview is the at-a-glance view: brand snapshot (top sections only, click to edit on the dedicated tab), action distribution histogram, active projects, competitors preview, recent activity. The <strong>tab cluster separator</strong> visually groups always-on tabs (Brand DNA, Pages) vs. project-driven tabs (Keywords) vs. meta tabs (Projects).
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 5 · Brand DNA                                                       -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s5">
+  <div class="screen-label">Screen 5</div>
+  <h2 class="screen-title">Brand DNA</h2>
+  <p class="screen-desc">Today: vertical stack of utilitarian cards. v2: still cards, but richer typographic treatment, source/confidence prominent, inheritance handled explicitly.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search clients, properties… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">Kitchen Guard</div>
+        <div class="sb-property"><span class="dot prospect"></span>kitchenguard.com</div>
+        <div class="sb-property active"><span class="dot prospect"></span>kg.com/provo</div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>Workspace</a> <span class="sep">/</span> <a>Kitchen Services of Provo</a> <span class="sep">/</span> <a>kg.com/provo</a> <span class="sep">/</span> <span class="here">Brand DNA</span></div>
+      </div>
+
+      <div class="prop-hero" style="padding: 24px 32px;">
+        <div class="client-line">Kitchen Services of Provo · Tacoma Legacy Partners, LLC</div>
+        <h2>kitchenguard.com<span style="font-weight: 400; color: var(--text-muted);">/provo</span> <span class="pill pill-prospect" style="vertical-align: middle; margin-left: 8px;"><span class="pill-dot"></span>Prospect</span></h2>
+      </div>
+
+      <div class="tabstrip">
+        <div class="tab">Overview</div>
+        <div class="tab active">Brand DNA <span class="tab-badge">5/12</span></div>
+        <div class="tab">Pages <span class="tab-badge">8</span></div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Campaigns</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Projects</div>
+      </div>
+
+      <div class="page" style="max-width: 880px; margin: 0 auto;">
+        <div class="inherit-banner">
+          <span>⟜</span>
+          <span>Inheriting <strong>7 sections</strong> from <strong>Kitchen Guard Corporate</strong>. Edit any to override locally.</span>
+          <span style="margin-left: auto; font-size: 11px; cursor: pointer; text-decoration: underline;">View inherited</span>
+        </div>
+
+        <div class="dna-section">
+          <div class="dna-h-flex">
+            <h4>Identity</h4>
+            <div class="h-meta meta-right">
+              <span class="src">gpt-4o</span> · conf 0.91 · edited
+            </div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Brand name</div>
+            <div class="v">Kitchen Services of Provo (a Kitchen Guard franchise)</div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Category</div>
+            <div class="v">Commercial kitchen exhaust cleaning</div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Location</div>
+            <div class="v">Provo, UT (Utah County + surrounding)</div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Founded</div>
+            <div class="v">2024 (franchise founding date)</div>
+          </div>
+        </div>
+
+        <div class="dna-section">
+          <div class="dna-h-flex">
+            <h4>Voice & tone</h4>
+            <div class="h-meta meta-right" style="color: var(--violet);">⟜ inherited from Kitchen Guard</div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Traits</div>
+            <div class="dna-chips">
+              <span class="dna-chip">no-nonsense</span>
+              <span class="dna-chip">code-compliant</span>
+              <span class="dna-chip">safety-first</span>
+              <span class="dna-chip">trade-fluent</span>
+            </div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Avoid</div>
+            <div class="dna-chips">
+              <span class="dna-chip">fluffy marketing speak</span>
+              <span class="dna-chip">"premium"</span>
+              <span class="dna-chip">"luxury"</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dna-section">
+          <div class="dna-h-flex">
+            <h4>Personas</h4>
+            <div class="h-meta meta-right">
+              <span class="src">gpt-4o</span> · conf 0.83 · edited locally
+            </div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Primary: Restaurant GM (Brian, 42)</div>
+            <div class="v">Manages 2–4 location restaurant group in Utah County. Cares about compliance, downtime minimization, and being able to text the cleaner directly when something's off. Hates corporate vendors that send him to a portal.</div>
+          </div>
+          <div class="dna-field">
+            <div class="k">Secondary: Multi-unit franchise ops (Megan, 38)</div>
+            <div class="v">Oversees kitchen vendor relationships across 8 quick-service restaurants statewide. Wants standardized service, monthly reporting, predictable billing.</div>
+          </div>
+        </div>
+
+        <div class="dna-section">
+          <div class="dna-h-flex">
+            <h4>Competitors</h4>
+            <div class="h-meta meta-right">BQ Meta · read-only · 4 competitors</div>
+          </div>
+          <table class="tbl" style="margin-top: 8px;">
+            <thead><tr><th>Domain</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">hoodclean.com</td><td class="sec">national chain · franchise-owned</td></tr>
+              <tr><td class="mono">utahkitchenclean.com</td><td class="sec">local independent</td></tr>
+              <tr><td class="mono">mountainstateshood.com</td><td class="sec">regional · 4 states</td></tr>
+              <tr><td class="mono">crystalcleankitchen.com</td><td class="sec">SLC-based</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="dna-section" style="background: var(--surface-alt); border-style: dashed;">
+          <div class="dna-h-flex">
+            <h4 style="color: var(--text-muted);">Proof <span class="h-meta">⟜ inherited from Kitchen Guard</span></h4>
+            <div class="h-meta meta-right" style="font-size: 11px; cursor: pointer;">Override locally →</div>
+          </div>
+          <div class="dna-field" style="opacity: 0.7;">
+            <div class="k">Case studies</div>
+            <div class="v">12 multi-location restaurant groups under contract for 2+ years.</div>
+          </div>
+          <div class="dna-field" style="opacity: 0.7;">
+            <div class="k">Certifications</div>
+            <div class="v">IKECA-certified · NFPA 96 compliant · insured to $5M.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> a sustained-width content column (880px) makes the Brand DNA actually feel like a brand document, not a settings panel. Each section header has clear <strong>source attribution</strong> (gpt-4o · conf 0.91 · edited) so it's obvious what's machine-generated vs. human-touched. The <strong>inheritance banner</strong> at the top tells the user "you inherit 7 sections from KG Corporate" — and inherited sections render with a dashed border and muted appearance, with an explicit "Override locally" affordance. Competitors render inline as a real Brand DNA section, BQ-sourced.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 6 · Pages triage                                                    -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s6">
+  <div class="screen-label">Screen 6</div>
+  <h2 class="screen-title">Pages triage</h2>
+  <p class="screen-desc">A flat URL table today. v2 leads with the decision distribution and lets you filter to the work that matters now.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property active"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+        <div class="sb-property"><span class="dot active"></span>minibushire <span class="phase">P1</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>TNA</a> <span class="sep">/</span> <a>BusCharter</a> <span class="sep">/</span> <span class="here">Pages</span></div>
+      </div>
+
+      <div class="tabstrip" style="margin-top: 0;">
+        <div class="tab">Overview</div>
+        <div class="tab">Brand DNA <span class="tab-badge">8</span></div>
+        <div class="tab active">Pages <span class="tab-badge">1,096</span></div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Keywords</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Projects <span class="tab-badge">3</span></div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Pages triage</h2>
+            <p>1,096 pages · last audit 2026-04-27 · 179 undecided</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Filters ▾</button>
+            <button class="btn">Bulk action</button>
+            <button class="btn btn-primary">Export decisions</button>
+          </div>
+        </div>
+
+        <div class="histo">
+          <div class="histo-cell selected"><div class="lbl">All</div><div class="num">1,096</div></div>
+          <div class="histo-cell"><div class="lbl">Optimize</div><div class="num">334</div></div>
+          <div class="histo-cell"><div class="lbl">Restore</div><div class="num">12</div></div>
+          <div class="histo-cell"><div class="lbl">Redirect</div><div class="num">410</div></div>
+          <div class="histo-cell"><div class="lbl">Consolidate</div><div class="num">38</div></div>
+          <div class="histo-cell"><div class="lbl">Remove</div><div class="num">22</div></div>
+          <div class="histo-cell" style="background: #fffbeb; border-color: #fde68a;"><div class="lbl">Review</div><div class="num">179</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-b" style="padding: 0;">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th style="width: 50%;">URL</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                  <th>Word count</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="mono">/brisbane-airport-transfers/</div><div class="sec">Brisbane Airport Bus Transfers — On Time, Every Time</div></td>
+                  <td class="sec">service</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-optimize">Optimize</span></td>
+                  <td class="sec">1,247</td>
+                </tr>
+                <tr>
+                  <td><div class="mono">/sydney-charter-bus-hire/</div><div class="sec">Sydney Charter Bus Hire</div></td>
+                  <td class="sec">service</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-optimize">Optimize</span></td>
+                  <td class="sec">892</td>
+                </tr>
+                <tr>
+                  <td><div class="mono">/about-old/</div><div class="sec">(no title)</div></td>
+                  <td class="sec">page</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-redirect">Redirect</span><div class="xsmall muted" style="margin-top: 2px;">→ /about/</div></td>
+                  <td class="sec">418</td>
+                </tr>
+                <tr>
+                  <td><div class="mono">/wedding-bus-2019/</div><div class="sec">Wedding Bus Hire 2019 — Book Now</div></td>
+                  <td class="sec">blog</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-remove">Remove</span></td>
+                  <td class="sec">312</td>
+                </tr>
+                <tr style="background: #fffbeb;">
+                  <td><div class="mono">/coach-hire-rates/</div><div class="sec">Coach Hire Rates Across Australia</div></td>
+                  <td class="sec">page</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-undecided">Undecided</span></td>
+                  <td class="sec">1,902</td>
+                </tr>
+                <tr>
+                  <td><div class="mono">/melbourne-event-charter/</div><div class="sec">Melbourne Event Charter Bus Hire</div></td>
+                  <td class="sec">service</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-optimize">Optimize</span></td>
+                  <td class="sec">1,108</td>
+                </tr>
+                <tr>
+                  <td><div class="mono">/tag/buses/</div><div class="sec">Tag: buses</div></td>
+                  <td class="sec">archive</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-consolidate">Consolidate</span><div class="xsmall muted" style="margin-top: 2px;">→ /coach-hire/</div></td>
+                  <td class="sec">86</td>
+                </tr>
+                <tr style="background: #fffbeb;">
+                  <td><div class="mono">/blog/luxury-coach-features-2018/</div><div class="sec">10 Luxury Features in Our 2018 Coach Fleet</div></td>
+                  <td class="sec">blog</td>
+                  <td class="sec">200</td>
+                  <td><span class="action action-undecided">Undecided</span></td>
+                  <td class="sec">724</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding: 12px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;">
+            <span>Showing 8 of 1,096 · Page 1 of 138</span>
+            <span>Next →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> the <strong>action distribution histogram</strong> at top doubles as a filter — click any cell to scope the table. The "Review" cell is visually distinct (warm yellow) to draw the eye to undecided work. Each row gets a secondary subtitle (the page title) so URLs aren't the only identifier. Redirect / consolidate actions show their target inline. Undecided rows get a warm-yellow row background for the same reason. Page actions in the header (Filters, Bulk action, Export) make batch operations a first-class workflow.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 7 · Projects                                                        -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s7">
+  <div class="screen-label">Screen 7</div>
+  <h2 class="screen-title">Projects</h2>
+  <p class="screen-desc">Today: a list of BQ Meta rows. v2: a stream of work-in-flight with phase progress, key outputs, and direct links to artifacts.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property active"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>TNA</a> <span class="sep">/</span> <a>BusCharter</a> <span class="sep">/</span> <span class="here">Projects</span></div>
+      </div>
+
+      <div class="tabstrip">
+        <div class="tab">Overview</div>
+        <div class="tab">Brand DNA <span class="tab-badge">8</span></div>
+        <div class="tab">Pages <span class="tab-badge">1,096</span></div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Keywords</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab active">Projects <span class="tab-badge">3</span></div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Projects</h2>
+            <p>Sourced from BigQuery Meta · matched to buscharter.com.au</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">↗ Open in admin portal</button>
+          </div>
+        </div>
+
+        <div class="grid-2" style="gap: 14px;">
+          <div class="card">
+            <div class="card-h">
+              <h3>seo · qa_test_001</h3>
+              <span class="pill pill-active" style="margin-left: 8px;"><span class="pill-dot"></span>Active</span>
+              <span class="src">project_id 4</span>
+            </div>
+            <div class="card-b">
+              <div class="xsmall muted" style="margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">Phase 2 · Technical SEO</div>
+              <div class="phase-strip">
+                <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+              </div>
+              <div class="phase-cell-labels">
+                <span>Onboard</span><span>WQA</span><span>Tech SEO</span><span>Keywords</span><span>Content</span><span>Authority</span><span>Tracking</span>
+              </div>
+              <div style="margin-top: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.7;">
+                Started 2026-04-15 · 32 days active<br>
+                Last activity: 23 pages marked Optimize · 2h ago<br>
+                Owner: Adam · Skyward
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h">
+              <h3>seo · e2e_test_001</h3>
+              <span class="pill pill-active" style="margin-left: 8px;"><span class="pill-dot"></span>Active</span>
+              <span class="src">project_id 7</span>
+            </div>
+            <div class="card-b">
+              <div class="xsmall muted" style="margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">Phase 2 · Technical SEO</div>
+              <div class="phase-strip">
+                <div class="phase-cell done"></div><div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+              </div>
+              <div class="phase-cell-labels">
+                <span>Onboard</span><span>WQA</span><span>Tech SEO</span><span>Keywords</span><span>Content</span><span>Authority</span><span>Tracking</span>
+              </div>
+              <div style="margin-top: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.7;">
+                Started 2026-04-20 · 27 days active<br>
+                Last activity: keyword aggregate refresh · yesterday<br>
+                Owner: Adam · Skyward
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h">
+              <h3>seo · zz_qa_test_kga</h3>
+              <span class="pill pill-active" style="margin-left: 8px;"><span class="pill-dot"></span>Active</span>
+              <span class="src">project_id 12</span>
+            </div>
+            <div class="card-b">
+              <div class="xsmall muted" style="margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">Phase 1 · Website Quality Audit</div>
+              <div class="phase-strip">
+                <div class="phase-cell done"></div><div class="phase-cell current"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div><div class="phase-cell"></div>
+              </div>
+              <div class="phase-cell-labels">
+                <span>Onboard</span><span>WQA</span><span>Tech SEO</span><span>Keywords</span><span>Content</span><span>Authority</span><span>Tracking</span>
+              </div>
+              <div style="margin-top: 16px; font-size: 12px; color: var(--text-muted); line-height: 1.7;">
+                Started 2026-05-05 · 10 days active<br>
+                Last activity: triage workbook generated · 4d ago<br>
+                Owner: Adam · Skyward
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="border-style: dashed; background: var(--surface-alt);">
+            <div class="card-h" style="border-bottom: none;">
+              <h3 style="color: var(--text-muted);">+ Start new project</h3>
+            </div>
+            <div class="card-b" style="padding-top: 0;">
+              <div class="xsmall muted">Create a new SEO, paid search, or paid social project on this property. New projects register in BQ Meta.</div>
+              <button class="btn" style="margin-top: 14px;">↗ Open in admin portal</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> projects render as <strong>cards in a 2-column grid</strong>, not a flat row of metadata. Each card surfaces the project's <em>current phase</em> as a labeled progress strip — far more useful than today's raw "project_type / status / created_at" table. "Last activity" gives a hook for "what's actually happening here." A dashed "Start new project" card sits at the end for the create flow (deferred to admin portal during prototype phase).
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 8 · Keywords (future)                                                -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s8">
+  <div class="screen-label">Screen 8</div>
+  <h2 class="screen-title">Keywords <span class="muted xsmall" style="margin-left: 6px; font-weight: 400;">future state — Adam's Phase 3 aggregate lands here</span></h2>
+  <p class="screen-desc">A speculative design for what fills this tab when the keyword aggregate pipeline ships. Mocked data; nothing wired.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property active"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>BusCharter</a> <span class="sep">/</span> <span class="here">Keywords</span></div>
+      </div>
+
+      <div class="tabstrip">
+        <div class="tab">Overview</div>
+        <div class="tab">Brand DNA</div>
+        <div class="tab">Pages</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab active">Keywords <span class="tab-badge">847</span></div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Projects</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Keywords</h2>
+            <p>847 keywords across 23 clusters · Phase 3 aggregate · last refresh 2 days ago</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Filters ▾</button>
+            <button class="btn">Export</button>
+          </div>
+        </div>
+
+        <div class="grid-stat-4">
+          <div class="stat-tile">
+            <div class="lbl">Total keywords</div>
+            <div class="num">847</div>
+            <div class="sub">23 clusters</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Ranking top 10</div>
+            <div class="num">142 <span class="stat-trend stat-up">↑ 18</span></div>
+            <div class="sub">vs. last week</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Opportunity score</div>
+            <div class="num">71/100</div>
+            <div class="sub">good coverage</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Competitive gap</div>
+            <div class="num">213</div>
+            <div class="sub">they rank, we don't</div>
+          </div>
+        </div>
+
+        <h3 style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 8px 0 12px;">Top clusters by opportunity</h3>
+        <div class="card">
+          <div class="card-b" style="padding: 0;">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Cluster</th>
+                  <th>Keywords</th>
+                  <th>SV</th>
+                  <th>Best rank</th>
+                  <th>Opportunity</th>
+                  <th>Target URL</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Brisbane airport transfers</strong><div class="sec">12 keywords</div></td>
+                  <td class="sec">12</td>
+                  <td class="sec">14,200/mo</td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>#11</span></td>
+                  <td><div class="stack-bar" style="width: 80px;"><div style="background: var(--emerald); width: 88%"></div><div style="background: #f0f0f2; width: 12%"></div></div></td>
+                  <td class="mono">/brisbane-airport-transfers/</td>
+                </tr>
+                <tr>
+                  <td><strong>Sydney charter bus</strong><div class="sec">38 keywords</div></td>
+                  <td class="sec">38</td>
+                  <td class="sec">21,400/mo</td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>#6</span></td>
+                  <td><div class="stack-bar" style="width: 80px;"><div style="background: var(--emerald); width: 72%"></div><div style="background: #f0f0f2; width: 28%"></div></div></td>
+                  <td class="mono">/sydney-charter-bus-hire/</td>
+                </tr>
+                <tr>
+                  <td><strong>Coach hire rates / pricing</strong><div class="sec">22 keywords</div></td>
+                  <td class="sec">22</td>
+                  <td class="sec">8,800/mo</td>
+                  <td><span class="pill pill-paused"><span class="pill-dot"></span>#23</span></td>
+                  <td><div class="stack-bar" style="width: 80px;"><div style="background: var(--amber); width: 64%"></div><div style="background: #f0f0f2; width: 36%"></div></div></td>
+                  <td class="sec">—</td>
+                </tr>
+                <tr>
+                  <td><strong>Wedding bus hire</strong><div class="sec">28 keywords</div></td>
+                  <td class="sec">28</td>
+                  <td class="sec">6,400/mo</td>
+                  <td><span class="pill pill-active"><span class="pill-dot"></span>#8</span></td>
+                  <td><div class="stack-bar" style="width: 80px;"><div style="background: var(--emerald); width: 58%"></div><div style="background: #f0f0f2; width: 42%"></div></div></td>
+                  <td class="mono">/wedding-bus-hire/</td>
+                </tr>
+                <tr>
+                  <td><strong>Melbourne event transport</strong><div class="sec">19 keywords</div></td>
+                  <td class="sec">19</td>
+                  <td class="sec">3,200/mo</td>
+                  <td><span class="pill pill-paused"><span class="pill-dot"></span>#31</span></td>
+                  <td><div class="stack-bar" style="width: 80px;"><div style="background: var(--amber); width: 52%"></div><div style="background: #f0f0f2; width: 48%"></div></div></td>
+                  <td class="sec">—</td>
+                </tr>
+                <tr>
+                  <td><strong>School excursion bus</strong><div class="sec">31 keywords</div></td>
+                  <td class="sec">31</td>
+                  <td class="sec">2,800/mo</td>
+                  <td><span class="pill pill-completed"><span class="pill-dot"></span>#4</span></td>
+                  <td><div class="stack-bar" style="width: 80px;"><div style="background: var(--emerald); width: 42%"></div><div style="background: #f0f0f2; width: 58%"></div></div></td>
+                  <td class="mono">/school-excursion-bus/</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 24px;">
+          <div class="card">
+            <div class="card-h"><h3>Competitive gap — top 10</h3></div>
+            <div class="card-b" style="padding: 0;">
+              <table class="tbl">
+                <thead><tr><th>Keyword</th><th>Their rank</th><th>SV</th></tr></thead>
+                <tbody>
+                  <tr><td>coach hire melbourne to sydney</td><td class="sec">bankstownbushire #4</td><td class="sec">2,100</td></tr>
+                  <tr><td>cheap charter bus brisbane</td><td class="sec">bigbusco #7</td><td class="sec">1,800</td></tr>
+                  <tr><td>luxury coach hire perth</td><td class="sec">coachhire #5</td><td class="sec">1,400</td></tr>
+                  <tr><td>corporate charter bus melbourne</td><td class="sec">bigbusco #3</td><td class="sec">900</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Ranking changes — last 7d</h3></div>
+            <div class="card-b">
+              <div class="activity-item">
+                <div class="activity-dot rank"></div>
+                <div><strong>brisbane airport bus transfers</strong> · #15 → #11<div class="activity-meta">SV 1,300 · +4 positions</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot rank"></div>
+                <div><strong>sydney charter bus 50 seat</strong> · #12 → #8<div class="activity-meta">SV 590 · +4 positions</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot rank" style="background: var(--rose);"></div>
+                <div><strong>wedding bus hire sydney</strong> · #6 → #11<div class="activity-meta">SV 2,400 · -5 positions</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> the empty placeholder gets replaced with a real workspace. Four key stats up top (volume / ranking top 10 / opportunity / competitive gap). The <strong>top clusters table</strong> is the operational unit — each row is a content target (one URL per cluster). The opportunity bar gives a quick visual scan. Competitive gap and ranking-change widgets surface the work that needs attention. Speculative until Adam's keyword aggregate lands.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- Change log                                                          -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="change">
+  <div class="screen-label">Summary</div>
+  <h2 class="screen-title">What changed vs. today</h2>
+
+  <div class="grid-2" style="margin-top: 24px; gap: 24px;">
+    <div class="card">
+      <div class="card-h"><h3>Structural changes</h3></div>
+      <div class="card-b">
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; color: var(--text);">
+          <li><strong>Dashboard becomes the home page.</strong> Replaces today's empty "Welcome." Shows active engagements, signals, recent activity.</li>
+          <li><strong>Property overview becomes the default property route.</strong> Brand DNA moves to its own tab. <code>/properties/[slug]</code> now lands on an at-a-glance summary.</li>
+          <li><strong>Property hero header</strong> replaces the small left-aligned banner. Phase strip with labels, 4 key metrics, breadcrumb.</li>
+          <li><strong>Tab cluster separators</strong> visually group always-on tabs vs. project-driven tabs vs. meta tabs.</li>
+          <li><strong>Inheritance banner</strong> on Brand DNA — explicit "inheriting N sections from X" with Override Locally per section.</li>
+          <li><strong>Action histogram</strong> on Pages tab doubles as a filter. Undecided rows highlighted.</li>
+          <li><strong>Projects render as cards</strong> with phase strips, not table rows.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Visual changes</h3></div>
+      <div class="card-b">
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; color: var(--text);">
+          <li><strong>Refined neutral palette</strong> — zinc/slate hierarchy instead of Tailwind defaults. Single accent (near-black, with indigo for active states).</li>
+          <li><strong>Tabular numerics</strong> on stat values, page counts, ranks.</li>
+          <li><strong>Sidebar adds search</strong> (⌘K), groups Properties under collapsible clients with phase pills.</li>
+          <li><strong>Status pills standardized</strong> — Active emerald · Prospect sky · Paused amber · Inactive slate · Completed indigo. Each with a colored dot prefix.</li>
+          <li><strong>Action pills</strong> on pages get their own palette to avoid confusion with status pills.</li>
+          <li><strong>Pipeline phase strips</strong> appear consistently across dashboard, client detail, property hero, project cards.</li>
+          <li><strong>Activity feed</strong> as a recurring pattern (signal dot + title + meta line + timestamp).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale" style="margin-top: 24px;">
+    <strong>What this doesn't change:</strong> the data model. Same client → property → project hierarchy. Same Supabase tables. Same BQ Meta integration. The Vercel Python functions for clients / projects / competitors still drive the data — the React server components just render it more deliberately. This is purely a frontend reorganization; nothing in the Python or schema layer would need to move.
+  </p>
+</section>
+
+</body>
+</html>
