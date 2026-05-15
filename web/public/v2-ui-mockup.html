@@ -3212,92 +3212,112 @@
         <div class="subnav-item">Seed Keywords <span style="opacity: 0.55; margin-left: 3px;">47</span></div>
       </div>
 
-      <div class="page" style="max-width: 880px; margin: 0 auto;">
+      <div class="page" style="max-width: 1000px; margin: 0 auto;">
         <div class="page-header">
           <div>
             <h2>Brand Terms</h2>
-            <p>Canonical naming, acceptable variants, do-not-use list. The Assistant uses these rules when drafting copy and the QA layer flags violations.</p>
+            <p>Variations of your brand names used to auto-tag branded keywords in the Keyword Universe and branded queries in GSC performance. Matches use word-boundaries by default, so short brand names won't hit unrelated words. Add exceptions below for ambiguous terms (e.g. generic words that collide with your brand).</p>
           </div>
           <div class="page-actions">
-            <button class="btn btn-primary">+ Add term</button>
+            <button class="btn" style="background: var(--rose-bg); color: var(--rose); border-color: transparent;">Clean up product names</button>
+            <button class="btn" style="background: var(--violet-bg); color: var(--violet); border-color: transparent;"><span style="margin-right: 4px;">✦</span>Autofill from Brand</button>
           </div>
         </div>
 
-        <!-- Term 1: BusCharter -->
-        <div class="card" style="margin-bottom: 16px;">
-          <div class="card-h" style="display: flex; align-items: flex-start; padding: 18px 22px;">
+        <!-- Section 1: Branded Terms -->
+        <div style="margin-bottom: 28px;">
+          <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
             <div style="flex: 1;">
-              <h3 style="font-size: 16px;">BusCharter <span class="dna-chip" style="font-size: 10px; margin-left: 8px; vertical-align: 2px;">brand name</span></h3>
-              <p style="font-size: 12px; color: var(--text-muted); margin: 3px 0 0;">The brand itself. Used across all customer-facing copy.</p>
+              <h3 style="font-size: 14px; font-weight: 600; margin: 0;">Branded Terms</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 3px 0 0;">Keywords matching any of these are tagged as branded.</p>
             </div>
-            <div style="display: flex; gap: 6px;">
-              <button class="btn">Edit</button>
-              <button class="btn" style="color: var(--rose);">🗑</button>
-            </div>
+            <button class="btn" style="background: var(--violet-bg); color: var(--violet); border-color: transparent;">+ Add</button>
           </div>
-          <div class="card-b" style="padding: 22px;">
-            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 16px 24px;">
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Canonical</div>
-              <div style="font-size: 14px;"><code style="background: var(--emerald-bg); color: var(--emerald); padding: 2px 8px; border-radius: 4px; font-weight: 600;">BusCharter</code> <span class="muted xsmall" style="margin-left: 8px;">single word, B and C capitalized</span></div>
 
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Acceptable variants</div>
-              <div class="dna-chips">
-                <span class="dna-chip">BusCharter Australia</span>
-                <span class="dna-chip">BusCharter AU</span>
-                <span class="dna-chip">BusCharter (a TNA company)</span>
-              </div>
-
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Do not use</div>
-              <div class="dna-chips">
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">Bus Charter</span>
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">buscharter</span>
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">BUSCHARTER</span>
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">buscharters</span>
-              </div>
-
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Usage notes</div>
-              <div style="font-size: 13px; line-height: 1.6;">
-                In formal contracts and legal copy, use <strong>"BusCharter, a division of TNA Pty Ltd."</strong> In marketing copy and on the website, <strong>"BusCharter"</strong> alone is fine. First mention in a press release should include "(buscharter.com.au)" for SEO.
-              </div>
+          <div class="card">
+            <div class="card-b" style="padding: 0;">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th style="width: 45%;">Pattern</th>
+                    <th>Match</th>
+                    <th>Brand Type</th>
+                    <th style="width: 36px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="mono">BusCharter</td>
+                    <td class="sec">word</td>
+                    <td class="mono sec">own_brand</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                  <tr>
+                    <td class="mono">buscharter.com.au</td>
+                    <td class="sec">contains</td>
+                    <td class="mono sec">own_brand</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                  <tr>
+                    <td class="mono">TNA Pty Ltd</td>
+                    <td class="sec">contains</td>
+                    <td class="mono sec">own_brand</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                  <tr>
+                    <td class="mono">Transport Network Australia</td>
+                    <td class="sec">contains</td>
+                    <td class="mono sec">own_brand</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                  <tr>
+                    <td class="mono">TNA Bus</td>
+                    <td class="sec">contains</td>
+                    <td class="mono sec">own_brand</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <!-- Term 2: Charter (industry term) -->
-        <div class="card">
-          <div class="card-h" style="display: flex; align-items: flex-start; padding: 18px 22px;">
+        <!-- Section 2: Exceptions -->
+        <div>
+          <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
             <div style="flex: 1;">
-              <h3 style="font-size: 16px;">Charter <span class="dna-chip" style="font-size: 10px; margin-left: 8px; vertical-align: 2px;">industry term</span></h3>
-              <p style="font-size: 12px; color: var(--text-muted); margin: 3px 0 0;">How we describe the service. Pivots between US-formal and AU-colloquial depending on audience.</p>
+              <h3 style="font-size: 14px; font-weight: 600; margin: 0;">Exceptions</h3>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 3px 0 0;">Keywords matching any of these are NEVER tagged as branded, even if a rule above would match. Use for ambiguous words that collide with your brand name.</p>
             </div>
-            <div style="display: flex; gap: 6px;">
-              <button class="btn">Edit</button>
-              <button class="btn" style="color: var(--rose);">🗑</button>
-            </div>
+            <button class="btn" style="background: var(--violet-bg); color: var(--violet); border-color: transparent;">+ Add</button>
           </div>
-          <div class="card-b" style="padding: 22px;">
-            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 16px 24px;">
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Preferred</div>
-              <div style="font-size: 14px;"><code style="background: var(--emerald-bg); color: var(--emerald); padding: 2px 8px; border-radius: 4px; font-weight: 600;">charter</code> <span class="muted xsmall" style="margin-left: 8px;">when describing the service itself</span></div>
 
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Acceptable variants</div>
-              <div class="dna-chips">
-                <span class="dna-chip">hire</span>
-                <span class="dna-chip">bus hire</span>
-                <span class="dna-chip">coach hire</span>
-              </div>
-
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Do not use</div>
-              <div class="dna-chips">
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">rental</span>
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">lease</span>
-                <span class="dna-chip" style="background: var(--rose-bg); color: var(--rose); text-decoration: line-through;">rent-a-bus</span>
-              </div>
-
-              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;">Usage notes</div>
-              <div style="font-size: 13px; line-height: 1.6;">
-                Australian colloquial often says <strong>"bus hire"</strong> or <strong>"coach hire"</strong> — fine for landing pages where users search those phrases. In B2B contracts and quotes, use <strong>"charter"</strong>. Never use "rental" or "lease" — those imply self-drive, which is the wrong service entirely.
-              </div>
+          <div class="card">
+            <div class="card-b" style="padding: 0;">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th style="width: 45%;">Pattern</th>
+                    <th>Match</th>
+                    <th>Reason</th>
+                    <th style="width: 36px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="mono">tna wrestling</td>
+                    <td class="sec">contains</td>
+                    <td class="sec">collides with TNA Wrestling org</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                  <tr>
+                    <td class="mono">tna jeans</td>
+                    <td class="sec">contains</td>
+                    <td class="sec">collides with TNA clothing brand</td>
+                    <td style="color: var(--text-subtle); cursor: pointer;">🗑</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -3307,7 +3327,13 @@
   </div>
 
   <p class="rationale">
-    <strong>What's new:</strong> card-per-term layout (better than a table at this scale — only 2 terms). Each card has a header with the term name + type chip + Edit/Delete buttons, then a 2-column body with consistent labels: <strong>Canonical</strong> (green code-block highlighted) → <strong>Acceptable variants</strong> (neutral chips) → <strong>Do not use</strong> (red strikethrough chips) → <strong>Usage notes</strong> (prose). The visual contrast between "use this" (green) and "don't use this" (red, struck through) makes the rules scannable at a glance. The Assistant uses these as drafting rules; a QA layer can flag violations in any property page or ad copy.
+    <strong>What's new:</strong> Brand Terms is now a <strong>keyword-tagging rules</strong> surface, not a copy-style guide. Two sections, each with its own header (title + subcopy + + Add button) above a table.
+    <br><br>
+    <strong>Branded Terms</strong> — patterns that auto-tag matching keywords as branded in the Keyword Universe and GSC performance. Columns: <code>Pattern</code> · <code>Match</code> (word vs. contains) · <code>Brand Type</code> (own_brand initially; could expand to competitor_brand / partner_brand). 5 rows for BusCharter covering the brand itself, the domain, and the parent TNA naming.
+    <br><br>
+    <strong>Exceptions</strong> — patterns that are NEVER tagged as branded even when a rule above matches. Adds a <code>Reason</code> column so future-you remembers why each exception exists (e.g. "TNA Wrestling org collision"). Two rows for BusCharter.
+    <br><br>
+    Top-right page actions: <strong>Clean up product names</strong> (rose tint, maintenance action that dedupes/normalizes) + <strong>✦ Autofill from Brand</strong> (violet tint, suggests terms from the Identity tab's Company Name / Tagline). Both rendered as soft-tinted buttons rather than solid primaries — they're suggestive, not destructive.
   </p>
 </section>
 
