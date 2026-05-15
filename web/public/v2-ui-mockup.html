@@ -583,6 +583,8 @@
     <a href="#s6">6 · Pages triage</a>
     <a href="#s7">7 · Projects</a>
     <a href="#s8">8 · Keywords (future)</a>
+    <a href="#s9">9 · Signals</a>
+    <a href="#s10">10 · Activity</a>
     <a href="#change">Change log</a>
   </nav>
 </div>
@@ -2002,6 +2004,433 @@
 
   <p class="rationale">
     <strong>What's new:</strong> the empty placeholder gets replaced with a real workspace. Four key stats up top (volume / ranking top 10 / opportunity / competitive gap). The <strong>top clusters table</strong> is the operational unit — each row is a content target (one URL per cluster). The opportunity bar gives a quick visual scan. Competitive gap and ranking-change widgets surface the work that needs attention. Speculative until Adam's keyword aggregate lands.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 9 · Signals                                                          -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s9">
+  <div class="screen-label">Screen 9</div>
+  <h2 class="screen-title">Signals</h2>
+  <p class="screen-desc">The team's "what needs attention" inbox. System-detected, severity-ranked, cross-property. Different from the dashboard's signals card — that's a summary; this is the triage surface.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search clients, properties… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients <span class="sb-count">16</span></div>
+        <div class="sb-item"><span class="sb-icon">≈</span>Activity</div>
+        <div class="sb-item active"><span class="sb-icon">⚡</span>Signals <span class="sb-count">11</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">Phil Lasry</div>
+        <div class="sb-property"><span class="dot active"></span>plasry.com <span class="phase">P3</span></div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+        <div class="sb-property"><span class="dot active"></span>minibushire <span class="phase">P1</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>Workspace</a> <span class="sep">/</span> <span class="here">Signals</span></div>
+        <div class="topbar-spacer"></div>
+        <div class="topbar-action">Last 30 days ▾</div>
+        <div class="topbar-action">All properties ▾</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Signals</h2>
+            <p>11 active · 3 urgent · auto-refreshes hourly · last sync 8 min ago</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Settings</button>
+            <button class="btn">Mark all read</button>
+          </div>
+        </div>
+
+        <div class="grid-stat-4">
+          <div class="stat-tile" style="border-left: 3px solid var(--rose);">
+            <div class="lbl">Urgent</div>
+            <div class="num" style="color: var(--rose);">3</div>
+            <div class="sub">action this week</div>
+          </div>
+          <div class="stat-tile" style="border-left: 3px solid var(--amber);">
+            <div class="lbl">Watch</div>
+            <div class="num" style="color: var(--amber);">5</div>
+            <div class="sub">keep an eye on</div>
+          </div>
+          <div class="stat-tile" style="border-left: 3px solid var(--slate);">
+            <div class="lbl">Info</div>
+            <div class="num" style="color: var(--slate);">3</div>
+            <div class="sub">fyi</div>
+          </div>
+          <div class="stat-tile">
+            <div class="lbl">Snoozed</div>
+            <div class="num">4</div>
+            <div class="sub">re-surface later</div>
+          </div>
+        </div>
+
+        <!-- Urgent -->
+        <h3 style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--rose); margin: 8px 0 12px; display: flex; align-items: center; gap: 8px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--rose);"></span>
+          Urgent
+        </h3>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-b" style="padding: 0;">
+            <!-- signal 1 -->
+            <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: start;">
+              <div style="font-size: 16px; line-height: 24px;">📉</div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <strong>"wedding bus hire sydney"</strong>
+                  <span class="pill pill-paused" style="background: var(--rose-bg); color: var(--rose);"><span class="pill-dot" style="background: var(--rose);"></span>Rank drop</span>
+                  <span class="dna-chip" style="font-size: 10px;">TNA / buscharter</span>
+                </div>
+                <div class="xsmall muted">#6 → #11 over the last 7 days. SV 2,400/mo. Was a top-ranking term for buscharter; check what changed on /wedding-bus-hire/.</div>
+                <div class="xsmall muted" style="margin-top: 6px;">Detected 6h ago · DataForSEO ranking sync</div>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn">Snooze</button>
+                <button class="btn btn-primary">Take action</button>
+              </div>
+            </div>
+
+            <!-- signal 2 -->
+            <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: start;">
+              <div style="font-size: 16px; line-height: 24px;">📋</div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <strong>19 pages awaiting triage decision</strong>
+                  <span class="pill pill-paused" style="background: var(--rose-bg); color: var(--rose);"><span class="pill-dot" style="background: var(--rose);"></span>Pending decisions</span>
+                  <span class="dna-chip" style="font-size: 10px;">TNA / tnabushire</span>
+                </div>
+                <div class="xsmall muted">From the 2026-04-30 v2 audit refresh. Still marked "Review" — needs human triage before content phase can proceed.</div>
+                <div class="xsmall muted" style="margin-top: 6px;">Detected 2 days ago · stale_audit_check</div>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn">Snooze</button>
+                <button class="btn btn-primary">Open Pages</button>
+              </div>
+            </div>
+
+            <!-- signal 3 -->
+            <div style="padding: 14px 18px; display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: start;">
+              <div style="font-size: 16px; line-height: 24px;">🤖</div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <strong>Brand DNA · voice_tone awaiting approval</strong>
+                  <span class="pill pill-paused" style="background: var(--rose-bg); color: var(--rose);"><span class="pill-dot" style="background: var(--rose);"></span>AI output review</span>
+                  <span class="dna-chip" style="font-size: 10px;">TNA / buscharter</span>
+                </div>
+                <div class="xsmall muted">gpt-4o inferred a revised voice_tone section (conf 0.84). Edited by Paul yesterday but not yet approved. Currently shows in editor as "pending."</div>
+                <div class="xsmall muted" style="margin-top: 6px;">Detected today · approval_pending</div>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn">Reject</button>
+                <button class="btn btn-primary">Review &amp; approve</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Watch -->
+        <h3 style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--amber); margin: 8px 0 12px; display: flex; align-items: center; gap: 8px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--amber);"></span>
+          Watch
+        </h3>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-b" style="padding: 0;">
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: center;">
+              <div>🥷</div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <strong>bankstownbushire</strong> now ranks <strong>#4</strong> for "coach hire melbourne to sydney"
+                  <span class="dna-chip" style="font-size: 10px;">TNA · competitor</span>
+                </div>
+                <div class="xsmall muted">SV 2,100/mo. Competitive gap — we don't rank. Worth a brief.</div>
+              </div>
+              <div class="xsmall muted">2d ago</div>
+            </div>
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: center;">
+              <div>⏸</div>
+              <div>
+                <div><strong>phil-lasry</strong> · pipeline blocked in P3 for 21 days
+                  <span class="dna-chip" style="font-size: 10px;">Phil Lasry / plasry.com</span>
+                </div>
+                <div class="xsmall muted">Keyword analysis phase started 2026-04-24. No progression activity since.</div>
+              </div>
+              <div class="xsmall muted">today</div>
+            </div>
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: center;">
+              <div>⚠️</div>
+              <div>
+                <div><strong>minibushire</strong> · 17 pages returning 404 in latest crawl
+                  <span class="dna-chip" style="font-size: 10px;">TNA / minibushire</span>
+                </div>
+                <div class="xsmall muted">14 are internal links from /sitemap.xml. Likely Replit migration aftermath.</div>
+              </div>
+              <div class="xsmall muted">1d ago</div>
+            </div>
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: center;">
+              <div>📈</div>
+              <div>
+                <div><strong>"brisbane airport bus transfers"</strong> · #15 → #11
+                  <span class="dna-chip" style="font-size: 10px;">TNA / buscharter</span>
+                </div>
+                <div class="xsmall muted">SV 1,300/mo. Near-miss. One brief away from page 1.</div>
+              </div>
+              <div class="xsmall muted">1d ago</div>
+            </div>
+            <div style="padding: 12px 18px; display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: center;">
+              <div>🆕</div>
+              <div>
+                <div>New keyword cluster detected · <strong>"school excursion bus melbourne"</strong>
+                  <span class="dna-chip" style="font-size: 10px;">TNA / buscharter</span>
+                </div>
+                <div class="xsmall muted">12 keywords, aggregate SV 1,400/mo. No target URL yet.</div>
+              </div>
+              <div class="xsmall muted">today</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info -->
+        <h3 style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate); margin: 8px 0 12px; display: flex; align-items: center; gap: 8px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--slate);"></span>
+          Info
+        </h3>
+
+        <div class="card">
+          <div class="card-b" style="padding: 0;">
+            <div style="padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted);">
+              <strong style="color: var(--text);">Schema markup updated</strong> on /sydney-charter-bus-hire/ · BusCharter · 4h ago
+            </div>
+            <div style="padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted);">
+              <strong style="color: var(--text);">New GA4 dataset matched</strong> · ga4_busbank_prod auto-attached to GCS / busbank · yesterday
+            </div>
+            <div style="padding: 10px 18px; font-size: 12px; color: var(--text-muted);">
+              <strong style="color: var(--text);">Project completed</strong> · seo · gcs_q1_audit moved to phase 6 · 3d ago
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> a real surface for the placeholder that's been sitting in the sidebar all session. Three severity tiers (Urgent / Watch / Info), each visually banded. Urgent gets the full treatment — type icon, signal title, property tag, detail, detection metadata, action buttons (Snooze · Take action / Open Pages / Review). Watch rows are denser. Info is single-line. Each signal carries the source mechanism in its meta line so the user knows why it fired. The "Snoozed" tile creates a way to defer without losing context.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 10 · Activity                                                       -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s10">
+  <div class="screen-label">Screen 10</div>
+  <h2 class="screen-title">Activity</h2>
+  <p class="screen-desc">Chronological audit trail of everything happening across the platform. Signals = "what should happen next." Activity = "what happened."</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search clients, properties… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients <span class="sb-count">16</span></div>
+        <div class="sb-item active"><span class="sb-icon">≈</span>Activity</div>
+        <div class="sb-item"><span class="sb-icon">⚡</span>Signals <span class="sb-count">11</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">Phil Lasry</div>
+        <div class="sb-property"><span class="dot active"></span>plasry.com <span class="phase">P3</span></div>
+        <div class="sb-client">TNA</div>
+        <div class="sb-property"><span class="dot active"></span>buscharter <span class="phase">P2</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P3</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>Workspace</a> <span class="sep">/</span> <span class="here">Activity</span></div>
+        <div class="topbar-spacer"></div>
+        <div class="topbar-action">Last 30 days ▾</div>
+        <div class="topbar-action">All properties ▾</div>
+        <div class="topbar-action">All actors ▾</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Activity</h2>
+            <p>312 events in the last 30 days · 47 today · filterable by property, type, actor</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Export CSV</button>
+          </div>
+        </div>
+
+        <!-- filter chips -->
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 28px;">
+          <span class="dna-chip" style="background: #18181b; color: white; border-color: #18181b;">All types</span>
+          <span class="dna-chip">Brand DNA edits</span>
+          <span class="dna-chip">Page decisions</span>
+          <span class="dna-chip">AI inference</span>
+          <span class="dna-chip">Project changes</span>
+          <span class="dna-chip">System events</span>
+          <span class="dna-chip">People</span>
+        </div>
+
+        <!-- Today -->
+        <h3 style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 8px 0 8px;">Today · 2026-05-15</h3>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-b" style="padding: 0;">
+
+            <!-- act 1 -->
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: start;">
+              <div class="activity-dot decision" style="margin-top: 8px; width: 6px; height: 6px;"></div>
+              <div class="sb-avatar" style="width: 24px; height: 24px; font-size: 10px;">PS</div>
+              <div>
+                <div><strong>Paul</strong> marked <strong>23 pages</strong> on tnabushire as <span class="action action-optimize">Optimize</span></div>
+                <div class="xsmall muted" style="margin-top: 2px;">P2 technical audit · tnabushire / TNA · batch decision</div>
+              </div>
+              <div class="xsmall muted">10:42 AM</div>
+            </div>
+
+            <!-- act 2 -->
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: start;">
+              <div class="activity-dot edit" style="margin-top: 8px; width: 6px; height: 6px;"></div>
+              <div class="sb-avatar" style="width: 24px; height: 24px; font-size: 10px;">PS</div>
+              <div>
+                <div><strong>Paul</strong> edited Brand DNA · <strong>voice_tone</strong> on buscharter</div>
+                <div class="xsmall muted" style="margin-top: 2px;">Snapshot saved to history · buscharter / TNA</div>
+                <div class="xsmall muted" style="margin-top: 4px; font-family: ui-monospace, monospace; background: var(--surface-alt); padding: 4px 8px; border-radius: 4px;">
+                  + "B2B-fluent" · - "casual" · traits unchanged otherwise
+                </div>
+              </div>
+              <div class="xsmall muted">9:14 AM</div>
+            </div>
+
+            <!-- act 3 -->
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: start;">
+              <div class="activity-dot" style="margin-top: 8px; width: 6px; height: 6px; background: var(--violet);"></div>
+              <div style="width: 24px; height: 24px; background: var(--violet-bg); color: var(--violet); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">AI</div>
+              <div>
+                <div><strong>gpt-4o</strong> inferred <strong>personas</strong> section for kssd-sd <span class="dna-chip" style="font-size: 10px; margin-left: 4px;">awaiting approval</span></div>
+                <div class="xsmall muted" style="margin-top: 2px;">confidence 0.87 · 2 personas · cost $0.34 · kssd-sd / KSSD</div>
+              </div>
+              <div class="xsmall muted">8:48 AM</div>
+            </div>
+
+            <!-- act 4 -->
+            <div style="padding: 12px 18px; display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: start;">
+              <div class="activity-dot rank" style="margin-top: 8px; width: 6px; height: 6px;"></div>
+              <div style="width: 24px; height: 24px; background: var(--surface-alt); color: var(--text-muted); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px;">⚙</div>
+              <div>
+                <div><strong>System</strong> · DataForSEO daily ranking sync</div>
+                <div class="xsmall muted" style="margin-top: 2px;">23 ranking changes detected · 3 fired signals · across 7 properties</div>
+              </div>
+              <div class="xsmall muted">3:00 AM</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Yesterday -->
+        <h3 style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 8px 0 8px;">Yesterday · 2026-05-14</h3>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-b" style="padding: 0;">
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: center;">
+              <div class="activity-dot edit" style="width: 6px; height: 6px; background: var(--indigo);"></div>
+              <div class="sb-avatar" style="width: 24px; height: 24px; font-size: 10px; background: linear-gradient(135deg, #f59e0b, #ef4444);">AM</div>
+              <div>
+                <div><strong>Adam</strong> backfilled <strong>199 pages</strong> on minibushire from v2 WQA workbook</div>
+                <div class="xsmall muted" style="margin-top: 2px;">minibushire / TNA · 21 Optimize / 19 Redirect / 31 Remove / 2 Review</div>
+              </div>
+              <div class="xsmall muted">4:22 PM</div>
+            </div>
+            <div style="padding: 12px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: center;">
+              <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--sky);"></div>
+              <div class="sb-avatar" style="width: 24px; height: 24px; font-size: 10px;">PS</div>
+              <div>
+                <div><strong>Paul</strong> created new client <strong>Manhattan Eye</strong> in admin portal</div>
+                <div class="xsmall muted" style="margin-top: 2px;">Manhattan Eye PLLC · Dr. Yuna Rapoport · refractive surgery</div>
+              </div>
+              <div class="xsmall muted">2:15 PM</div>
+            </div>
+            <div style="padding: 12px 18px; display: grid; grid-template-columns: 24px 28px 1fr auto; gap: 14px; align-items: center;">
+              <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--violet);"></div>
+              <div style="width: 24px; height: 24px; background: var(--violet-bg); color: var(--violet); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">AI</div>
+              <div>
+                <div><strong>claude-opus</strong> refreshed competitor list for <strong>TNA</strong></div>
+                <div class="xsmall muted" style="margin-top: 2px;">Added 2 new competitors · removed 1 stale · 13 total · cost $1.12</div>
+              </div>
+              <div class="xsmall muted">11:08 AM</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- This week -->
+        <h3 style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 8px 0 8px;">Earlier this week</h3>
+
+        <div class="card">
+          <div class="card-b" style="padding: 0;">
+            <div style="padding: 10px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 28px 1fr auto; gap: 14px; align-items: center; font-size: 12px;">
+              <div class="sb-avatar" style="width: 22px; height: 22px; font-size: 9px; background: linear-gradient(135deg, #10b981, #06b6d4);">CD</div>
+              <div>
+                <strong>Cristina</strong> audited <strong>47 pages</strong> on plasry · 12 Optimize · 22 Restore · 13 Remove
+                <span class="dna-chip" style="font-size: 10px; margin-left: 4px;">plasry / Phil Lasry</span>
+              </div>
+              <div class="xsmall muted">Mon</div>
+            </div>
+            <div style="padding: 10px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 28px 1fr auto; gap: 14px; align-items: center; font-size: 12px;">
+              <div class="sb-avatar" style="width: 22px; height: 22px; font-size: 9px;">PS</div>
+              <div>
+                <strong>Paul</strong> approved <strong>5 Brand DNA sections</strong> on phil-lasry
+                <span class="xsmall muted">· identity, voice_tone, personas, proof, future_audience</span>
+              </div>
+              <div class="xsmall muted">Mon</div>
+            </div>
+            <div style="padding: 10px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 28px 1fr auto; gap: 14px; align-items: center; font-size: 12px;">
+              <div style="width: 22px; height: 22px; background: var(--surface-alt); color: var(--text-muted); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;">⚙</div>
+              <div>
+                <strong>System</strong> · skyward-common bumped <strong>v1.4.0 → v1.4.1</strong>
+                <span class="xsmall muted">· pyproject pin updated</span>
+              </div>
+              <div class="xsmall muted">Wed</div>
+            </div>
+            <div style="padding: 10px 18px; display: grid; grid-template-columns: 28px 1fr auto; gap: 14px; align-items: center; font-size: 12px;">
+              <div class="sb-avatar" style="width: 22px; height: 22px; font-size: 9px; background: linear-gradient(135deg, #f59e0b, #ef4444);">AM</div>
+              <div>
+                <strong>Adam</strong> created project <strong>seo · qa_test_001</strong>
+                <span class="dna-chip" style="font-size: 10px; margin-left: 4px;">buscharter / TNA</span>
+              </div>
+              <div class="xsmall muted">Tue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> the chronological audit trail. Three info densities — today's events get the full treatment (avatar + actor + diff line), yesterday's are denser, this-week is single-line. Diffs render inline for Brand DNA edits ("+ B2B-fluent · - casual"). AI events render with a violet "AI" avatar + cost line. System events use a settings glyph. Filter chips up top let the user narrow by event type. Connects to Signals via shared event sources — every signal that fires writes an activity event.
   </p>
 </section>
 
