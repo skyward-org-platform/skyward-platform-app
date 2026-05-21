@@ -15,6 +15,7 @@ import { OverviewTab } from "@/components/wqa/OverviewTab";
 import { OptimizeTab } from "@/components/wqa/OptimizeTab";
 import { RedirectTab } from "@/components/wqa/RedirectTab";
 import { RestoreTab } from "@/components/wqa/RestoreTab";
+import { ConsolidateTab } from "@/components/wqa/ConsolidateTab";
 import { RemoveTab } from "@/components/wqa/RemoveTab";
 import {
   EvaluateTab,
@@ -357,6 +358,8 @@ function Body({
       return <RedirectTab {...props} />;
     case "Restore":
       return <RestoreTab {...props} />;
+    case "Consolidate":
+      return <ConsolidateTab {...props} />;
     case "Remove":
       return <RemoveTab {...props} />;
     case "Evaluate":
