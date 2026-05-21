@@ -4,11 +4,10 @@
 // wqa_decision, keyed by (property_id, url). The Pages UI reads the
 // override (if any) and falls back to the SOP-computed action otherwise.
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
-import { CACHE_TAGS } from "@/lib/cache";
 import {
   upsertExecution,
   type ExecutionStatus,
@@ -84,7 +83,6 @@ export async function setWqaDecision(
       { onConflict: "property_id,url" },
     );
   if (error) return { ok: false, error: error.message };
-  updateTag(CACHE_TAGS.property(propertySlug));
   revalidatePath(`/properties/${propertySlug}/pages`);
   return { ok: true };
 }
@@ -104,7 +102,6 @@ export async function clearWqaDecision(
     .eq("property_id", prop.id)
     .eq("url", url);
   if (error) return { ok: false, error: error.message };
-  updateTag(CACHE_TAGS.property(propertySlug));
   revalidatePath(`/properties/${propertySlug}/pages`);
   return { ok: true };
 }
@@ -158,7 +155,6 @@ export type ExecutionField = typeof VALID_EXECUTION_FIELDS extends Set<infer T>
   : never;
 
 function bustPagesCache(slug: string): void {
-  updateTag(CACHE_TAGS.property(slug));
   revalidatePath(`/properties/${slug}/pages`);
 }
 
@@ -280,6 +276,40 @@ export async function setCheckNotes(
       url,
       check_id: checkId,
       notes: normalized,
+      updated_by: getOperator(),
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  bustPagesCache(propertySlug);
+  return { ok: true };
+}
+
+/** Per-check owner override. Mirrors setCheckStatus / setCheckNotes: the
+ *  Audit Check Detail view edits owner inline so the cohort accountability
+ *  picture is per-(url, check_id), not per-URL. Empty string normalizes to
+ *  null so blanking the input clears the override. */
+export async function setCheckOwner(
+  propertySlug: string,
+  url: string,
+  checkId: string,
+  owner: string | null,
+): Promise<Ok | Err> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  if (!url) return { ok: false, error: "URL required" };
+  if (!checkId) return { ok: false, error: "checkId required" };
+  const prop = await resolveProperty(propertySlug);
+  if ("error" in prop) return { ok: false, error: prop.error };
+
+  const normalized = owner === "" ? null : owner;
+
+  try {
+    await upsertCheckState({
+      property_id: prop.id,
+      url,
+      check_id: checkId,
+      owner: normalized,
       updated_by: getOperator(),
     });
   } catch (e) {
