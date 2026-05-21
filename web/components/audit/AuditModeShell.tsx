@@ -11,11 +11,11 @@
 //   - checklist         → AuditChecklistTab OR AuditCheckDetailView
 //                         (when ?check= is set, deep-link into per-check
 //                          filtered URL list)
-//   - url-priority      → placeholder (Chunk 4b)
-//   - architecture      → placeholder (Chunk 4b)
-//   - schema            → placeholder (Chunk 4b)
-//   - pagespeed         → placeholder (Chunk 4b)
-//   - broken            → placeholder (Chunk 4b)
+//   - url-priority      → AuditUrlPriorityTab (consolidated per-URL view)
+//   - architecture      → AuditArchitectureTab (depth + inlinks + sitemap)
+//   - schema            → AuditSchemaTab (required schema per category)
+//   - pagespeed         → AuditPageSpeedTab (BLOCKED placeholder)
+//   - broken            → AuditBrokenTab (BLOCKED placeholder)
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -23,6 +23,11 @@ import { UrlDrawer } from "@/components/UrlDrawer";
 import { AuditOverviewTab } from "@/components/audit/AuditOverviewTab";
 import { AuditChecklistTab } from "@/components/audit/AuditChecklistTab";
 import { AuditCheckDetailView } from "@/components/audit/AuditCheckDetailView";
+import { AuditUrlPriorityTab } from "@/components/audit/AuditUrlPriorityTab";
+import { AuditArchitectureTab } from "@/components/audit/AuditArchitectureTab";
+import { AuditSchemaTab } from "@/components/audit/AuditSchemaTab";
+import { AuditPageSpeedTab } from "@/components/audit/AuditPageSpeedTab";
+import { AuditBrokenTab } from "@/components/audit/AuditBrokenTab";
 import { triageRow, type TriageAction } from "@/lib/wqa-triage";
 import { buildCtx } from "@/lib/wqa-checks";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
@@ -42,14 +47,6 @@ type SubView =
   | "schema"
   | "pagespeed"
   | "broken";
-
-const PLACEHOLDER_LABEL: Partial<Record<SubView, string>> = {
-  "url-priority": "URL Priority",
-  architecture: "Website Architecture",
-  schema: "Schema Optimization",
-  pagespeed: "Page Speed",
-  broken: "Broken Links",
-};
 
 export function AuditModeShell({
   propertySlug,
@@ -199,21 +196,18 @@ export function AuditModeShell({
         <SubTabButton
           active={view === "url-priority"}
           onClick={() => setView("url-priority")}
-          subdued
         >
           URL Priority
         </SubTabButton>
         <SubTabButton
           active={view === "architecture"}
           onClick={() => setView("architecture")}
-          subdued
         >
           Architecture
         </SubTabButton>
         <SubTabButton
           active={view === "schema"}
           onClick={() => setView("schema")}
-          subdued
         >
           Schema
         </SubTabButton>
@@ -240,6 +234,8 @@ export function AuditModeShell({
         propertySlug={propertySlug}
         scopeTriaged={scopeTriaged}
         scopeRows={scopeRows}
+        decisions={decisions}
+        executions={executions}
         ctx={ctx}
         checkStatesByKey={checkStatesByKey}
         onOpenDrawer={(url) => setDrawerUrl(url)}
@@ -271,6 +267,8 @@ function Body({
   propertySlug,
   scopeTriaged,
   scopeRows,
+  decisions,
+  executions,
   ctx,
   checkStatesByKey,
   onOpenDrawer,
@@ -280,6 +278,8 @@ function Body({
   propertySlug: string;
   scopeTriaged: TriagedRow[];
   scopeRows: WqaRow[];
+  decisions: DecisionRow[];
+  executions: PageExecutionRow[];
   ctx: ReturnType<typeof buildCtx>;
   checkStatesByKey: Map<string, PageCheckStateRow>;
   onOpenDrawer: (url: string) => void;
@@ -307,19 +307,49 @@ function Body({
     }
     return <AuditChecklistTab scopeRows={scopeRows} ctx={ctx} />;
   }
-  // Everything else is a Chunk 4b placeholder.
-  const label = PLACEHOLDER_LABEL[view] ?? view;
-  return (
-    <div className="border border-dashed rounded-lg bg-muted/30 p-10 text-center">
-      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">
-        TODO · CHUNK 4B
-      </div>
-      <p className="mt-3 text-sm font-medium text-foreground">{label}</p>
-      <p className="mt-1 text-[12px] text-muted-foreground">
-        Coming in Chunk 4b.
-      </p>
-    </div>
-  );
+  if (view === "url-priority") {
+    return (
+      <AuditUrlPriorityTab
+        rows={scopeRows}
+        decisions={decisions}
+        executions={executions}
+        ctx={ctx}
+        propertySlug={propertySlug}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  }
+  if (view === "architecture") {
+    return (
+      <AuditArchitectureTab
+        rows={scopeRows}
+        decisions={decisions}
+        executions={executions}
+        ctx={ctx}
+        propertySlug={propertySlug}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  }
+  if (view === "schema") {
+    return (
+      <AuditSchemaTab
+        rows={scopeRows}
+        decisions={decisions}
+        executions={executions}
+        ctx={ctx}
+        propertySlug={propertySlug}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  }
+  if (view === "pagespeed") {
+    return <AuditPageSpeedTab rows={scopeRows} onOpenDrawer={onOpenDrawer} />;
+  }
+  if (view === "broken") {
+    return <AuditBrokenTab rows={scopeRows} onOpenDrawer={onOpenDrawer} />;
+  }
+  return null;
 }
 
 function SubTabButton({
