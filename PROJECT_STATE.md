@@ -452,3 +452,61 @@ This app depends on two sibling repos:
 4. **Shared `.env`** at `/Users/paulskirbe/agency/.env` (symlinked here) — single secret store for the local agency workspace; Vercel has its own equivalent
 
 The seams are clear and deliberate. The README's "Two-store architecture (interim rule, 2026-05-14)" section is the authoritative description of why they look this way: Adam owns BQ Meta and the admin portal; this app owns the new Brand DNA / pages / project_brain Supabase surface; the two are deliberately disconnected until Adam migrates Meta into Supabase.
+
+---
+
+## 12. Update Log
+
+This section captures material changes since the initial 2026-05-16 inventory. Each entry points to a session note for the full record.
+
+### 2026-05-21 — Execution surface shipped (merged to main, production-deployed)
+
+Single new route `/properties/[slug]/pages` becomes the canonical execution surface — mirrors the 12-tab WQA workbook (Phase 1) and the ~14-tab Technical SEO Audit workbook (Phase 2) in one app surface, scoped per property. 40-file diff merged via PR #1 (`b214f0d`). Production: https://skyward-seo-platform.vercel.app.
+
+**New tables in `seo-platform-dev`:**
+- `page_execution` + `page_execution_history` + `snapshot_page_execution` trigger — per-URL workflow state (status, owner, due, notes, target URL, restore content spec).
+- `page_check_state` + `page_check_state_history` + trigger — per-URL × Phase 2 check workflow state.
+- `url_relationship` — cross-URL edges (table only, no UI surface).
+
+**New routes / sub-routes:**
+- `/properties/[slug]/pages` gains a TRIAGE / TECHNICAL AUDIT mode switcher. Triage sub-tabs (per `?action=`): Overview, All URLs, Optimize, Redirect, Restore, Remove, Consolidate, Evaluate, Investigate, Canonical Audit, Action Legend. Audit sub-tabs (per `?mode=audit&view=`): Overview/Issue Summary, Audit Checklist, URL Priority, Architecture, Schema, Page Speed (Blocked), Broken Links (Blocked). Per-check drill at `?view=checklist&check={T6|C8|...}`.
+
+**New components:**
+- `components/UrlDrawer.tsx` — universal per-URL drawer (Signals / Phase 1 / Phase 2 Checks / Execution / Restore Spec / History / footer).
+- `components/wqa/{CanonicalAuditTab,ActionLegendTab,ConsolidateTab}.tsx`.
+- `components/audit/{AuditModeShell,AuditOverviewTab,AuditChecklistTab,AuditCheckDetailView,AuditUrlPriorityTab,AuditArchitectureTab,AuditSchemaTab,AuditPageSpeedTab,AuditBrokenTab}.tsx`.
+
+**New libs:**
+- `lib/page-execution.ts`, `lib/page-check-state.ts` — typed queries.
+- `lib/wqa-checks.ts` — TypeScript port of T/C check predicates from `delivery/tna/build_phase2_technical.py`.
+
+**New server actions** (extending `app/properties/[slug]/pages/wqa-actions.ts`):
+- `setExecutionStatus`, `setExecutionField` (page_execution writes)
+- `setCheckStatus`, `setCheckNotes`, `setCheckOwner` (page_check_state writes)
+
+**New API endpoints:**
+- `GET /api/wqa/export?slug=X&phase=1|2` — streams the canonical xlsx (12-tab Phase 1 OR ~14-tab Phase 2), byte-identical to `delivery/tna/build_phase1_wqa.py` / `build_phase2_technical.py` output. Backed by `web/api/wqa/_phase1_builder.py` (~1156 LoC) + `_phase2_builder.py` (~916 LoC) — forks of those standalone scripts.
+
+**Lib fixes shipped this session:**
+- `lib/supabase.ts` — lazy Proxy singleton (avoids "supabaseKey is required" module-load race in Next.js 16 server render).
+- `lib/api-base.ts` — preview/dev VERCEL_ENV → `VERCEL_URL`; production → `VERCEL_PROJECT_PRODUCTION_URL`. Prevents cross-env API auth mismatches.
+- `lib/auth.ts` — `requireWriteToken` fail-open when `APP_WRITE_TOKEN` env unset (matches proxy middleware; Supabase RLS is the real backstop).
+
+**Vercel plan:** Pro (upgraded this session — Hobby plan capped at 12 functions, blocked initial preview deploy).
+
+**Deployment Protection:** disabled for previews this session to allow server-to-server fetches; production gates writes via APP_WRITE_TOKEN cookie.
+
+**Followups tracked in `session-notes/2026-05-21-execution-surface-shipped.md`:**
+1. Python WQA builders duplicated between `web/api/` and `~/agency/delivery/tna/` — drift risk.
+2. Audit-mode Status writes `page_execution` not `page_check_state` — semantic conflation per spec edit-boundaries table.
+3. Drawer "Open full page" link 404s.
+4. History reader placeholder — schema in place, UI query pending.
+5. Notes-prefix encoding for Remove "Recommended Action" is fragile.
+6. Untracked `web/` subdirectory restructure still in working tree; git-triggered Vercel builds remain unreliable until committed (workaround: `vercel --prod` from local).
+
+**Reference docs added this session:**
+- `docs/superpowers/specs/2026-05-20-platform-execution-surface-design.md` — design spec
+- `docs/superpowers/plans/2026-05-20-platform-execution-surface.md` — implementation plan
+- `docs/web-app-as-built-2026-05-21.md` — as-built mapping each surface to its source-of-truth SOP
+
+**Session note:** `session-notes/2026-05-21-execution-surface-shipped.md`
