@@ -1,20 +1,25 @@
 """Vercel Python function: GET /api/wqa/export
 
-Streams the 12-tab Phase 1 WQA workbook (the same shape produced by
-`delivery/tna/build_phase1_wqa.py`) for a single property, generated
-on demand from live state:
+Streams either the Phase 1 12-tab WQA workbook (default) or the Phase 2
+Technical SEO Audit workbook for a single property, generated on demand
+from live state:
 
   - BQ `wqa_output` row set (resolved by property's primary_domain)
   - Supabase `wqa_decision` overrides (per-URL action override)
-  - Supabase `page_execution` rows (per-URL target H1 / title / meta /
-    target URL — surfaced in the Restore + Redirect tabs)
+  - Supabase `page_execution` rows (Phase 1 only — per-URL target H1 /
+    title / meta / target URL surfaced in the Restore + Redirect tabs)
+  - Supabase `page_check_state` rows (Phase 2 only — per-check workflow
+    status overlaid onto the failing T/C tabs)
 
 Query params:
-    slug   (required)   property slug, e.g. "buscharter"
-    env    (optional)   "dev" (default) | "prod"
+    slug    (required)  property slug, e.g. "buscharter"
+    env     (optional)  "dev" (default) | "prod"
+    phase   (optional)  "1" (default) | "2"
 
 Response: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-attachment, filename `{slug}-Website-Quality-Audit-{YYYY-MM-DD}.xlsx`.
+attachment. Filename:
+  - phase=1: `{slug}-Website-Quality-Audit-{YYYY-MM-DD}.xlsx`
+  - phase=2: `{slug}-Technical-SEO-Audit-{YYYY-MM-DD}.xlsx`
 
 Auth: optional `Authorization: Bearer <APP_WRITE_TOKEN>` header.
 """
@@ -25,7 +30,7 @@ import json
 import os
 import re
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -133,10 +138,7 @@ def _supabase_get(path: str, *, params: dict | None = None) -> list[dict]:
         raise RuntimeError(
             "Supabase env vars missing (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)"
         )
-    qs = ""
-    if params:
-        from urllib.parse import urlencode
-        qs = "?" + urlencode(params)
+    qs = "?" + urlencode(params) if params else ""
     req = Request(
         f"{url.rstrip('/')}/rest/v1/{path}{qs}",
         headers={
@@ -185,6 +187,18 @@ def _load_executions(property_id: str) -> dict[str, dict]:
     return {r["url"]: r for r in rows}
 
 
+def _load_check_states(property_id: str) -> dict[str, dict]:
+    """Returns map keyed by "url\\x1fcheck_id"."""
+    rows = _supabase_get(
+        "page_check_state",
+        params={
+            "select": "url,check_id,status,notes,owner,fix_applied_at",
+            "property_id": f"eq.{property_id}",
+        },
+    )
+    return {f"{r['url']}\x1f{r['check_id']}": r for r in rows}
+
+
 # ─── filename helper ────────────────────────────────────────────────────────
 _SAFE_FN = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -219,8 +233,11 @@ class handler(BaseHTTPRequestHandler):
             q = parse_qs(urlparse(self.path).query)
             slug = (q.get("slug", [""])[0] or "").strip()
             env = (q.get("env", ["dev"])[0] or "dev").strip().lower()
+            phase = (q.get("phase", ["1"])[0] or "1").strip()
             if not slug:
                 return self._send_json(400, {"ok": False, "error": "slug query param required."})
+            if phase not in ("1", "2"):
+                return self._send_json(400, {"ok": False, "error": "unknown phase"})
 
             prop = _resolve_property(slug)
             if not prop:
@@ -252,34 +269,58 @@ class handler(BaseHTTPRequestHandler):
                 )
 
             overrides = _load_overrides(prop["id"])
-            executions = _load_executions(prop["id"])
+            title = (prop.get("name") or slug).strip()
 
-            # Builder import: deferred so cold-start of unrelated routes
-            # doesn't pay openpyxl + pandas import cost. The sibling
-            # module path must be on sys.path because Vercel runs each
-            # function file in isolation.
+            # Builder imports: deferred so cold-start of unrelated routes
+            # doesn't pay openpyxl + pandas import cost. Vercel runs each
+            # function file in isolation, so we add this dir to sys.path.
             import sys as _sys
             _here = os.path.dirname(os.path.abspath(__file__))
             if _here not in _sys.path:
                 _sys.path.insert(0, _here)
-            from _phase1_builder import build_phase1_workbook  # type: ignore
-
-            title = (prop.get("name") or slug).strip()
-            # Pick a primary host: prefer the canonical https://www.{domain}
-            # form unless the resolved BQ rows show a bare-host majority.
-            primary_host = f"https://www.{domain_norm}"
-
-            buf = build_phase1_workbook(
-                rows,
-                title=title,
-                primary_host=primary_host,
-                domain=domain_norm,
-                overrides=overrides,
-                executions=executions,
-            )
 
             today = _dt.date.today().isoformat()
-            filename = f"{_safe_filename(slug)}-Website-Quality-Audit-{today}.xlsx"
+
+            if phase == "2":
+                check_states = _load_check_states(prop["id"])
+                from _phase1_builder import build_phase1_dataframe  # type: ignore
+                from _phase2_builder import build_phase2_workbook  # type: ignore
+
+                triage_df = build_phase1_dataframe(
+                    rows, domain=domain_norm, overrides=overrides
+                )
+
+                # Sitewide HTTP probes (S1/S3) hit the public origin; allow
+                # disabling via env so we can keep cold invocations fast.
+                skip_http = os.environ.get("PHASE2_SKIP_SITEWIDE_HTTP", "").lower() in (
+                    "1", "true", "yes",
+                )
+                buf = build_phase2_workbook(
+                    triage_df,
+                    title=title,
+                    domain=domain_norm,
+                    check_states=check_states,
+                    skip_sitewide_http=skip_http,
+                )
+                filename = f"{_safe_filename(slug)}-Technical-SEO-Audit-{today}.xlsx"
+            else:
+                executions = _load_executions(prop["id"])
+                from _phase1_builder import build_phase1_workbook  # type: ignore
+
+                # Pick a primary host: prefer the canonical https://www.{domain}
+                # form unless the resolved BQ rows show a bare-host majority.
+                primary_host = f"https://www.{domain_norm}"
+
+                buf = build_phase1_workbook(
+                    rows,
+                    title=title,
+                    primary_host=primary_host,
+                    domain=domain_norm,
+                    overrides=overrides,
+                    executions=executions,
+                )
+                filename = f"{_safe_filename(slug)}-Website-Quality-Audit-{today}.xlsx"
+
             data = buf.getvalue()
 
             self.send_response(200)

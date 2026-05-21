@@ -186,13 +186,10 @@ function ExportButton({
   propertySlug: string;
 }) {
   // Triage mode → Phase 1 workbook. Audit mode → Phase 2 workbook.
-  // Both endpoints stream xlsx attachments named off the slug + today's
-  // date; we let the browser pick up Content-Disposition for the
-  // download filename.
-  const href =
-    mode === "triage"
-      ? `/api/wqa/export?slug=${encodeURIComponent(propertySlug)}`
-      : `/api/audit/phase-2/export?slug=${encodeURIComponent(propertySlug)}`;
+  // Both phases stream from a single endpoint that branches on ?phase=;
+  // we let the browser pick up Content-Disposition for the filename.
+  const phase = mode === "triage" ? "1" : "2";
+  const href = `/api/wqa/export?slug=${encodeURIComponent(propertySlug)}&phase=${phase}`;
   const label = mode === "triage" ? "Export WQA (xlsx)" : "Export Phase 2 (xlsx)";
   return (
     <a
