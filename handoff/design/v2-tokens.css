@@ -1,0 +1,98 @@
+/* ──────────────────────────────────────────────────────────────────
+ * v2 design tokens — extracted from v2-ui-mockup.html
+ * Canonical reference for the V1.1 visual refresh.
+ *
+ * Source of truth: ../v2-ui-mockup.html (`:root` block, lines 8-33).
+ * Do not modify these values without updating the mockup first.
+ *
+ * Annotations explain what each token is for so this file can be
+ * lifted into web/app/globals.css without spelunking the mockup.
+ * ────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ─── Surface hierarchy ────────────────────────────────────────── */
+  /* Used in order from page background → top-of-stack: */
+  --bg:             #f7f7f8;  /* page canvas */
+  --surface:        #ffffff;  /* cards, panels, top nav, hero bands */
+  --surface-alt:    #fafafa;  /* sidebar background, table head, subnav */
+
+  /* ─── Borders ──────────────────────────────────────────────────── */
+  --border:         #e7e7ea;  /* default 1px solid */
+  --border-strong:  #d4d4d8;  /* hover state on interactive borders */
+
+  /* ─── Text hierarchy ───────────────────────────────────────────── */
+  /* Used in order from highest contrast → lowest: */
+  --text:           #18181b;  /* headings, primary content, numbers */
+  --text-muted:     #71717a;  /* body, secondary, labels */
+  --text-subtle:    #a1a1aa;  /* eyebrow labels, helper text, sb-version */
+
+  /* ─── Accent ───────────────────────────────────────────────────── */
+  /* Near-black is the SINGLE accent. Used for: primary buttons, active
+   * sidebar items (filled black with white text), table-row hover state,
+   * tab active underline, and phase-strip done cells. Indigo (below) is
+   * the only other "active" colour and is reserved for current-phase
+   * indicators + structural rationale callouts.                       */
+  --accent:         #18181b;
+  --accent-hover:   #3f3f46;
+
+  /* ─── Status colors ───────────────────────────────────────────── */
+  /* Foreground / background tint pairs.
+   * Bg tints all use *-bg suffix; foreground colours pair with them. */
+  --emerald:        #059669;  /* success: active, completed-good, restore */
+  --emerald-bg:    #ecfdf5;
+  --amber:          #d97706;  /* warning: paused, redirect, undecided-warm */
+  --amber-bg:      #fffbeb;
+  --rose:           #dc2626;  /* danger: removed, failed */
+  --rose-bg:       #fef2f2;
+  --sky:            #0284c7;  /* informational: prospect, optimize */
+  --sky-bg:        #f0f9ff;
+  --indigo:         #4f46e5;  /* active phase, completed projects, rationale rule */
+  --indigo-bg:     #eef2ff;
+  --violet:         #7c3aed;  /* AI / agent / inheritance / Brand DNA assistant */
+  --violet-bg:     #f5f3ff;
+  --slate:          #64748b;  /* inactive, keep (page triage) */
+  --slate-bg:      #f8fafc;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Body baseline (apply at the @layer base level in globals.css)
+ *
+ * font-feature-settings: 'cv11', 'ss01' — Inter character variants
+ *   cv11: alternate single-storey 'a' for tighter visual rhythm
+ *   ss01: stylistic set 1 (rounder dotless i)
+ * letter-spacing -0.011em is the mockup's body letter-spacing.
+ * ────────────────────────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+  letter-spacing: -0.011em;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Serif numerals — used ONLY inside the completeness gauge on the
+ * Brand DNA Overview screen. Lora at weight 500, 36px, letter-
+ * spacing -0.025em.  See `gauge .pct-num` in the mockup style block.
+ * ────────────────────────────────────────────────────────────────── */
+.serif-numeric {
+  font-family: 'Lora', 'Iowan Old Style', 'Apple Garamond', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Tabular numerics — apply to any context displaying counts, ranks,
+ * percentages, dates, phase indices, etc. Prevents number jitter.
+ * ────────────────────────────────────────────────────────────────── */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Monospace — used for domain names, URLs, IDs, code samples.
+ * ────────────────────────────────────────────────────────────────── */
+.mono {
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+}

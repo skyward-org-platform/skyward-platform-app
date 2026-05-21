@@ -6,5 +6,6 @@
       "memory": 1024,
       "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,**/fixtures/**,**/__pycache__/**,**/locales/**,**/*.dist-info/**,docs/**}"
     }
-  }
+  },
+  "crons": []
 }

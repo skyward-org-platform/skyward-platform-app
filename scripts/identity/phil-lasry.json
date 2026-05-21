@@ -1,0 +1,8 @@
+{
+  "legal_name": "Philippe Lasry Photography LLC",
+  "brand_name": "Philippe Lasry",
+  "founded": 2003,
+  "hq_location": "Miami, FL",
+  "operating_locations": ["Miami", "South Florida"],
+  "_notes": "Extracted 2026-05-17 from backfill_phil_lasry_brand_dna.py. legal_name and founded are approximations derived from plasry.com /aboutus content."
+}

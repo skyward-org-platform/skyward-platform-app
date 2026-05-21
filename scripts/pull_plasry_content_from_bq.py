@@ -1,4 +1,16 @@
-"""Pull plasry page content from Adam's Screaming Frog BQ table into Supabase.
+"""DEPRECATED 2026-05-17 — superseded by scripts/pull_content_from_bq.py.
+
+The generic version takes <property_slug> + optional --domain and uses the BQ
+domain from Supabase property.primary_domain when --domain is omitted. Run:
+
+    python scripts/pull_content_from_bq.py phil-lasry --domain plasry.com
+
+instead. This file is retained for historical reference (hardcoded BQ filter
+and 2026-04-14 crawl timestamp).
+
+---
+
+Pull plasry page content from Adam's Screaming Frog BQ table into Supabase.
 
 Read-only on BigQuery. Reads `data-hub-468216.ScreamingFrog.custom_javascript_page_content`
 filtered to domain='plasry.com', and for each row with non-null Page_Content_1:

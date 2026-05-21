@@ -1,4 +1,15 @@
-"""Backfill phil-lasry pages from the existing WQA workbook into Supabase.
+"""DEPRECATED 2026-05-17 — superseded by scripts/backfill_pages.py.
+
+backfill_pages.py reads workbook columns by header name (not position), so it
+handles plasry's 41-col layout and other layouts equally. Run:
+
+    python scripts/backfill_pages.py phil-lasry delivery/phil-lasry/phase-1-wqa/plasry-Website-Quality-Audit-2026-04-14.xlsx
+
+instead. This file is retained for the historical column-position notes below.
+
+---
+
+Backfill phil-lasry pages from the existing WQA workbook into Supabase.
 
 Reads the URL Triage tab, normalizes audit_action labels, upserts page rows.
 

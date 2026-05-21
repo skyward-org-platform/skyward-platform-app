@@ -4,11 +4,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ──────────────────────────────────────────────────────────────────
+ * V2 design tokens — sourced from handoff/design/v2-tokens.css
+ * Light-themed. Refined neutral palette. Near-black accent.
+ * Indigo for active. Inter with cv11/ss01 features on body.
+ * ────────────────────────────────────────────────────────────────── */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -18,11 +24,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -39,82 +40,67 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  /* V2 raw tokens (from v2-tokens.css) */
+  --v2-bg:             #f7f7f8;
+  --v2-surface:        #ffffff;
+  --v2-surface-alt:    #fafafa;
+  --v2-border:         #e7e7ea;
+  --v2-border-strong:  #d4d4d8;
+  --v2-text:           #18181b;
+  --v2-text-muted:     #71717a;
+  --v2-text-subtle:    #a1a1aa;
+  --v2-accent:         #18181b;
+  --v2-accent-hover:   #3f3f46;
+  --v2-emerald:        #059669;
+  --v2-emerald-bg:     #ecfdf5;
+  --v2-amber:          #d97706;
+  --v2-amber-bg:       #fffbeb;
+  --v2-rose:           #dc2626;
+  --v2-rose-bg:        #fef2f2;
+  --v2-sky:            #0284c7;
+  --v2-sky-bg:         #f0f9ff;
+  --v2-indigo:         #4f46e5;
+  --v2-indigo-bg:      #eef2ff;
+  --v2-violet:         #7c3aed;
+  --v2-violet-bg:      #f5f3ff;
+  --v2-slate:          #64748b;
+  --v2-slate-bg:       #f8fafc;
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* shadcn semantic mappings → v2 tokens */
+  --background:           var(--v2-bg);
+  --foreground:           var(--v2-text);
+  --card:                 var(--v2-surface);
+  --card-foreground:      var(--v2-text);
+  --popover:              var(--v2-surface);
+  --popover-foreground:   var(--v2-text);
+  --primary:              var(--v2-accent);
+  --primary-foreground:   #ffffff;
+  --secondary:            var(--v2-surface-alt);
+  --secondary-foreground: var(--v2-text);
+  --muted:                var(--v2-surface-alt);
+  --muted-foreground:     var(--v2-text-muted);
+  --accent:               var(--v2-indigo-bg);
+  --accent-foreground:    var(--v2-indigo);
+  --destructive:          var(--v2-rose);
+  --border:               var(--v2-border);
+  --input:                var(--v2-border);
+  --ring:                 var(--v2-border-strong);
+  --radius:               0.625rem;
+  --sidebar:              var(--v2-surface-alt);
+  --sidebar-foreground:   var(--v2-text);
+  --sidebar-primary:      var(--v2-accent);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:       #f0f0f2;
+  --sidebar-accent-foreground: var(--v2-text);
+  --sidebar-border:       var(--v2-border);
+  --sidebar-ring:         var(--v2-border-strong);
 }
 
 @layer base {
@@ -123,8 +109,18 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
     @apply font-sans;
   }
 }
+
+/* Utility class for tabular-aligned numerics. Tailwind's `tabular-nums`
+ * utility class already does this; this one mirrors the v2-tokens.css
+ * convention and gives a single-token name to apply where Tailwind's
+ * spelling reads less obvious. */
+.tabular { font-variant-numeric: tabular-nums; }

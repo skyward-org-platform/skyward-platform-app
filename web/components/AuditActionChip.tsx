@@ -8,29 +8,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  ACTION_VARIANTS,
+  type ActionVariant,
+  actionPillClasses,
+  actionLabel,
+} from "@/components/ActionPill";
 import { updateAuditAction } from "@/app/properties/[slug]/pages/actions";
 
-const ACTION_COLORS: Record<string, string> = {
-  optimize: "bg-blue-100 text-blue-700 hover:bg-blue-200",
-  restore: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
-  redirect: "bg-amber-100 text-amber-800 hover:bg-amber-200",
-  consolidate: "bg-slate-200 text-slate-700 hover:bg-slate-300",
-  remove: "bg-red-100 text-red-700 hover:bg-red-200",
-  keep: "bg-slate-100 text-slate-600 hover:bg-slate-200",
-  no_action: "bg-slate-100 text-slate-500 hover:bg-slate-200",
-  undecided: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-};
-
-const ACTIONS = [
-  "optimize",
-  "restore",
-  "redirect",
-  "consolidate",
-  "remove",
-  "keep",
-  "no_action",
-  "undecided",
-];
+function isActionVariant(s: string | null | undefined): s is ActionVariant {
+  return !!s && (ACTION_VARIANTS as readonly string[]).includes(s);
+}
 
 export function AuditActionChip({
   pageId,
@@ -41,12 +29,15 @@ export function AuditActionChip({
   initialAction: string | null;
   propertySlug: string;
 }) {
-  const [current, setCurrent] = useState(initialAction ?? "undecided");
+  const initial: ActionVariant = isActionVariant(initialAction)
+    ? initialAction
+    : "undecided";
+  const [current, setCurrent] = useState<ActionVariant>(initial);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   function handleChange(newAction: string | null) {
-    if (!newAction) return;
+    if (!isActionVariant(newAction)) return;
     const previous = current;
     setCurrent(newAction); // optimistic
     setError(null);
@@ -59,26 +50,28 @@ export function AuditActionChip({
     });
   }
 
-  const color = ACTION_COLORS[current] ?? "bg-slate-100 text-slate-600 hover:bg-slate-200";
+  // Reuse ActionPill's color schema for the trigger so static pills (in
+  // tables, on overview) and the editable trigger share one palette.
+  const triggerCls = `${actionPillClasses(current)} h-[22px] border-0 shadow-none ${
+    pending ? "opacity-60" : ""
+  }`;
 
   return (
     <div className="inline-flex items-center gap-1">
       <Select value={current} onValueChange={handleChange} disabled={pending}>
-        <SelectTrigger
-          className={`h-6 px-2 text-[11px] font-semibold border-0 rounded shadow-none ${color} ${pending ? "opacity-60" : ""}`}
-        >
+        <SelectTrigger className={triggerCls}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {ACTIONS.map((a) => (
+          {ACTION_VARIANTS.map((a) => (
             <SelectItem key={a} value={a} className="text-xs">
-              {a}
+              {actionLabel(a)}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       {error && (
-        <span className="text-[10px] text-red-600" title={error}>
+        <span className="text-[10px] text-rose-700" title={error}>
           !
         </span>
       )}

@@ -1,6 +1,16 @@
-"""Backfill phil-lasry Brand DNA: identity from manual constants, voice/terms/proof/future/story from inference.
+"""DEPRECATED 2026-05-17 — superseded by scripts/backfill_brand_dna.py.
 
-Skips re-running inference if a section already exists in brand_dna_section unless --force.
+The plasry identity constants below were extracted into
+scripts/identity/phil-lasry.json. Run:
+
+    python scripts/backfill_brand_dna.py phil-lasry [--force]
+
+instead. This file is retained for historical reference (the original derivation
+notes for the legal_name / founded fields live in the comments here).
+
+---
+
+Backfill phil-lasry Brand DNA: identity from manual constants, voice/terms/proof/future/story from inference.
 """
 from __future__ import annotations
 

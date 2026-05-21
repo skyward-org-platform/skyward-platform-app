@@ -1,8 +1,11 @@
 // /clients/[id] — single-client detail sourced from BQ Meta via /api/clients/[id].
 // Read-only in v1. Edits live in Adam's admin portal during this phase
-// (see ~/skyward-platform-app/session-notes/2026-05-14-admin-merge-plan.md).
+// (see session-notes/2026-05-14-admin-merge-plan.md).
 
 import Link from "next/link";
+import { apiBase } from "@/lib/api-base";
+import { supabase } from "@/lib/supabase";
+import { StatusPill } from "@/components/StatusPill";
 
 type BqClient = {
   client_id: number;
@@ -40,10 +43,40 @@ type Detail = {
   projects: Project[];
 };
 
-async function fetchClient(id: string): Promise<Detail | { error: string }> {
-  const base =
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-  const res = await fetch(`${base}/api/clients/${id}`, { cache: "no-store" });
+// Resolve a slug-shaped param (e.g. "phil-lasry") to a numeric BQ client_id.
+// The Supabase `client` table holds the slug; the canonical mapping is by name
+// (case-insensitive) against the BQ clients list. Returns null if no match.
+async function resolveSlugToClientId(slug: string): Promise<number | null> {
+  const { data: row } = await supabase
+    .from("client")
+    .select("name")
+    .eq("slug", slug)
+    .maybeSingle();
+  const name = (row as { name?: string } | null)?.name;
+  if (!name) return null;
+
+  const listRes = await fetch(`${apiBase()}/api/clients`, { cache: "no-store" });
+  if (!listRes.ok) return null;
+  const { clients } = (await listRes.json()) as { clients: BqClient[] };
+  const target = name.trim().toLowerCase();
+  const hit = clients.find(
+    (c) => c.client_name.trim().toLowerCase() === target,
+  );
+  return hit?.client_id ?? null;
+}
+
+async function fetchClient(idOrSlug: string): Promise<Detail | { error: string }> {
+  let resolvedId = idOrSlug;
+  if (!/^\d+$/.test(idOrSlug)) {
+    const numericId = await resolveSlugToClientId(idOrSlug);
+    if (numericId === null) {
+      return { error: `No BigQuery client matched slug "${idOrSlug}".` };
+    }
+    resolvedId = String(numericId);
+  }
+  const res = await fetch(`${apiBase()}/api/clients/${resolvedId}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     return { error: body.error ?? `HTTP ${res.status}` };
@@ -51,22 +84,8 @@ async function fetchClient(id: string): Promise<Detail | { error: string }> {
   return (await res.json()) as Detail;
 }
 
-function Pill({ color, children }: { color: string; children: React.ReactNode }) {
-  return (
-    <span
-      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${color}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function StatusPill({ active }: { active: boolean }) {
-  return active ? (
-    <Pill color="bg-emerald-100 text-emerald-700">Active</Pill>
-  ) : (
-    <Pill color="bg-slate-100 text-slate-600">Inactive</Pill>
-  );
+function ActivePill({ active }: { active: boolean }) {
+  return <StatusPill variant={active ? "active" : "inactive"} />;
 }
 
 function Section({
@@ -79,11 +98,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-6 border rounded bg-white">
-      <header className="px-4 py-2 border-b bg-slate-50 flex items-center justify-between">
-        <div className="text-sm font-semibold text-slate-900">{title}</div>
+    <section className="mb-6 border rounded-lg bg-card">
+      <header className="px-4 py-2 border-b bg-muted/40 flex items-center justify-between">
+        <div className="text-sm font-semibold">{title}</div>
         {typeof count === "number" && (
-          <div className="text-xs text-slate-500 tabular-nums">{count}</div>
+          <div className="text-xs text-muted-foreground tabular-nums">{count}</div>
         )}
       </header>
       <div className="p-4">{children}</div>
@@ -101,13 +120,13 @@ export default async function ClientDetailPage({
 
   if ("error" in data) {
     return (
-      <div className="p-8 max-w-3xl">
-        <div className="text-xs text-slate-500 mb-2">
+      <div className="p-4 sm:p-8 max-w-3xl">
+        <div className="text-xs text-muted-foreground mb-2">
           <Link href="/clients" className="hover:underline">
             ← Clients
           </Link>
         </div>
-        <div className="p-3 border border-red-200 bg-red-50 text-red-800 text-sm rounded">
+        <div className="p-3 border border-rose-200 bg-rose-50 text-rose-800 text-sm rounded">
           <div className="font-semibold mb-1">Couldn&rsquo;t load client {id}.</div>
           <div className="font-mono text-xs">{data.error}</div>
         </div>
@@ -118,18 +137,18 @@ export default async function ClientDetailPage({
   const { client, owned_domains, projects } = data;
 
   return (
-    <div className="p-8 max-w-4xl">
-      <div className="text-xs text-slate-500 mb-2">
+    <div className="p-4 sm:p-8 max-w-4xl">
+      <div className="text-xs text-muted-foreground mb-2">
         <Link href="/clients" className="hover:underline">
           ← Clients
         </Link>
       </div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3">
           {client.client_name}
-          <StatusPill active={client.is_active} />
+          <ActivePill active={client.is_active} />
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Sourced from BigQuery Meta. Edits live in the{" "}
           <a
             href="https://github.com/skyward-org-platform/skyward-platform"
@@ -145,16 +164,16 @@ export default async function ClientDetailPage({
 
       <Section title="Client details">
         <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
-          <dt className="text-slate-500">Client ID</dt>
+          <dt className="text-muted-foreground">Client ID</dt>
           <dd className="tabular-nums">{client.client_id}</dd>
-          <dt className="text-slate-500">Name</dt>
+          <dt className="text-muted-foreground">Name</dt>
           <dd>{client.client_name}</dd>
-          <dt className="text-slate-500">Abbreviation</dt>
+          <dt className="text-muted-foreground">Abbreviation</dt>
           <dd>{client.abbreviation ?? "—"}</dd>
-          <dt className="text-slate-500">Notes</dt>
+          <dt className="text-muted-foreground">Notes</dt>
           <dd className="whitespace-pre-wrap">{client.notes ?? "—"}</dd>
-          <dt className="text-slate-500">Created</dt>
-          <dd className="text-slate-600">
+          <dt className="text-muted-foreground">Created</dt>
+          <dd className="text-muted-foreground tabular-nums">
             {client.created_at ? new Date(client.created_at).toLocaleDateString() : "—"}
           </dd>
         </dl>
@@ -162,10 +181,10 @@ export default async function ClientDetailPage({
 
       <Section title="Owned domains" count={owned_domains.length}>
         {owned_domains.length === 0 ? (
-          <div className="text-sm text-slate-500">No owned domains.</div>
+          <div className="text-sm text-muted-foreground">No owned domains.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500 uppercase">
+            <thead className="text-xs text-muted-foreground uppercase">
               <tr>
                 <th className="text-left py-1">Domain</th>
                 <th className="text-left py-1">Name</th>
@@ -177,10 +196,10 @@ export default async function ClientDetailPage({
               {owned_domains.map((d) => (
                 <tr key={d.domain_id} className="border-t">
                   <td className="py-1.5">{d.domain}</td>
-                  <td className="py-1.5 text-slate-600">{d.domain_name ?? "—"}</td>
-                  <td className="py-1.5 text-slate-600">{d.priority ?? "—"}</td>
+                  <td className="py-1.5 text-muted-foreground">{d.domain_name ?? "—"}</td>
+                  <td className="py-1.5 text-muted-foreground">{d.priority ?? "—"}</td>
                   <td className="py-1.5">
-                    <StatusPill active={d.is_active} />
+                    <ActivePill active={d.is_active} />
                   </td>
                 </tr>
               ))}
@@ -195,10 +214,10 @@ export default async function ClientDetailPage({
 
       <Section title="Projects" count={projects.length}>
         {projects.length === 0 ? (
-          <div className="text-sm text-slate-500">No projects yet.</div>
+          <div className="text-sm text-muted-foreground">No projects yet.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500 uppercase">
+            <thead className="text-xs text-muted-foreground uppercase">
               <tr>
                 <th className="text-left py-1">ID</th>
                 <th className="text-left py-1">Type</th>
@@ -211,10 +230,10 @@ export default async function ClientDetailPage({
               {projects.map((p) => (
                 <tr key={p.project_id} className="border-t">
                   <td className="py-1.5 tabular-nums">{p.project_id}</td>
-                  <td className="py-1.5 text-slate-600">{p.project_type}</td>
+                  <td className="py-1.5 text-muted-foreground">{p.project_type}</td>
                   <td className="py-1.5">{p.project_name ?? "—"}</td>
-                  <td className="py-1.5 text-slate-600">{p.status ?? "—"}</td>
-                  <td className="py-1.5 text-slate-600">
+                  <td className="py-1.5 text-muted-foreground">{p.status ?? "—"}</td>
+                  <td className="py-1.5 text-muted-foreground tabular-nums">
                     {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
                   </td>
                 </tr>

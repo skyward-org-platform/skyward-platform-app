@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.0",
     "@base-ui/react": "^1.4.1",
     "@supabase/supabase-js": "^2.105.4",
     "class-variance-authority": "^0.7.1",

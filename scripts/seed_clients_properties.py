@@ -15,6 +15,7 @@ CLIENTS = [
     {"slug": "tacoma-legacy-partners", "name": "Tacoma Legacy Partners", "legal_name": "Tacoma Legacy Partners, LLC"},
     {"slug": "becker-family-flooring", "name": "Becker Family Flooring", "legal_name": "Becker Family Flooring, Inc"},
     {"slug": "busbank", "name": "BusBank", "legal_name": "GCS Holdings"},
+    {"slug": "gcs", "name": "Global Charter Services", "legal_name": "GCS Holdings"},
     {"slug": "shs", "name": "SHS Home Warranty", "legal_name": "SHS Home Services"},
     {"slug": "manhattan-eye", "name": "Manhattan Eye", "legal_name": "Manhattan Eye PLLC"},
     {"slug": "dental-shop", "name": "Dental Shop", "legal_name": "Dental Shop"},
@@ -37,7 +38,9 @@ PROPERTIES = [
      "primary_domain": "kitchenservicesofprovo.com"},
     {"client_slug": "becker-family-flooring", "slug": "fci-westchester", "name": "FCI Southern Westchester",
      "primary_domain": "floorcoveringsinternational.com"},
-    {"client_slug": "busbank", "slug": "busbank", "name": "BusBank", "primary_domain": "busbank.com"},
+    {"client_slug": "gcs", "slug": "busbank", "name": "BusBank", "primary_domain": "busbank.com"},
+    {"client_slug": "gcs", "slug": "corporateshuttle", "name": "Corporate Shuttle", "primary_domain": "corporateshuttle.com"},
+    {"client_slug": "gcs", "slug": "buster", "name": "Buster", "primary_domain": "buster.com"},
 ]
 
 
