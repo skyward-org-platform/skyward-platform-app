@@ -1,29 +1,13 @@
-import { supabase } from "@/lib/supabase";
-import { AuditActionChip } from "@/components/AuditActionChip";
+// /properties/[slug]/pages — unified Pages tab. WQA aggregate from BQ is
+// the canonical row source; SOP-derived triage is the default action;
+// human overrides in wqa_decision take precedence per-URL.
 
-type Page = {
-  id: string;
-  url: string;
-  page_type: string | null;
-  status_code: number | null;
-  audit_action: string | null;
-  word_count: number | null;
-};
-
-async function getPages(slug: string): Promise<{ pages: Page[]; slug: string }> {
-  const { data: prop } = await supabase
-    .from("property")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-  if (!prop) return { pages: [], slug };
-  const { data } = await supabase
-    .from("page")
-    .select("id, url, page_type, status_code, audit_action, word_count")
-    .eq("property_id", prop.id)
-    .order("audit_action", { ascending: true });
-  return { pages: (data ?? []) as Page[], slug };
-}
+import { getPropertyBySlug } from "@/lib/property";
+import { getWqaForDomain } from "@/lib/wqa";
+import { getWqaDecisions } from "@/lib/wqa-decisions";
+import { getExecutionByUrl } from "@/lib/page-execution";
+import { getCheckStateByUrlCheck } from "@/lib/page-check-state";
+import { PagesView } from "@/components/PagesView";
 
 export default async function PagesTab({
   params,
@@ -31,54 +15,49 @@ export default async function PagesTab({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { pages } = await getPages(slug);
+  const prop = await getPropertyBySlug(slug);
+  const primaryDomain = prop?.primary_domain ?? null;
+  const propertyId = prop?.id ?? null;
 
-  if (pages.length === 0) {
-    return (
-      <div className="p-8 text-slate-500">No pages found for this property.</div>
-    );
-  }
+  const wqa = primaryDomain
+    ? await getWqaForDomain(primaryDomain, "dev")
+    : null;
+  const decisions = await getWqaDecisions(slug);
+
+  // Fetch the operator-side overlays (page_execution + page_check_state) so
+  // the drawer can render status/owner/due/check-status without a second
+  // round-trip. Both reads are property-scoped and return Maps the client
+  // can index in O(1).
+  const [executions, checkStates] = propertyId
+    ? await Promise.all([
+        getExecutionByUrl(propertyId),
+        getCheckStateByUrlCheck(propertyId),
+      ])
+    : [new Map(), new Map()];
+
+  const wqaPayload =
+    wqa && "ok" in wqa && wqa.ok
+      ? {
+          rows: wqa.rows,
+          summary: wqa.site_summary,
+          projectId: wqa.project_id,
+          version: wqa.version,
+          dataset: wqa.dataset,
+          message: wqa.message,
+        }
+      : null;
+  const wqaError = wqa && "ok" in wqa && !wqa.ok ? wqa.error : null;
 
   return (
-    <div className="p-8">
-      <div className="text-xs text-slate-500 mb-3">{pages.length} pages</div>
-      <div className="border rounded">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-600 uppercase">
-            <tr>
-              <th className="text-left px-3 py-2">URL</th>
-              <th className="text-left px-3 py-2">Type</th>
-              <th className="text-left px-3 py-2">Status</th>
-              <th className="text-left px-3 py-2">Audit Action</th>
-              <th className="text-right px-3 py-2">Words</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pages.map((p) => (
-              <tr key={p.id} className="border-t hover:bg-slate-50">
-                <td
-                  className="px-3 py-2 font-mono text-xs truncate max-w-md"
-                  title={p.url}
-                >
-                  {p.url}
-                </td>
-                <td className="px-3 py-2 text-slate-600">{p.page_type ?? "—"}</td>
-                <td className="px-3 py-2">{p.status_code ?? "—"}</td>
-                <td className="px-3 py-2">
-                  <AuditActionChip
-                    pageId={p.id}
-                    initialAction={p.audit_action}
-                    propertySlug={slug}
-                  />
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
-                  {p.word_count ?? "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <PagesView
+      propertySlug={slug}
+      propertyId={propertyId}
+      wqa={wqaPayload}
+      wqaError={wqaError}
+      primaryDomain={primaryDomain}
+      decisions={decisions}
+      executions={Array.from(executions.values())}
+      checkStates={Array.from(checkStates.values())}
+    />
   );
 }
