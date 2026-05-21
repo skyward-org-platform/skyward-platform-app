@@ -4,6 +4,7 @@
 
 import type { WqaRow } from "@/lib/wqa";
 import type { TriageAction, TriageResult } from "@/lib/wqa-triage";
+import type { PageExecutionRow } from "@/lib/page-execution";
 
 export type TriagedRow = { row: WqaRow; triage: TriageResult };
 
@@ -16,6 +17,10 @@ export type ActionTabProps = {
   /** Click handler invoked when a URL row is clicked — opens the
    *  universal URL drawer at the parent (WqaTabs) level. */
   onOpenDrawer?: (url: string) => void;
+  /** url → page_execution row. Per-tab inline editors (destination URL,
+   *  target H1, recommended action override) seed their defaults from
+   *  this map; absent means "no execution row yet". */
+  execByUrl?: Map<string, PageExecutionRow>;
 };
 
 export const TAB_ORDER: TriageAction[] = [

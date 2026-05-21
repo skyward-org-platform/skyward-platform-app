@@ -20,6 +20,8 @@ import {
   EvaluateTab,
   InvestigateTab,
 } from "@/components/wqa/HumanReviewTabs";
+import { CanonicalAuditTab } from "@/components/wqa/CanonicalAuditTab";
+import { ActionLegendTab } from "@/components/wqa/ActionLegendTab";
 import { UrlDrawer } from "@/components/UrlDrawer";
 import { ACTION_TINT, triageRow, type TriageAction } from "@/lib/wqa-triage";
 import { buildCtx } from "@/lib/wqa-checks";
@@ -41,7 +43,9 @@ type SubTab =
   | "consolidate"
   | "remove"
   | "evaluate"
-  | "investigate";
+  | "investigate"
+  | "canonical-audit"
+  | "action-legend";
 
 const TAB_TO_ACTION: Partial<Record<SubTab, TriageAction>> = {
   optimize: "Optimize",
@@ -217,6 +221,19 @@ export function WqaTabs({
             );
           },
         )}
+        <TabButton
+          active={view === "canonical-audit"}
+          onClick={() => setView("canonical-audit")}
+        >
+          Canonical Audit
+        </TabButton>
+        <TabButton
+          active={view === "action-legend"}
+          onClick={() => setView("action-legend")}
+          subdued
+        >
+          Action Legend
+        </TabButton>
         <span className="flex-1" />
         <TabButton
           active={view === "all"}
@@ -238,6 +255,7 @@ export function WqaTabs({
         version={version}
         dataset={dataset}
         message={message}
+        execByUrl={execByUrl}
         onOpenDrawer={(url) => setDrawerUrl(url)}
       />
 
@@ -270,6 +288,7 @@ function Body({
   version,
   dataset,
   message,
+  execByUrl,
   onOpenDrawer,
 }: {
   view: SubTab;
@@ -281,10 +300,38 @@ function Body({
   version: number | null;
   dataset: string;
   message?: string;
+  execByUrl: Map<string, PageExecutionRow>;
   onOpenDrawer: (url: string) => void;
 }) {
   if (view === "overview") {
-    return <OverviewTab rows={triaged} all={triaged} propertySlug={propertySlug} />;
+    // synthetic://* rows in page_execution belong to the action-plan /
+    // implementation-checklist editors. Pre-filter so OverviewTab doesn't
+    // walk the full execution map for every cell read.
+    const synthetic = new Map<string, PageExecutionRow>();
+    for (const [url, row] of execByUrl) {
+      if (url.startsWith("synthetic://")) synthetic.set(url, row);
+    }
+    return (
+      <OverviewTab
+        rows={triaged}
+        all={triaged}
+        propertySlug={propertySlug}
+        syntheticExecutions={synthetic}
+      />
+    );
+  }
+  if (view === "canonical-audit") {
+    return (
+      <CanonicalAuditTab
+        rows={triaged}
+        all={triaged}
+        propertySlug={propertySlug}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  }
+  if (view === "action-legend") {
+    return <ActionLegendTab />;
   }
   if (view === "all") {
     return (
@@ -302,7 +349,7 @@ function Body({
   const action = TAB_TO_ACTION[view];
   if (!action) return null;
   const rows = triaged.filter((r) => r.triage.action === action);
-  const props = { rows, all: triaged, propertySlug, onOpenDrawer };
+  const props = { rows, all: triaged, propertySlug, onOpenDrawer, execByUrl };
   switch (action) {
     case "Optimize":
       return <OptimizeTab {...props} />;
