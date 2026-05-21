@@ -1,11 +1,17 @@
 "use client";
 
-// Pages tab — unified WQA view. No Triage/WQA Data toggle anymore; the
-// WQA aggregate from BQ is the canonical source and the per-action tabs
-// (Overview / Optimize / Redirect / Restore / Remove / Evaluate /
-// Investigate / All URLs) live below the header.
+// Pages tab — unified WQA view with two top-level modes:
+//   - TRIAGE          → <WqaTabs>          (Phase 1 — what to do per URL)
+//   - TECHNICAL AUDIT → <AuditModeShell>   (Phase 2 — check catalog +
+//                                            per-check URL drill)
+//
+// The mode toggle persists in the URL search param `?mode=`. Triage is
+// the default (empty / "triage"). Both modes consume the same WQA data
+// + overlays, so switching is a pure render swap — no extra fetch.
 
+import { useRouter, useSearchParams } from "next/navigation";
 import { WqaTabs } from "@/components/wqa/WqaTabs";
+import { AuditModeShell } from "@/components/audit/AuditModeShell";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
 import type { DecisionRow } from "@/lib/wqa-decisions";
 import type { PageExecutionRow } from "@/lib/page-execution";
@@ -19,6 +25,8 @@ type WqaPayload = {
   dataset: string;
   message?: string;
 };
+
+type Mode = "triage" | "audit";
 
 export function PagesView({
   propertySlug,
@@ -39,6 +47,27 @@ export function PagesView({
   executions: PageExecutionRow[];
   checkStates: PageCheckStateRow[];
 }) {
+  const router = useRouter();
+  const sp = useSearchParams();
+  const mode = ((sp.get("mode") || "triage") as Mode) === "audit"
+    ? "audit"
+    : "triage";
+
+  function setMode(next: Mode) {
+    const params = new URLSearchParams(sp.toString());
+    if (next === "triage") {
+      params.delete("mode");
+      // Clear audit-mode-only params so we don't leak them into Triage.
+      params.delete("view");
+      params.delete("check");
+    } else {
+      params.set("mode", "audit");
+      // Triage uses `action` for its sub-tabs; not meaningful in audit.
+      params.delete("action");
+    }
+    router.push(`?${params.toString()}`, { scroll: false });
+  }
+
   return (
     <div className="p-4 sm:p-8 max-w-7xl">
       <header className="mb-4">
@@ -66,22 +95,81 @@ export function PagesView({
       {!wqa || wqa.rows.length === 0 ? (
         <EmptyState primaryDomain={primaryDomain} />
       ) : (
-        <WqaTabs
-          propertySlug={propertySlug}
-          propertyId={propertyId}
-          primaryDomain={primaryDomain}
-          rows={wqa.rows}
-          summary={wqa.summary}
-          projectId={wqa.projectId}
-          version={wqa.version}
-          dataset={wqa.dataset}
-          message={wqa.message}
-          decisions={decisions}
-          executions={executions}
-          checkStates={checkStates}
-        />
+        <>
+          <ModeSwitcher mode={mode} onChange={setMode} />
+          {mode === "triage" ? (
+            <WqaTabs
+              propertySlug={propertySlug}
+              propertyId={propertyId}
+              primaryDomain={primaryDomain}
+              rows={wqa.rows}
+              summary={wqa.summary}
+              projectId={wqa.projectId}
+              version={wqa.version}
+              dataset={wqa.dataset}
+              message={wqa.message}
+              decisions={decisions}
+              executions={executions}
+              checkStates={checkStates}
+            />
+          ) : (
+            <AuditModeShell
+              propertySlug={propertySlug}
+              propertyId={propertyId}
+              primaryDomain={primaryDomain}
+              rows={wqa.rows}
+              summary={wqa.summary}
+              decisions={decisions}
+              executions={executions}
+              checkStates={checkStates}
+            />
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+function ModeSwitcher({
+  mode,
+  onChange,
+}: {
+  mode: Mode;
+  onChange: (next: Mode) => void;
+}) {
+  return (
+    <div className="mb-5 inline-flex items-center gap-1 p-1 rounded-lg bg-muted/60 border">
+      <ModePill active={mode === "triage"} onClick={() => onChange("triage")}>
+        Triage
+      </ModePill>
+      <ModePill active={mode === "audit"} onClick={() => onChange("audit")}>
+        Technical Audit
+      </ModePill>
+    </div>
+  );
+}
+
+function ModePill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-[12px] font-semibold uppercase tracking-wider px-3 py-1.5 rounded-md transition-colors ${
+        active
+          ? "bg-foreground text-background shadow-sm"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
