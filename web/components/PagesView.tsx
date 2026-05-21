@@ -70,17 +70,22 @@ export function PagesView({
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl">
-      <header className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Pages</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Every URL with its WQA triage action and the data behind it. SOP
-          v5 § 5.2 decision tree runs automatically; click any chip to
-          override. WQA aggregate from{" "}
-          <code className="bg-muted px-1 rounded text-xs">
-            skyward-seo-pipeline
-          </code>{" "}
-          / BQ <code className="bg-muted px-1 rounded text-xs">wqa_output</code>.
-        </p>
+      <header className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Pages</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Every URL with its WQA triage action and the data behind it. SOP
+            v5 § 5.2 decision tree runs automatically; click any chip to
+            override. WQA aggregate from{" "}
+            <code className="bg-muted px-1 rounded text-xs">
+              skyward-seo-pipeline
+            </code>{" "}
+            / BQ <code className="bg-muted px-1 rounded text-xs">wqa_output</code>.
+          </p>
+        </div>
+        {wqa && wqa.rows.length > 0 && (
+          <ExportButton mode={mode} propertySlug={propertySlug} />
+        )}
       </header>
 
       {wqaError && (
@@ -170,6 +175,35 @@ function ModePill({
     >
       {children}
     </button>
+  );
+}
+
+function ExportButton({
+  mode,
+  propertySlug,
+}: {
+  mode: Mode;
+  propertySlug: string;
+}) {
+  // Triage mode → Phase 1 workbook. Audit mode → Phase 2 workbook.
+  // Both endpoints stream xlsx attachments named off the slug + today's
+  // date; we let the browser pick up Content-Disposition for the
+  // download filename.
+  const href =
+    mode === "triage"
+      ? `/api/wqa/export?slug=${encodeURIComponent(propertySlug)}`
+      : `/api/audit/phase-2/export?slug=${encodeURIComponent(propertySlug)}`;
+  const label = mode === "triage" ? "Export WQA (xlsx)" : "Export Phase 2 (xlsx)";
+  return (
+    <a
+      href={href}
+      download
+      className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-md border bg-card hover:bg-muted/60 transition-colors shrink-0"
+      title="Download the canonical workbook generated from current live state"
+    >
+      <span aria-hidden>↓</span>
+      <span>{label}</span>
+    </a>
   );
 }
 
