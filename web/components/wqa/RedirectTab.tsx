@@ -5,10 +5,11 @@
 // value / chain fix). Each group collapses to one fix when it represents a
 // single SSL toggle or systemic change.
 
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import type { ActionTabProps, TriagedRow } from "@/components/wqa/types";
+import { setExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
 
 type RedirectType =
   | "HTTP → HTTPS"
@@ -76,7 +77,7 @@ const PRIORITY_BAND = {
   Low: "bg-muted text-muted-foreground",
 } as const;
 
-export function RedirectTab({ rows, propertySlug, onOpenDrawer }: ActionTabProps) {
+export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: ActionTabProps) {
   if (rows.length === 0) {
     return <EmptyTab message="No URLs are tagged Redirect." />;
   }
@@ -133,6 +134,9 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer }: ActionTabProps
                   <tr>
                     <th className="text-left px-3 py-2 font-medium min-w-[260px]">Source URL</th>
                     <th className="text-left px-2 py-2 font-medium">Action</th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[280px]">
+                      Destination URL
+                    </th>
                     <th className="text-right px-2 py-2 font-medium">Status</th>
                     <th className="text-right px-2 py-2 font-medium">Sessions</th>
                     <th className="text-right px-2 py-2 font-medium">Refs</th>
@@ -168,6 +172,16 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer }: ActionTabProps
                             sopAction={r.triage.sopAction ?? r.triage.action}
                             initialAction={r.triage.action}
                             isOverridden={!!r.triage.isOverridden}
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <DestinationUrlInput
+                            propertySlug={propertySlug}
+                            url={r.row.url}
+                            defaultValue={
+                              execByUrl?.get(r.row.url)?.target_url ?? ""
+                            }
+                            suggested={suggested}
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
@@ -212,5 +226,57 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer }: ActionTabProps
         })}
       </div>
     </section>
+  );
+}
+
+/** Inline editor for page_execution.target_url. defaultValue seeds from the
+ *  saved override if present, otherwise stays blank — the operator can
+ *  glance at the "Suggested destination" column to the right and type or
+ *  paste the right URL. stopPropagation on the wrapper keeps the row's
+ *  drawer-open click from firing while the input has focus. */
+function DestinationUrlInput({
+  propertySlug,
+  url,
+  defaultValue,
+  suggested,
+}: {
+  propertySlug: string;
+  url: string;
+  defaultValue: string;
+  suggested: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div
+      className="inline-flex items-center gap-1 w-full"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="url"
+        defaultValue={defaultValue}
+        placeholder={suggested ?? "https://…"}
+        className={`font-mono text-[11px] w-[280px] px-2 py-1 rounded border border-input bg-background ${pending ? "opacity-60" : ""}`}
+        onBlur={(e) => {
+          const next = e.currentTarget.value.trim() || null;
+          if ((next ?? "") === (defaultValue ?? "")) return;
+          setError(null);
+          startTransition(async () => {
+            const res = await setExecutionField(
+              propertySlug,
+              url,
+              "target_url",
+              next,
+            );
+            if (!res.ok) setError(res.error);
+          });
+        }}
+      />
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </div>
   );
 }
