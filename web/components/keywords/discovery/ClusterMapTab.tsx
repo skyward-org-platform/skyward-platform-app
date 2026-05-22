@@ -13,12 +13,40 @@ import {
 } from "@/components/wqa/helpers";
 import { ClusterPriorityPill } from "../ClusterPriorityPill";
 import { ClusterPageActionChip } from "../ClusterPageActionChip";
-import type { KeywordsViewProps } from "../KeywordsView";
-import type { ClusterRow } from "@/lib/clusters";
+import type { KeywordsViewProps, RowClickHandler } from "../KeywordsView";
+import type {
+  ClusterRow,
+  ClusterMemberRow,
+  UrlClusterAssignmentRow,
+} from "@/lib/clusters";
 
-export function ClusterMapTab(props: KeywordsViewProps) {
-  const { clusters, propertySlug } = props;
+export function ClusterMapTab(
+  props: KeywordsViewProps & { onRowClick?: RowClickHandler },
+) {
+  const { clusters, clusterMembers, urlAssignments, propertySlug, onRowClick } =
+    props;
   const [search, setSearch] = useState("");
+
+  // Pre-bucket members + URLs per cluster so row clicks open a hydrated
+  // ClusterDrawerSubject in O(1).
+  const membersByCluster = useMemo(() => {
+    const m = new Map<string, ClusterMemberRow[]>();
+    for (const cm of clusterMembers) {
+      const list = m.get(cm.cluster_id) ?? [];
+      list.push(cm);
+      m.set(cm.cluster_id, list);
+    }
+    return m;
+  }, [clusterMembers]);
+  const urlsByCluster = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const a of urlAssignments) {
+      const list = m.get(a.primary_cluster_id) ?? [];
+      list.push(a.url);
+      m.set(a.primary_cluster_id, list);
+    }
+    return m;
+  }, [urlAssignments]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -79,6 +107,9 @@ export function ClusterMapTab(props: KeywordsViewProps) {
               key={c.id}
               cluster={c}
               propertySlug={propertySlug}
+              members={membersByCluster.get(c.id) ?? []}
+              urlsInCluster={urlsByCluster.get(c.id) ?? []}
+              onRowClick={onRowClick}
             />
           ))}
         </tbody>
@@ -90,13 +121,34 @@ export function ClusterMapTab(props: KeywordsViewProps) {
 function ClusterRowView({
   cluster,
   propertySlug,
+  members,
+  urlsInCluster,
+  onRowClick,
 }: {
   cluster: ClusterRow;
   propertySlug: string;
+  members: ClusterMemberRow[];
+  urlsInCluster: string[];
+  onRowClick?: RowClickHandler;
 }) {
   const name = cluster.name_override || cluster.head_term;
   return (
-    <tr className="border-t hover:bg-muted/40">
+    <tr
+      className={
+        "border-t hover:bg-muted/40 " + (onRowClick ? "cursor-pointer" : "")
+      }
+      onClick={
+        onRowClick
+          ? () =>
+              onRowClick({
+                kind: "cluster",
+                cluster,
+                members,
+                urlsInCluster,
+              })
+          : undefined
+      }
+    >
       <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
         {cluster.cluster_number}
       </td>

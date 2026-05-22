@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import type { KeywordsViewProps } from "./KeywordsView";
+import type { KeywordsViewProps, RowClickHandler } from "./KeywordsView";
 import { UniverseTab } from "./discovery/UniverseTab";
 import { SourcesTab } from "./discovery/SourcesTab";
 import { ClusterMapTab } from "./discovery/ClusterMapTab";
@@ -28,7 +28,10 @@ const OPTIMIZATION_TABS = [
 ] as const;
 
 export function KeywordsModeShell(
-  props: KeywordsViewProps & { mode: "discovery" | "optimization" },
+  props: KeywordsViewProps & {
+    mode: "discovery" | "optimization";
+    onRowClick: RowClickHandler;
+  },
 ) {
   const router = useRouter();
   const sp = useSearchParams();

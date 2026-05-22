@@ -12,7 +12,7 @@ import {
   fmtN,
 } from "@/components/wqa/helpers";
 import { KeywordStatusChip } from "../KeywordStatusChip";
-import type { KeywordsViewProps } from "../KeywordsView";
+import type { KeywordsViewProps, RowClickHandler } from "../KeywordsView";
 import type { KeywordRow, KeywordStatus, KeywordSource } from "@/lib/keywords";
 
 const SOURCES: (KeywordSource | "all")[] = [
@@ -34,16 +34,18 @@ const STATUSES: (KeywordStatus | "all")[] = [
 
 const PAGE_SIZE = 100;
 
-export function UniverseTab(props: KeywordsViewProps) {
-  const { keywords, clusters, clusterMembers, propertySlug } = props;
+export function UniverseTab(
+  props: KeywordsViewProps & { onRowClick?: RowClickHandler },
+) {
+  const { keywords, clusters, clusterMembers, propertySlug, onRowClick } = props;
 
-  // Build keyword → cluster head_term map in O(K+M).
+  // Build keyword → (cluster_id, name) map in O(K+M).
   const clusterByKeyword = useMemo(() => {
     const clusterById = new Map(clusters.map((c) => [c.id, c]));
-    const m = new Map<string, string>();
+    const m = new Map<string, { id: string; name: string }>();
     for (const cm of clusterMembers) {
       const c = clusterById.get(cm.cluster_id);
-      if (c) m.set(cm.keyword, c.name_override || c.head_term);
+      if (c) m.set(cm.keyword, { id: c.id, name: c.name_override || c.head_term });
     }
     return m;
   }, [clusters, clusterMembers]);
@@ -129,14 +131,19 @@ export function UniverseTab(props: KeywordsViewProps) {
           </tr>
         </thead>
         <tbody>
-          {pageRows.map((k) => (
-            <KeywordRowView
-              key={k.id}
-              row={k}
-              clusterName={clusterByKeyword.get(k.keyword) ?? null}
-              propertySlug={propertySlug}
-            />
-          ))}
+          {pageRows.map((k) => {
+            const link = clusterByKeyword.get(k.keyword) ?? null;
+            return (
+              <KeywordRowView
+                key={k.id}
+                row={k}
+                clusterName={link?.name ?? null}
+                clusterId={link?.id ?? null}
+                propertySlug={propertySlug}
+                onRowClick={onRowClick}
+              />
+            );
+          })}
         </tbody>
       </TableShell>
 
@@ -153,14 +160,34 @@ export function UniverseTab(props: KeywordsViewProps) {
 function KeywordRowView({
   row,
   clusterName,
+  clusterId,
   propertySlug,
+  onRowClick,
 }: {
   row: KeywordRow;
   clusterName: string | null;
+  clusterId: string | null;
   propertySlug: string;
+  onRowClick?: RowClickHandler;
 }) {
   return (
-    <tr className="border-t hover:bg-muted/40">
+    <tr
+      className={
+        "border-t hover:bg-muted/40 " +
+        (onRowClick ? "cursor-pointer" : "")
+      }
+      onClick={
+        onRowClick
+          ? () =>
+              onRowClick({
+                kind: "keyword",
+                keyword: row,
+                clusterName,
+                clusterId,
+              })
+          : undefined
+      }
+    >
       <td className="px-3 py-1.5 text-[11.5px] truncate max-w-0" title={row.keyword}>
         {row.keyword}
       </td>
