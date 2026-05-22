@@ -5,9 +5,14 @@
 // Tabs (in order): Overview · Referring Domains · Audits
 //
 // URL state via `?view=<tab>`. Mirrors the pattern used by KeywordsView /
-// ContentView. This chunk is read-only — Chunk 4 will wire row-click →
-// RefDomain drawer through this shell.
+// ContentView.
+//
+// Drawer state lives here (lifted from ReferringDomainsTab) so that any tab
+// can open the universal UrlDrawer for a referring-domain subject. The
+// dispatcher in UrlDrawer routes `kind: "refdomain"` to the RefDomainDrawer
+// variant (the 5th polymorphic subject added in Chunk 4).
 
+import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import type {
   SiteSnapshot,
@@ -16,6 +21,7 @@ import type {
   AuditDocRow,
   Alert,
 } from "@/lib/authority";
+import { UrlDrawer, type DrawerSubject } from "@/components/UrlDrawer";
 import { OverviewTab } from "./OverviewTab";
 import { ReferringDomainsTab } from "./ReferringDomainsTab";
 import { AuditsTab } from "./AuditsTab";
@@ -45,6 +51,25 @@ export function AuthorityView(props: AuthorityViewProps) {
   const sp = useSearchParams();
   const rawView = sp.get("view") || "overview";
   const view: TabKey = (TABS.find(([k]) => k === rawView)?.[0] ?? "overview") as TabKey;
+
+  // ─── Drawer state (lifted from ReferringDomainsTab) ─────────────────────
+  const [drawerSubject, setDrawerSubject] = useState<DrawerSubject | null>(
+    null,
+  );
+  const disavowByDomain = useMemo(
+    () => new Map(props.disavow.map((d) => [d.domain, d])),
+    [props.disavow],
+  );
+
+  function handleRowClick(domain: string) {
+    const row = props.refDomains.find((r) => r.domain === domain);
+    if (!row) return;
+    setDrawerSubject({
+      kind: "refdomain",
+      row,
+      disavow: disavowByDomain.get(domain) ?? null,
+    });
+  }
 
   function setView(next: TabKey) {
     const params = new URLSearchParams(sp.toString());
@@ -81,8 +106,18 @@ export function AuthorityView(props: AuthorityViewProps) {
       </nav>
 
       {view === "overview" && <OverviewTab {...props} />}
-      {view === "refdomains" && <ReferringDomainsTab {...props} />}
+      {view === "refdomains" && (
+        <ReferringDomainsTab {...props} onRowClick={handleRowClick} />
+      )}
       {view === "audits" && <AuditsTab {...props} />}
+
+      <UrlDrawer
+        subject={drawerSubject}
+        onClose={() => setDrawerSubject(null)}
+        propertySlug={props.propertySlug}
+        propertyId={props.propertyId}
+        primaryDomain={props.primaryDomain}
+      />
     </div>
   );
 }

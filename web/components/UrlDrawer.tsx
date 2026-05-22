@@ -56,11 +56,19 @@ import type {
   ClusterState,
 } from "@/lib/clusters";
 import type { ContentRow } from "@/lib/content-rows";
+import type { ReferringDomainRow, DisavowEntryRow } from "@/lib/authority";
 import { ClusterChatPanel } from "@/components/keywords/ClusterChatPanel";
 import { StatusChip } from "@/components/content/StatusChip";
 import { ActionTypeChip } from "@/components/content/ActionTypeChip";
 import { WriterCell } from "@/components/content/WriterCell";
 import { SprintCell } from "@/components/content/SprintCell";
+import { QualityChip } from "@/components/authority/QualityChip";
+import {
+  setDomainNotes,
+  addToDisavow,
+  setDisavowStatus,
+  setDisavowReason,
+} from "@/app/properties/[slug]/authority/actions";
 
 // ─── Subject union ───────────────────────────────────────────────────────
 export type UrlDrawerSubject = {
@@ -96,11 +104,19 @@ export type ContentDrawerSubject = {
   cluster: ClusterRow | null;
 };
 
+export type RefDomainDrawerSubject = {
+  kind: "refdomain";
+  row: ReferringDomainRow;
+  /** The matching disavow_entry, or null if the domain is not in the disavow list. */
+  disavow: DisavowEntryRow | null;
+};
+
 export type DrawerSubject =
   | UrlDrawerSubject
   | KeywordDrawerSubject
   | ClusterDrawerSubject
-  | ContentDrawerSubject;
+  | ContentDrawerSubject
+  | RefDomainDrawerSubject;
 
 // ─── Common props passed to every variant ───────────────────────────────
 type CommonProps = {
@@ -145,6 +161,9 @@ export function UrlDrawer(props: UrlDrawerProps) {
   }
   if (subject.kind === "content") {
     return <ContentDrawer subject={subject} {...stripSubject(props)} />;
+  }
+  if (subject.kind === "refdomain") {
+    return <RefDomainDrawer subject={subject} {...stripSubject(props)} />;
   }
   return <UrlDrawerView subject={subject} {...stripSubject(props)} />;
 }
@@ -1569,6 +1588,295 @@ function SelectDrawerEditor({
           </option>
         ))}
       </select>
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// REFERRING DOMAIN DRAWER (Phase 5)
+// ═══════════════════════════════════════════════════════════════════════
+function RefDomainDrawer({
+  subject,
+  onClose,
+  propertySlug,
+  primaryDomain,
+}: { subject: RefDomainDrawerSubject } & CommonProps) {
+  const r = subject.row;
+  const disavow = subject.disavow;
+  const router = useRouter();
+  const [adding, startAdd] = useTransition();
+
+  return (
+    <DrawerShell ariaLabel="Referring domain details" onClose={onClose}>
+      <header className="px-4 py-3 border-b shrink-0 sticky top-0 bg-background z-10">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {primaryDomain && (
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                {primaryDomain} · referring domain
+              </div>
+            )}
+            <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+              <a
+                href={`https://${r.domain}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[13px] text-foreground hover:underline truncate"
+                title={r.domain}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {r.domain} ↗
+              </a>
+              <QualityChip
+                slug={propertySlug}
+                domain={r.domain}
+                value={r.quality}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-lg leading-none px-1 shrink-0"
+            aria-label="Close drawer"
+          >
+            ×
+          </button>
+        </div>
+      </header>
+
+      <Section title="Metrics">
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11.5px]">
+          {/*
+            DFS Rank: stored in `domain_rating` but sourced from DataForSEO's
+            `rank` field on a 0–1000 scale. Labeled "DFS Rank" (matching
+            Chunk 3) so it's not mistaken for Ahrefs DR.
+          */}
+          <SignalRow
+            label="DFS Rank"
+            value={r.domain_rating != null ? r.domain_rating.toFixed(0) : null}
+          />
+          <SignalRow label="Traffic" value={r.traffic_domain} />
+          <SignalRow label="Dofollow links" value={r.dofollow_links} />
+          <SignalRow label="Links to target" value={r.links_to_target} />
+          <SignalRow
+            label="First seen"
+            value={
+              r.first_seen ? new Date(r.first_seen).toLocaleDateString() : null
+            }
+          />
+          <SignalRow
+            label="Last seen"
+            value={
+              r.last_seen ? new Date(r.last_seen).toLocaleDateString() : null
+            }
+          />
+          <SignalRow
+            label="Detected spam"
+            value={r.detected_spam ? "Yes" : "No"}
+          />
+        </dl>
+      </Section>
+
+      <Section title="Editors">
+        <Field label="Notes">
+          <RefDomainNotesEditor
+            slug={propertySlug}
+            domain={r.domain}
+            value={r.notes}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Disavow">
+        {disavow ? (
+          <div className="grid gap-2.5">
+            <Field label="Status">
+              <DisavowStatusEditor
+                slug={propertySlug}
+                domain={r.domain}
+                value={disavow.status}
+              />
+            </Field>
+            <Field label="Reason">
+              <DisavowReasonEditor
+                slug={propertySlug}
+                domain={r.domain}
+                value={disavow.reason}
+              />
+            </Field>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={adding}
+            onClick={() =>
+              startAdd(async () => {
+                const res = await addToDisavow(propertySlug, r.domain, null);
+                if (!res.ok) {
+                  alert(`Mark for disavow failed: ${res.error}`);
+                  return;
+                }
+                // Refresh server-rendered data so disavow + quality reflect
+                // the new state; then close so the row reopens with the
+                // updated subject on next click.
+                router.refresh();
+                onClose();
+              })
+            }
+            className={`text-[11.5px] px-3 py-1.5 rounded border bg-card hover:bg-muted ${adding ? "opacity-60" : ""}`}
+          >
+            {adding ? "Adding…" : "Mark for disavow"}
+          </button>
+        )}
+      </Section>
+    </DrawerShell>
+  );
+}
+
+function RefDomainNotesEditor({
+  slug,
+  domain,
+  value,
+}: {
+  slug: string;
+  domain: string;
+  value: string | null;
+}) {
+  const [local, setLocal] = useState(value ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function commit() {
+    const next = local.trim() === "" ? null : local;
+    if (next === (value ?? null)) return;
+    setError(null);
+    start(async () => {
+      const res = await setDomainNotes(slug, domain, next);
+      if (!res.ok) {
+        setLocal(value ?? "");
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-start gap-1 w-full">
+      <textarea
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        disabled={pending}
+        rows={3}
+        placeholder="(no notes)"
+        className={`text-[11.5px] px-2 py-1 border rounded bg-background w-full resize-y ${pending ? "opacity-60" : ""}`}
+      />
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
+  );
+}
+
+const DISAVOW_STATUSES = ["Pending", "In File", "Confirmed by GSC"] as const;
+type DisavowStatusValue = (typeof DISAVOW_STATUSES)[number];
+
+function DisavowStatusEditor({
+  slug,
+  domain,
+  value,
+}: {
+  slug: string;
+  domain: string;
+  value: DisavowStatusValue;
+}) {
+  const [current, setCurrent] = useState<DisavowStatusValue>(value);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function onChange(next: DisavowStatusValue) {
+    const previous = current;
+    setCurrent(next);
+    setError(null);
+    start(async () => {
+      const res = await setDisavowStatus(slug, domain, next);
+      if (!res.ok) {
+        setCurrent(previous);
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select
+        value={current}
+        disabled={pending}
+        onChange={(e) => onChange(e.target.value as DisavowStatusValue)}
+        onClick={(e) => e.stopPropagation()}
+        className={`text-[11.5px] px-2 py-1 border rounded bg-background ${pending ? "opacity-60" : ""}`}
+      >
+        {DISAVOW_STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
+  );
+}
+
+function DisavowReasonEditor({
+  slug,
+  domain,
+  value,
+}: {
+  slug: string;
+  domain: string;
+  value: string | null;
+}) {
+  const [local, setLocal] = useState(value ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function commit() {
+    const next = local.trim() === "" ? null : local.trim();
+    if (next === (value ?? null)) return;
+    setError(null);
+    start(async () => {
+      const res = await setDisavowReason(slug, domain, next);
+      if (!res.ok) {
+        setLocal(value ?? "");
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 w-full">
+      <input
+        type="text"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        disabled={pending}
+        placeholder="e.g. spam_network, pbn, manipulative_anchor"
+        className={`text-[11.5px] px-2 py-1 border rounded bg-background w-full ${pending ? "opacity-60" : ""}`}
+      />
       {error && (
         <span className="text-[10px] text-rose-700" title={error}>
           !
