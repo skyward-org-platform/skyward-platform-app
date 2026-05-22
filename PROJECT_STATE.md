@@ -544,20 +544,53 @@ Single new route `/properties/[slug]/pages` becomes the canonical execution surf
 - `delivery/tna/cluster_buscharter.py` — threshold bumped to 4, emits members CSV
 - `delivery/tna/phase3_backfill_supabase.py` — one-shot CSV → Supabase loader
 
-**Preview deploy:** https://skyward-platform-b1y31idg1-skywards-projects-60431a3a.vercel.app/properties/buscharter/keywords
+**Tier 1 redesign (later same day, 4 more commits):** Flat 7-tab nav (Overview · Clusters · All Keywords · Mapping · Sources · Review Queue · Action Legend), Overview tab with 4-up stat tiles + Top 5 clusters preview, status counter strip with URL-persisted filters, inline Cluster column, color-coded RelevancePill (emerald/amber/rose), per-column filter inputs on Universe/Clusters/Mapping. Dropped BQ-placeholder tabs (Forecasting/Gap/Coverage). Folded Opportunities into Review Queue.
 
-**Followups tracked in `session-notes/2026-05-22-phase3-surface.md`:**
-1. Tier 1 redesign vs reference auto-SEO UI (flatten tabs · pipeline progress strip · Run-pipeline buttons · stat tile Overview · counter strip · color-coded relevance · inline cluster column · per-column filters).
-2. Branch state hiccup mid-Chunk 5 — check `git status` on `fix/wqa-pages-domain-match` for stale changes.
-3. Unrelated `unstable_cache` refactor sitting in working tree (predates session).
-4. `ANTHROPIC_API_KEY` not in local `.env`; chat works on Vercel only.
-5. UrlMapTab row click renders URL as anchor, not drawer (needs wqa_output + execution + check_states load in keywords page.tsx).
-6. Tools auto-execute without proposal-card approval flow.
-7. CSVs gitignored in agency repo — re-run cluster_buscharter.py to regenerate.
-8. `runRecluster` server action specified but not built — re-clustering is CLI-only today.
+**Merged to main via PR #3** (merge commit `8a1de39`). Promoted to production via `vercel --prod`. Live at https://skyward-seo-platform.vercel.app/properties/{slug}/keywords.
+
+**KGA fan-out completed (same day):** `delivery/tna/tna_phase3_fanout.py` (in agency repo, commit `091ac4f`) ran KGA + cluster + Supabase backfill for the 7 remaining TNA properties. All 8 TNA properties now have Phase 3 data live in production:
+
+| Domain | Keywords | Clusters | Members | URL→Cluster |
+|---|---:|---:|---:|---:|
+| buscharter.com.au | 9,003 | 646 | 2,514 | 115 |
+| tnabushire.com.au | 8,479 | 479 | 1,770 | 33 |
+| bushire.com.au | 8,466 | 429 | 1,620 | 50 |
+| minibushire.com.au | 8,402 | 424 | 1,627 | 17 |
+| partybusguru.com.au | 8,382 | 446 | 1,434 | 30 |
+| transportnetworkaustralia.com.au | 8,220 | 377 | 1,218 | 0 (no client ranks) |
+| bushire.co.nz | 472 | 71 | 406 | 57 |
+| minibushire.co.nz | 147 | 21 | 80 | 13 |
+
+Total: 51,571 keywords · 2,893 clusters · 10,669 memberships · 315 URL assignments.
+
+**Agency repo (separate):**
+- `delivery/tna/cluster_buscharter.py` — threshold=4, emits members CSV
+- `delivery/tna/phase3_backfill_supabase.py` — one-shot CSV → Supabase loader (buscharter)
+- `delivery/tna/tna_phase3_fanout.py` — consolidated runner for the 7-site fan-out
+
+**Followups carried into next session (consolidated, updated):**
+1. **Intent counter chips** on All Keywords counter strip — requires backfilling `intent` column on `keyword` Supabase table from BQ `kga_output`. ~30 min. Highest-value small task.
+2. **`runRecluster` server action** not built — reclustering CLI-only.
+3. **`UrlMapTab` row click → URL drawer** — currently plain anchor. Needs wqa_output + execution + check_states loaded in `keywords/page.tsx`.
+4. **Tools auto-execute without proposal-card approval** — `mark_keyword_excluded` mutates immediately. Brand DNA uses proposal cards. Re-design pass after using on real work.
+5. **`search_serp` is a stub** — needs `/api/serp` bridge endpoint to BQ.
+6. **Per-column filter URL persistence** — currently component-local.
+7. **Branded keyword concept** — first-class flag + filter + counter chip.
+8. **Star/favorite per keyword** — not modeled.
+9. **SERP freshness tracking** — `serp_last_checked_at` column + Check SERP inline action.
+10. **`Meta.projects` project_id collisions** from Session 2 — project_id=15 covers 3 domains, project_id=17 covers 3 domains. KGA fan-out worked around via job_id filtering. Adam's territory.
+11. **Unrelated `unstable_cache` refactor** sitting in working tree — predates session. Author needs to commit or stash.
+12. **`ANTHROPIC_API_KEY` not in `web/.env.local`** — chat works on Vercel; errors on local `npm run dev`.
+13. **`fix/wqa-pages-domain-match` branch** — may have stale working-tree changes from Chunk 5's branch mishap. Worth checking.
 
 **Reference docs added this session:**
 - `docs/superpowers/specs/2026-05-22-phase3-surface-design.md`
 - `docs/superpowers/plans/2026-05-22-phase3-surface.md`
 
-**Session note:** `session-notes/2026-05-22-phase3-surface.md`
+**Session note:** `session-notes/2026-05-22-phase3-surface.md` (updated with end-of-session addendum covering Tier 1 + merge + fan-out)
+
+**Production state at end of session:**
+- /properties/[slug]/pages — Phase 1 + Phase 2 surface (all 8 TNA properties populated)
+- /properties/[slug]/keywords — Phase 3 surface (all 8 TNA properties populated)
+- Both surfaces live at https://skyward-seo-platform.vercel.app
+- Next natural phase: Phase 4 Content Pipeline (reads Phase 3 page_action decisions + URL→cluster map)

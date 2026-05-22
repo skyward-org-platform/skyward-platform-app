@@ -1,12 +1,13 @@
 ---
-title: Phase 3 Keyword Surface shipped to preview — /properties/[slug]/keywords
+title: Phase 3 Keyword Surface — shipped to production, fanned out to all 8 TNA properties
 date: 2026-05-22
-status: preview-deployed; not merged to main; user sitting with the preview before deciding next moves
-branch: feat/phase3-surface
-preview_url: https://skyward-platform-b1y31idg1-skywards-projects-60431a3a.vercel.app/properties/buscharter/keywords
+status: live in production; all 8 TNA properties populated
+branch: feat/phase3-surface (merged to main via PR #3)
+merge_commit: 8a1de39
+prod_url: https://skyward-seo-platform.vercel.app/properties/buscharter/keywords
 ---
 
-# Phase 3 Surface shipped to preview
+# Phase 3 Surface — shipped to production
 
 ## What landed
 
@@ -132,11 +133,84 @@ User said sit with the current preview first; redesign is a follow-up session.
 6. **CSVs gitignored in agency repo** — `delivery/tna/buscharter/phase-3-keywords/buscharter-*-2026-05-21.csv` are on disk but excluded by the agency `.gitignore` rule for CSVs. If a fresh checkout is needed, re-run `cluster_buscharter.py` to regenerate.
 7. **Re-cluster CLI-only** — `runRecluster` server action specified in the design wasn't built. To re-run clustering today, manually run `uv run python delivery/tna/cluster_buscharter.py` from the agency repo, then `uv run python delivery/tna/phase3_backfill_supabase.py` to push to Supabase.
 
-## Production state
+## End-of-session: Tier 1 redesign + production merge + KGA fan-out
 
-- Production at https://skyward-seo-platform.vercel.app — **unchanged this session**. Still serves the previous build (with /pages execution surface only; no /keywords). `feat/phase3-surface` is on a preview deploy only.
-- Preview deploy: https://skyward-platform-b1y31idg1-skywards-projects-60431a3a.vercel.app
-- PR not yet opened. User decision pending: sit with preview, then either merge to main or iterate the surface (Tier 1 redesign).
+After the initial preview shipped + user reviewed against the reference auto-SEO UI screenshots, three additional pieces landed in this same session:
+
+### Tier 1 redesign of /keywords (4 commits)
+
+Per side-by-side comparison with the auto-SEO reference UI, picked Bundle A+B (visual polish + power-user filtering):
+
+- `a3d7e14` feat(keywords): RelevancePill + per-column filter primitives
+- `9c9f391` feat(keywords): per-column filter inputs on Clusters + Mapping tables
+- `6619e41` feat(keywords): Overview tab + Review Queue tab
+- `2d3fa4d` refactor(keywords): flatten tabs, drop BQ placeholders, redesign Universe
+
+Changes:
+- Flat 7-tab nav (Overview · Clusters · All Keywords · Mapping · Sources · Review Queue · Action Legend) — dropped the Discovery/Optimization mode switcher entirely.
+- Overview tab with 4-up stat tile row (Total Clusters / Total Keywords / Total Volume / Mapped vs Unmapped) + Top 5 clusters by SV mini-table.
+- Status counter strip on All Keywords with URL-persisted filtering (`?status=Retained,Candidate`).
+- Inline Cluster column (click → cluster drawer; stopPropagation prevents row's keyword drawer from firing).
+- Color-coded RelevancePill (emerald 80+ / amber 50-79 / rose <50 / muted "—").
+- Per-column filter inputs on Universe / Clusters / Mapping tables (text · numeric ≥≤= · select).
+- Deleted BQ-placeholder tabs (ForecastingTab, CompetitiveGapTab, CoverageTab) — out of scope this round.
+- Folded Opportunities tab into Review Queue (same data, better surface name).
+- Renamed "Cluster Map" → "Clusters" and "URL Map" → "Mapping" to match the new nav.
+
+### Production merge
+
+- PR #3 opened with full test plan + 8 known followups documented.
+- Merged via `gh pr merge 3 --merge --admin` (the Vercel git-triggered check still fails because main lacks the committed `web/` subdirectory restructure from a prior session — known issue, deploys go via `vercel --prod` from local).
+- Promoted via `vercel --prod`. Production deploy: `skyward-platform-6b2obm98v` → aliased to https://skyward-seo-platform.vercel.app.
+- Production now serves the /keywords route. Buscharter Phase 3 data live.
+
+### KGA fan-out to the 7 remaining TNA properties
+
+`delivery/tna/tna_phase3_fanout.py` — one consolidated runner that loops domains, runs KGA → cluster → Supabase backfill per site. Commit `091ac4f` in the agency repo.
+
+Final state across all 8 TNA properties:
+
+| Domain | Keywords | Clusters | Members | URL→Cluster |
+|---|---:|---:|---:|---:|
+| buscharter.com.au | 9,003 | 646 | 2,514 | 115 |
+| tnabushire.com.au | 8,479 | 479 | 1,770 | 33 |
+| bushire.com.au | 8,466 | 429 | 1,620 | 50 |
+| minibushire.com.au | 8,402 | 424 | 1,627 | 17 |
+| partybusguru.com.au | 8,382 | 446 | 1,434 | 30 |
+| transportnetworkaustralia.com.au | 8,220 | 377 | 1,218 | **0** |
+| bushire.co.nz | 472 | 71 | 406 | 57 |
+| minibushire.co.nz | 147 | 21 | 80 | 13 |
+| **Total** | **51,571** | **2,893** | **10,669** | **315** |
+
+Observations:
+- AU sites cluster around the same ~8.4K keyword universe (shared competitor set, same client_id).
+- NZ sites are much smaller — less SEO footprint in NZ market.
+- transportnetworkaustralia.com.au has 0 URL assignments — its `kga_output` has no `role='client' AND rank IS NOT NULL` rows because the site barely ranks. Consistent with the Phase 1 finding that it only has GA4 data linked (no GSC/SF/DFS).
+- ~700 fresh SERP pulls for NZ sites; AU SERPs were largely cached from buscharter run. Real DFS spend likely $2-5 (didn't audit the bill).
+
+### Followups carried into next session
+
+Updates to the followups list from earlier in the day:
+
+1. **Intent counter chips on All Keywords counter strip** — still pending. Requires `intent` column on `keyword` Supabase table + backfill from BQ `kga_output`. ~30 min.
+2. **`runRecluster` server action** — still not built. Reclustering is CLI-only (`delivery/tna/tna_phase3_fanout.py` or per-site `cluster_buscharter.py`).
+3. **`UrlMapTab` row click → URL drawer** — still renders URL as plain anchor. Needs wqa_output + execution + check_states loaded in `keywords/page.tsx`.
+4. **Tools auto-execute without proposal-card approval** — `mark_keyword_excluded` mutates immediately. Brand DNA uses proposal cards. Re-design pass after using it on real work.
+5. **`search_serp` is a stub** — returns "not cached"; wiring requires a new `/api/serp` bridge endpoint.
+6. **Per-column filter URL persistence** — currently component-local. Tier 2.
+7. **Branded keyword concept** — first-class flag + filter + counter chip. Not yet modeled.
+8. **Star/favorite per keyword** — not modeled.
+9. **SERP freshness tracking** — per-keyword `serp_last_checked_at` column would unblock the "Check SERP" inline action + the SERP-coverage counter chip.
+10. **Project_id collisions from Session 2** — `Meta.projects` has 3 domains sharing project_id=15 and 3 domains sharing project_id=17. KGA fan-out worked around this via job_id-based downstream filtering, but the underlying Meta state is still messy. Adam's territory; not blocking.
+11. **Unrelated `unstable_cache` refactor** — `web/lib/cache.ts`, multiple `actions.ts`, etc. — still uncommitted in working tree. Predates this session's work. Author needs to commit or stash.
+
+### Out of scope, considered but deferred
+
+- KGA fan-out: DONE
+- Tier 1 redesign: DONE
+- Production deploy: DONE
+- Phase 4 Content Pipeline: not started; reads Phase 3 outputs (cluster page-actions + URL maps). Next phase per pipeline-structure-v2.
+- Tier 2/3 redesign (pipeline progress strip, Run buttons, branded keywords, etc.): deferred.
 
 ## Links
 
@@ -144,3 +218,6 @@ User said sit with the current preview first; redesign is a follow-up session.
 - Plan: `docs/superpowers/plans/2026-05-22-phase3-surface.md`
 - Reference auto-SEO transcript: `handoff/reference/auto-seo-overview-transcript.md`
 - Pipeline structure: `~/agency/operations/process-library/1. seo-pipeline/pipeline-structure-v2.md`
+- Fan-out runner: `~/agency/delivery/tna/tna_phase3_fanout.py`
+- PR: https://github.com/skyward-org-platform/skyward-platform-app/pull/3 (merged)
+- Production: https://skyward-seo-platform.vercel.app/properties/buscharter/keywords (default; swap slug for any of 8 TNA properties)
