@@ -2,10 +2,10 @@
 
 // URL Map — every URL that touches at least one cluster, joined to its
 // primary cluster for context. Score is the SERP-overlap pipeline's match
-// confidence (higher = stronger primary). n_clusters_touched would require
-// a BigQuery join (deferred).
+// confidence (higher = stronger primary). The cluster cell is editable
+// via ClusterPicker; on change → setUrlClusterAssignment server action.
 
-import { useMemo } from "react";
+import { useMemo, useTransition } from "react";
 import {
   EmptyTab,
   TabHeader,
@@ -13,10 +13,13 @@ import {
   UrlCell,
   fmtN,
 } from "@/components/wqa/helpers";
+import { ClusterPicker } from "../ClusterPicker";
+import { setUrlClusterAssignment } from "@/app/properties/[slug]/keywords/actions";
 import type { KeywordsViewProps } from "../KeywordsView";
+import type { ClusterRow } from "@/lib/clusters";
 
 export function UrlMapTab(props: KeywordsViewProps) {
-  const { urlAssignments, clusters } = props;
+  const { urlAssignments, clusters, propertySlug } = props;
 
   const clusterById = useMemo(
     () => new Map(clusters.map((c) => [c.id, c])),
@@ -61,31 +64,66 @@ export function UrlMapTab(props: KeywordsViewProps) {
         <tbody>
           {rows.map((a) => {
             const cluster = clusterById.get(a.primary_cluster_id);
-            const name = cluster
-              ? cluster.name_override || cluster.head_term
-              : "(unknown cluster)";
             return (
-              <tr key={a.id} className="border-t hover:bg-muted/40">
-                <td className="px-3 py-1.5 max-w-0">
-                  <UrlCell url={a.url} />
-                </td>
-                <td className="px-2 py-1.5 text-[11.5px] truncate max-w-0" title={name}>
-                  {name}
-                </td>
-                <td className="px-2 py-1.5 text-right tabular-nums">
-                  {a.score.toFixed(2)}
-                </td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                  {cluster ? fmtN(cluster.member_count) : "—"}
-                </td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                  —
-                </td>
-              </tr>
+              <UrlAssignmentRow
+                key={a.id}
+                url={a.url}
+                score={a.score}
+                cluster={cluster ?? null}
+                clusters={clusters}
+                propertySlug={propertySlug}
+              />
             );
           })}
         </tbody>
       </TableShell>
     </section>
+  );
+}
+
+function UrlAssignmentRow({
+  url,
+  score,
+  cluster,
+  clusters,
+  propertySlug,
+}: {
+  url: string;
+  score: number;
+  cluster: ClusterRow | null;
+  clusters: ClusterRow[];
+  propertySlug: string;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  function onPickCluster(nextId: string) {
+    startTransition(async () => {
+      await setUrlClusterAssignment(propertySlug, url, nextId);
+    });
+  }
+
+  return (
+    <tr className="border-t hover:bg-muted/40">
+      <td className="px-3 py-1.5 max-w-0">
+        <UrlCell url={url} />
+      </td>
+      <td className="px-2 py-1.5">
+        <ClusterPicker
+          clusters={clusters}
+          currentClusterId={cluster?.id ?? null}
+          onChange={onPickCluster}
+          disabled={pending}
+        />
+      </td>
+      <td className="px-2 py-1.5 text-right tabular-nums">
+        {score.toFixed(2)}
+      </td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
+        {cluster ? fmtN(cluster.member_count) : "—"}
+      </td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
+        —
+      </td>
+    </tr>
   );
 }
