@@ -1,5 +1,15 @@
 "use client";
 
+// Flat single-row tab nav for the Phase 3 keyword surface. No more
+// Discovery/Optimization mode switcher — every analytical surface is one
+// click away. URL state via `?view=<tab>` only (the legacy `?mode=` param
+// is stripped on switch).
+//
+// Tabs (in order):
+//   Overview · Clusters · All Keywords · Mapping · Sources · Review Queue · Action Legend
+//
+// The mode-shell file has been deleted; the nav is inlined below.
+
 import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { KeywordRow } from "@/lib/keywords";
@@ -14,9 +24,13 @@ import {
   type KeywordDrawerSubject,
   type ClusterDrawerSubject,
 } from "@/components/UrlDrawer";
-import { KeywordsModeShell } from "./KeywordsModeShell";
-
-type Mode = "discovery" | "optimization";
+import { OverviewTab } from "./OverviewTab";
+import { UniverseTab } from "./discovery/UniverseTab";
+import { SourcesTab } from "./discovery/SourcesTab";
+import { ClusterMapTab } from "./discovery/ClusterMapTab";
+import { ActionLegendTab } from "./discovery/ActionLegendTab";
+import { ReviewQueueTab } from "./discovery/ReviewQueueTab";
+import { UrlMapTab } from "./optimization/UrlMapTab";
 
 export type KeywordsViewProps = {
   propertySlug: string;
@@ -31,23 +45,34 @@ export type KeywordsViewProps = {
 
 export type RowClickHandler = (subject: DrawerSubject) => void;
 
+const TABS = [
+  ["overview", "Overview"],
+  ["clusters", "Clusters"],
+  ["universe", "All Keywords"],
+  ["mapping", "Mapping"],
+  ["sources", "Sources"],
+  ["review-queue", "Review Queue"],
+  ["legend", "Action Legend"],
+] as const;
+
+type TabKey = (typeof TABS)[number][0];
+
 export function KeywordsView(props: KeywordsViewProps) {
   const router = useRouter();
   const sp = useSearchParams();
-  const mode = (sp.get("mode") || "discovery") as Mode;
+  const rawView = sp.get("view") || "overview";
+  const view: TabKey = (TABS.find(([k]) => k === rawView)?.[0] ?? "overview") as TabKey;
 
   const [drawerSubject, setDrawerSubject] = useState<DrawerSubject | null>(null);
 
-  function setMode(next: Mode) {
+  function setView(next: TabKey) {
     const params = new URLSearchParams(sp.toString());
-    params.set("mode", next);
-    params.delete("view");
+    params.set("view", next);
+    params.delete("mode"); // strip legacy mode param if present
     router.push(`?${params.toString()}`);
   }
 
-  // When the drawer cross-navigates (cluster member → keyword drawer,
-  // keyword → cluster drawer) we need to hydrate the stub subject from
-  // local props since the stub only carries an id / keyword string.
+  // ─── Cross-navigation hydrators (drawer ↔ drawer) ────────────────
   const clusterById = useMemo(
     () => new Map(props.clusters.map((c) => [c.id, c])),
     [props.clusters],
@@ -83,7 +108,6 @@ export function KeywordsView(props: KeywordsViewProps) {
   function hydrate(subject: DrawerSubject): DrawerSubject | null {
     if (subject.kind === "url") return subject;
     if (subject.kind === "keyword") {
-      // Hydrate stub keyword drawer (from cluster → member crosslink).
       const stub = subject as KeywordDrawerSubject;
       const real = keywordByText.get(stub.keyword.keyword);
       if (!real) return null;
@@ -99,7 +123,6 @@ export function KeywordsView(props: KeywordsViewProps) {
         clusterId,
       };
     }
-    // cluster — hydrate from id, attach members + urls.
     const stub = subject as ClusterDrawerSubject;
     const real = clusterById.get(stub.cluster.id);
     if (!real) return null;
@@ -115,35 +138,66 @@ export function KeywordsView(props: KeywordsViewProps) {
     setDrawerSubject(hydrate(subject));
   };
 
+  // Inline cluster-cell click handler (from UniverseTab / ReviewQueueTab).
+  const onClusterClick = (cluster: ClusterRow) => {
+    setDrawerSubject(
+      hydrate({
+        kind: "cluster",
+        cluster,
+        members: [],
+        urlsInCluster: [],
+      }),
+    );
+  };
+
   return (
     <div className="p-4 sm:p-8 max-w-7xl">
       <header className="mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Keywords</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Phase 3 keyword universe + SERP-overlap clusters + URL map for{" "}
-          <span className="font-mono">{props.primaryDomain}</span>. Curate the
-          universe in Discovery; act on it in Optimization.
+          <span className="font-mono">{props.primaryDomain}</span>.
         </p>
       </header>
 
-      <div className="mb-5 inline-flex rounded-md border bg-muted p-0.5">
-        {(["discovery", "optimization"] as const).map((m) => (
+      <nav className="flex gap-1 border-b mb-5 overflow-x-auto">
+        {TABS.map(([k, label]) => (
           <button
-            key={m}
-            onClick={() => setMode(m)}
+            key={k}
+            onClick={() => setView(k as TabKey)}
             className={
-              "px-4 py-1.5 text-xs font-semibold uppercase tracking-wider rounded " +
-              (mode === m
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground")
+              "px-3 py-1.5 text-sm border-b-2 -mb-px whitespace-nowrap " +
+              (view === k
+                ? "border-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground")
             }
           >
-            {m}
+            {label}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <KeywordsModeShell mode={mode} {...props} onRowClick={onRowClick} />
+      {view === "overview" && (
+        <OverviewTab {...props} onRowClick={onRowClick} />
+      )}
+      {view === "clusters" && <ClusterMapTab {...props} onRowClick={onRowClick} />}
+      {view === "universe" && (
+        <UniverseTab
+          {...props}
+          onRowClick={onRowClick}
+          onClusterClick={onClusterClick}
+        />
+      )}
+      {view === "mapping" && <UrlMapTab {...props} />}
+      {view === "sources" && <SourcesTab {...props} />}
+      {view === "review-queue" && (
+        <ReviewQueueTab
+          {...props}
+          onRowClick={onRowClick}
+          onClusterClick={onClusterClick}
+        />
+      )}
+      {view === "legend" && <ActionLegendTab />}
 
       <UrlDrawer
         subject={drawerSubject}
