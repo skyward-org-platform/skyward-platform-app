@@ -261,19 +261,24 @@ export function WqaTabs({
       />
 
       <UrlDrawer
-        open={drawerUrl !== null}
+        subject={
+          drawerUrl && drawerTriaged
+            ? {
+                kind: "url",
+                row: drawerTriaged.row,
+                currentAction: drawerTriaged.triage.action,
+                category: drawerTriaged.row.type ?? "Other",
+                execution: execByUrl.get(drawerUrl) ?? null,
+                checkStatesForUrl:
+                  checkStatesByUrl.get(drawerUrl) ?? new Map(),
+                ctx,
+              }
+            : null
+        }
         onClose={() => setDrawerUrl(null)}
         propertySlug={propertySlug}
         propertyId={propertyId}
         primaryDomain={primaryDomain}
-        row={drawerTriaged?.row ?? null}
-        currentAction={drawerTriaged?.triage.action ?? ""}
-        category={drawerTriaged?.row.type ?? "Other"}
-        execution={drawerUrl ? execByUrl.get(drawerUrl) ?? null : null}
-        checkStatesForUrl={
-          drawerUrl ? checkStatesByUrl.get(drawerUrl) ?? new Map() : new Map()
-        }
-        ctx={ctx}
       />
     </div>
   );
