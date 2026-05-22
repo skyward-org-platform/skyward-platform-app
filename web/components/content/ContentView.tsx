@@ -1,8 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { ContentRow } from "@/lib/content-rows";
 import type { ClusterRow } from "@/lib/clusters";
+import {
+  UrlDrawer,
+  type ContentDrawerSubject,
+} from "@/components/UrlDrawer";
 import { OverviewTab } from "./OverviewTab";
 import { MasterPlanTab } from "./MasterPlanTab";
 import { SprintCalendarTab } from "./SprintCalendarTab";
@@ -26,16 +31,27 @@ export type ContentViewProps = {
   clusters: ClusterRow[];
 };
 
+// Row-click handler — opens the universal drawer with kind: "content".
+// Threaded down to MasterPlanTab + SprintCalendarTab + PerformanceTrackerTab.
+export type ContentRowClickHandler = (subject: ContentDrawerSubject) => void;
+
 export function ContentView(props: ContentViewProps) {
   const router = useRouter();
   const sp = useSearchParams();
   const view = sp.get("view") || "overview";
+
+  const [drawerSubject, setDrawerSubject] =
+    useState<ContentDrawerSubject | null>(null);
 
   function setView(next: string) {
     const params = new URLSearchParams(sp.toString());
     params.set("view", next);
     router.push(`?${params.toString()}`);
   }
+
+  const onRowClick: ContentRowClickHandler = (subject) => {
+    setDrawerSubject(subject);
+  };
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl">
@@ -66,10 +82,22 @@ export function ContentView(props: ContentViewProps) {
       </nav>
 
       {view === "overview" && <OverviewTab {...props} />}
-      {view === "plan" && <MasterPlanTab {...props} />}
-      {view === "calendar" && <SprintCalendarTab {...props} />}
-      {view === "tracker" && <PerformanceTrackerTab {...props} />}
+      {view === "plan" && <MasterPlanTab {...props} onRowClick={onRowClick} />}
+      {view === "calendar" && (
+        <SprintCalendarTab {...props} onRowClick={onRowClick} />
+      )}
+      {view === "tracker" && (
+        <PerformanceTrackerTab {...props} onRowClick={onRowClick} />
+      )}
       {view === "legend" && <ActionLegendTab />}
+
+      <UrlDrawer
+        subject={drawerSubject}
+        onClose={() => setDrawerSubject(null)}
+        propertySlug={props.propertySlug}
+        propertyId={props.propertyId}
+        primaryDomain={props.primaryDomain}
+      />
     </div>
   );
 }

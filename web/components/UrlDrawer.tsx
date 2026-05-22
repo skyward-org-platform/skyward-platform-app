@@ -24,7 +24,7 @@
 // Pattern lifted from BrandDnaAssistantDrawer: ESC closes, click outside
 // closes, body scroll lock while open.
 
-import { useEffect } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ACTION_TINT } from "@/lib/wqa-triage";
 import { evaluateChecks, type Ctx } from "@/lib/wqa-checks";
@@ -46,6 +46,7 @@ import {
   setClusterPriority,
   setClusterField,
 } from "@/app/properties/[slug]/keywords/actions";
+import { setRowField } from "@/app/properties/[slug]/content/actions";
 import type { KeywordRow, KeywordStatus } from "@/lib/keywords";
 import type {
   ClusterRow,
@@ -54,7 +55,12 @@ import type {
   ClusterPageAction,
   ClusterState,
 } from "@/lib/clusters";
+import type { ContentRow } from "@/lib/content-rows";
 import { ClusterChatPanel } from "@/components/keywords/ClusterChatPanel";
+import { StatusChip } from "@/components/content/StatusChip";
+import { ActionTypeChip } from "@/components/content/ActionTypeChip";
+import { WriterCell } from "@/components/content/WriterCell";
+import { SprintCell } from "@/components/content/SprintCell";
 
 // ─── Subject union ───────────────────────────────────────────────────────
 export type UrlDrawerSubject = {
@@ -84,10 +90,17 @@ export type ClusterDrawerSubject = {
   urlsInCluster: string[];
 };
 
+export type ContentDrawerSubject = {
+  kind: "content";
+  row: ContentRow;
+  cluster: ClusterRow | null;
+};
+
 export type DrawerSubject =
   | UrlDrawerSubject
   | KeywordDrawerSubject
-  | ClusterDrawerSubject;
+  | ClusterDrawerSubject
+  | ContentDrawerSubject;
 
 // ─── Common props passed to every variant ───────────────────────────────
 type CommonProps = {
@@ -129,6 +142,9 @@ export function UrlDrawer(props: UrlDrawerProps) {
   }
   if (subject.kind === "cluster") {
     return <ClusterDrawer subject={subject} {...stripSubject(props)} />;
+  }
+  if (subject.kind === "content") {
+    return <ContentDrawer subject={subject} {...stripSubject(props)} />;
   }
   return <UrlDrawerView subject={subject} {...stripSubject(props)} />;
 }
@@ -1103,6 +1119,462 @@ function ClusterDrawer({
         />
       </Section>
     </DrawerShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONTENT DRAWER (Phase 4)
+// ═══════════════════════════════════════════════════════════════════════
+function ContentDrawer({
+  subject,
+  onClose,
+  propertySlug,
+  primaryDomain,
+}: { subject: ContentDrawerSubject } & CommonProps) {
+  const r = subject.row;
+  const cluster = subject.cluster;
+  const action = r.action_type_override ?? r.action_type;
+  const clusterName = cluster
+    ? cluster.name_override || cluster.head_term
+    : null;
+
+  return (
+    <DrawerShell ariaLabel="Content row details" onClose={onClose}>
+      <header className="px-4 py-3 border-b shrink-0 sticky top-0 bg-background z-10">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {primaryDomain && (
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                {primaryDomain} · content row
+              </div>
+            )}
+            <div
+              className="font-mono text-[12px] truncate text-foreground mt-0.5"
+              title={r.url}
+            >
+              {r.url}
+            </div>
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              <span>Sprint {r.sprint ?? "—"}</span>
+              <span>·</span>
+              <span>{action}</span>
+              <span>·</span>
+              <span>{r.status}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-lg leading-none px-1 shrink-0"
+            aria-label="Close drawer"
+          >
+            ×
+          </button>
+        </div>
+      </header>
+
+      <Section title="Identity & Strategy">
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11.5px]">
+          <SignalRow label="Vertical" value={r.vertical} />
+          <SignalRow label="Page Type" value={r.page_type} />
+          <SignalRow label="Parent Page" value={r.parent_page} />
+          <SignalRow label="Priority" value={r.priority_tier} />
+          <SignalRow label="Target Keyword" value={r.target_keyword} />
+          <SignalRow label="Source" value={r.source} />
+          {cluster && (
+            <SignalRow
+              label="Cluster"
+              value={`${clusterName} (${cluster.member_count.toLocaleString()} kw / SV ${cluster.total_sv.toLocaleString()})`}
+            />
+          )}
+        </dl>
+      </Section>
+
+      <Section title="Calendar">
+        <div className="grid gap-2.5">
+          <Field label="Sprint">
+            <SprintCell slug={propertySlug} rowId={r.id} value={r.sprint} />
+          </Field>
+          <Field label="Brief Due">
+            <span className="text-[11.5px] font-mono">{r.brief_due ?? "—"}</span>
+          </Field>
+          <Field label="Draft Due">
+            <span className="text-[11.5px] font-mono">{r.draft_due ?? "—"}</span>
+          </Field>
+          <Field label="Target Publish">
+            <span className="text-[11.5px] font-mono">
+              {r.target_publish ?? "—"}
+            </span>
+          </Field>
+          <Field label="Owners">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="owners"
+              value={r.owners}
+            />
+          </Field>
+          <Field label="Calendar Status">
+            <SelectDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="calendar_status"
+              value={r.calendar_status}
+              options={["Scheduled", "Slipped", "Done"]}
+            />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Brief Spec">
+        <div className="grid gap-2.5">
+          <Field label="Action Type">
+            <ActionTypeChip
+              slug={propertySlug}
+              rowId={r.id}
+              value={r.action_type}
+              override={r.action_type_override}
+            />
+          </Field>
+          <Field label="Title (auto)">
+            <span className="text-[11.5px]">{r.title_formatted ?? "—"}</span>
+          </Field>
+          <Field label="Title override">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="title_override"
+              value={r.title_override}
+            />
+          </Field>
+          <Field label="H1 (auto)">
+            <span className="text-[11.5px]">{r.h1_target ?? "—"}</span>
+          </Field>
+          <Field label="H1 override">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="h1_override"
+              value={r.h1_override}
+            />
+          </Field>
+          <Field label="Meta description (auto)">
+            <span className="text-[11.5px]">
+              {r.meta_description_spec ?? "—"}
+            </span>
+          </Field>
+          <Field label="Meta description override">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="meta_description_override"
+              value={r.meta_description_override}
+              multiline
+            />
+          </Field>
+          <Field label="Word count target">
+            <span className="text-[11.5px]">{r.word_count_target ?? "—"}</span>
+          </Field>
+          <Field label="Phase 2 yellow resolution">
+            <pre className="whitespace-pre-wrap text-[11.5px] font-sans">
+              {r.phase2_yellow_resolution ?? "—"}
+            </pre>
+          </Field>
+          <Field label="Brief Status">
+            <SelectDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="brief_status"
+              value={r.brief_status}
+              options={["Not Started", "In Progress", "Approved"]}
+            />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Content Inputs">
+        <p className="text-[11px] text-muted-foreground italic">
+          {r.entities_blocked}
+        </p>
+        <p className="text-[11px] text-muted-foreground italic">
+          {r.faqs_blocked}
+        </p>
+        <p className="text-[11px] text-muted-foreground italic">
+          {r.fanout_blocked}
+        </p>
+        <button
+          type="button"
+          disabled
+          className="mt-2 text-[11px] px-2 py-1 rounded border bg-card opacity-50 cursor-not-allowed"
+          title="Brief generation lands in a follow-up chunk"
+        >
+          Generate Brief — Tier 2
+        </button>
+      </Section>
+
+      <Section title="Draft & Production">
+        <div className="grid gap-2.5">
+          <Field label="Status">
+            <StatusChip slug={propertySlug} rowId={r.id} value={r.status} />
+          </Field>
+          <Field label="Writer">
+            <WriterCell slug={propertySlug} rowId={r.id} value={r.writer} />
+          </Field>
+          <Field label="Word count actual">
+            <NumericDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="word_count_actual"
+              value={r.word_count_actual}
+            />
+          </Field>
+          <Field label="Draft link">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="draft_link"
+              value={r.draft_link}
+            />
+          </Field>
+          <Field label="Published URL">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="published_url"
+              value={r.published_url}
+            />
+          </Field>
+          <Field label="Feedback notes">
+            <TextDrawerEditor
+              slug={propertySlug}
+              rowId={r.id}
+              field="feedback_notes"
+              value={r.feedback_notes}
+              multiline
+            />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Dependencies + Linking">
+        <Field label="Dependencies">
+          <span className="text-[11.5px]">{r.dependencies ?? "—"}</span>
+        </Field>
+        <Field label="Internal links out">
+          <pre className="whitespace-pre-wrap text-[11px] font-mono">
+            {r.internal_links_out ?? "(none)"}
+          </pre>
+        </Field>
+        <Field label="Internal links in">
+          <pre className="whitespace-pre-wrap text-[11px] font-mono">
+            {r.internal_links_in ?? "(none)"}
+          </pre>
+        </Field>
+      </Section>
+
+      <Section title="Schema">
+        <Field label="Current">
+          <span className="text-[11.5px]">{r.current_schema ?? "—"}</span>
+        </Field>
+        <Field label="Required">
+          <span className="text-[11.5px]">{r.required_schema ?? "—"}</span>
+        </Field>
+        <Field label="JSON-LD notes">
+          <span className="text-[11.5px]">{r.jsonld_notes ?? "—"}</span>
+        </Field>
+      </Section>
+
+      <Section title="Post-Publish Tasks">
+        <pre className="whitespace-pre-wrap text-[11.5px] font-sans">
+          {r.post_publish_tasks ?? "—"}
+        </pre>
+      </Section>
+    </DrawerShell>
+  );
+}
+
+// ─── Drawer editors for content_row field updates ────────────────────────
+// Thin wrappers around setRowField for use inside ContentDrawer. Each
+// commits on blur (text/number) or change (select), with optimistic local
+// state and a one-character error indicator on failure.
+
+type ContentEditableField =
+  | "action_type_override"
+  | "title_override"
+  | "h1_override"
+  | "meta_description_override"
+  | "brief_status"
+  | "calendar_status"
+  | "owners"
+  | "word_count_actual"
+  | "draft_link"
+  | "published_url"
+  | "feedback_notes"
+  | "rank_30d"
+  | "rank_60d"
+  | "rank_90d";
+
+export function TextDrawerEditor({
+  slug,
+  rowId,
+  field,
+  value,
+  multiline,
+}: {
+  slug: string;
+  rowId: string;
+  field: ContentEditableField;
+  value: string | null;
+  multiline?: boolean;
+}) {
+  const [local, setLocal] = useState(value ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function commit() {
+    const next = local.trim() || null;
+    if (next === (value ?? null)) return;
+    setError(null);
+    start(async () => {
+      const res = await setRowField(slug, rowId, field, next);
+      if (!res.ok) {
+        setLocal(value ?? "");
+        setError(res.error);
+      }
+    });
+  }
+
+  const common = {
+    value: local,
+    onChange: (
+      e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    ) => setLocal(e.target.value),
+    onBlur: commit,
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    disabled: pending,
+    className: `text-[11.5px] px-2 py-1 border rounded bg-background w-full ${pending ? "opacity-60" : ""}`,
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1 w-full">
+      {multiline ? (
+        <textarea {...common} rows={3} className={`${common.className} resize-y`} />
+      ) : (
+        <input type="text" {...common} />
+      )}
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function NumericDrawerEditor({
+  slug,
+  rowId,
+  field,
+  value,
+}: {
+  slug: string;
+  rowId: string;
+  field: ContentEditableField;
+  value: number | null;
+}) {
+  const [local, setLocal] = useState(value?.toString() ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function commit() {
+    const trimmed = local.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && Number.isNaN(next)) {
+      setLocal(value?.toString() ?? "");
+      return;
+    }
+    if (next === (value ?? null)) return;
+    setError(null);
+    start(async () => {
+      const res = await setRowField(slug, rowId, field, next);
+      if (!res.ok) {
+        setLocal(value?.toString() ?? "");
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="number"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        disabled={pending}
+        className={`text-[11.5px] px-2 py-1 border rounded bg-background w-24 tabular-nums ${pending ? "opacity-60" : ""}`}
+      />
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
+  );
+}
+
+function SelectDrawerEditor({
+  slug,
+  rowId,
+  field,
+  value,
+  options,
+}: {
+  slug: string;
+  rowId: string;
+  field: ContentEditableField;
+  value: string;
+  options: string[];
+}) {
+  const [current, setCurrent] = useState(value);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function onChange(next: string) {
+    const previous = current;
+    setCurrent(next);
+    setError(null);
+    start(async () => {
+      const res = await setRowField(slug, rowId, field, next);
+      if (!res.ok) {
+        setCurrent(previous);
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <select
+        value={current}
+        disabled={pending}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        className={`text-[11.5px] px-2 py-1 border rounded bg-background ${pending ? "opacity-60" : ""}`}
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
   );
 }
 
