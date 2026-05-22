@@ -10,7 +10,7 @@
 //   • 30d / 60d / 90d rank cells are read-only this chunk — Chunk 4 wires
 //     inline numeric editors via setRowField.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   EmptyTab,
   TabHeader,
@@ -19,9 +19,10 @@ import {
 } from "@/components/wqa/helpers";
 import { TextFilter, SelectFilter, NumericFilter, parseNumeric } from "../keywords/filters";
 import { ACTION_TINT } from "./MasterPlanTab";
-import type { ContentViewProps } from "./ContentView";
+import type { ContentViewProps, ContentRowClickHandler } from "./ContentView";
 import type { ContentRow, ContentActionType } from "@/lib/content-rows";
 import type { ClusterRow } from "@/lib/clusters";
+import { setRowField } from "@/app/properties/[slug]/content/actions";
 
 const ACTION_VALUES: ContentActionType[] = [
   "Optimize",
@@ -49,7 +50,12 @@ function est12moClicks(clusterSv: number, target12mo: number): number {
   return target12mo <= 5 ? clusterSv * 0.15 : clusterSv * 0.07;
 }
 
-export function PerformanceTrackerTab({ rows, clusters }: ContentViewProps) {
+export function PerformanceTrackerTab({
+  rows,
+  clusters,
+  propertySlug,
+  onRowClick,
+}: ContentViewProps & { onRowClick?: ContentRowClickHandler }) {
   const clusterById = useMemo(
     () => new Map(clusters.map((c) => [c.id, c])),
     [clusters],
@@ -213,7 +219,13 @@ export function PerformanceTrackerTab({ rows, clusters }: ContentViewProps) {
         </thead>
         <tbody>
           {pageRows.map((r) => (
-            <PerfRowView key={r.id} row={r} clusterById={clusterById} />
+            <PerfRowView
+              key={r.id}
+              row={r}
+              clusterById={clusterById}
+              propertySlug={propertySlug}
+              onRowClick={onRowClick}
+            />
           ))}
         </tbody>
       </TableShell>
@@ -231,9 +243,13 @@ export function PerformanceTrackerTab({ rows, clusters }: ContentViewProps) {
 function PerfRowView({
   row,
   clusterById,
+  propertySlug,
+  onRowClick,
 }: {
   row: ContentRow;
   clusterById: Map<string, ClusterRow>;
+  propertySlug: string;
+  onRowClick?: ContentRowClickHandler;
 }) {
   const action = row.action_type_override ?? row.action_type;
   const cluster = row.cluster_id ? clusterById.get(row.cluster_id) ?? null : null;
@@ -242,10 +258,25 @@ function PerfRowView({
   const target12 = targetRank12mo(action);
   const est6 = clusterSv != null ? est6moClicks(clusterSv, target6) : null;
   const est12 = clusterSv != null ? est12moClicks(clusterSv, target12) : null;
-  const refreshFlag = row.rank_90d != null && row.rank_90d > target6 * 1.43;
+
+  // Track ranks locally so the Refresh flag updates while the user edits
+  // without waiting for the server round-trip. Server action revalidates
+  // the route which re-renders with fresh props (and resets local state
+  // on remount of the row).
+  const [rank30, setRank30] = useState<number | null>(row.rank_30d);
+  const [rank60, setRank60] = useState<number | null>(row.rank_60d);
+  const [rank90, setRank90] = useState<number | null>(row.rank_90d);
+  const refreshFlag = rank90 != null && rank90 > target6 * 1.43;
+
+  function open() {
+    onRowClick?.({ kind: "content", row, cluster });
+  }
 
   return (
-    <tr className="border-t hover:bg-muted/40">
+    <tr
+      className={`border-t hover:bg-muted/40 ${onRowClick ? "cursor-pointer" : ""}`}
+      onClick={onRowClick ? open : undefined}
+    >
       <td className="px-3 py-1.5 text-[11px] font-mono truncate max-w-0" title={row.url}>
         {row.url}
       </td>
@@ -273,14 +304,32 @@ function PerfRowView({
       <td className="px-2 py-1.5 text-right tabular-nums text-[11.5px]">
         {est12 != null ? fmtN(Math.round(est12)) : "—"}
       </td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-[11.5px]">
-        {row.rank_30d ?? <span className="text-muted-foreground">—</span>}
+      <td className="px-2 py-1.5 text-right">
+        <RankCell
+          slug={propertySlug}
+          rowId={row.id}
+          field="rank_30d"
+          value={rank30}
+          onLocalChange={setRank30}
+        />
       </td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-[11.5px]">
-        {row.rank_60d ?? <span className="text-muted-foreground">—</span>}
+      <td className="px-2 py-1.5 text-right">
+        <RankCell
+          slug={propertySlug}
+          rowId={row.id}
+          field="rank_60d"
+          value={rank60}
+          onLocalChange={setRank60}
+        />
       </td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-[11.5px]">
-        {row.rank_90d ?? <span className="text-muted-foreground">—</span>}
+      <td className="px-2 py-1.5 text-right">
+        <RankCell
+          slug={propertySlug}
+          rowId={row.id}
+          field="rank_90d"
+          value={rank90}
+          onLocalChange={setRank90}
+        />
       </td>
       <td className="px-2 py-1.5 text-center">
         {refreshFlag ? (
@@ -292,6 +341,74 @@ function PerfRowView({
         )}
       </td>
     </tr>
+  );
+}
+
+// Inline numeric editor for rank_30d / rank_60d / rank_90d. Commits on
+// blur or Enter. Empty input clears the value (null). Reports back to
+// parent via onLocalChange so the Refresh-flag column can recompute
+// without waiting for the server revalidation round-trip.
+function RankCell({
+  slug,
+  rowId,
+  field,
+  value,
+  onLocalChange,
+}: {
+  slug: string;
+  rowId: string;
+  field: "rank_30d" | "rank_60d" | "rank_90d";
+  value: number | null;
+  onLocalChange: (next: number | null) => void;
+}) {
+  const [local, setLocal] = useState(value?.toString() ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function commit() {
+    const trimmed = local.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && Number.isNaN(next)) {
+      setLocal(value?.toString() ?? "");
+      return;
+    }
+    if (next === (value ?? null)) return;
+    setError(null);
+    onLocalChange(next);
+    start(async () => {
+      const res = await setRowField(slug, rowId, field, next);
+      if (!res.ok) {
+        setLocal(value?.toString() ?? "");
+        onLocalChange(value);
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="number"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        disabled={pending}
+        placeholder="—"
+        className={`text-[11px] px-1.5 py-0.5 rounded border bg-transparent w-14 tabular-nums text-right ${pending ? "opacity-60" : ""}`}
+      />
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
   );
 }
 
