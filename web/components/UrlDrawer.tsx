@@ -54,6 +54,7 @@ import type {
   ClusterPageAction,
   ClusterState,
 } from "@/lib/clusters";
+import { ClusterChatPanel } from "@/components/keywords/ClusterChatPanel";
 
 // ─── Subject union ───────────────────────────────────────────────────────
 export type UrlDrawerSubject = {
@@ -1095,9 +1096,11 @@ function ClusterDrawer({
       </Section>
 
       <Section title="Agent">
-        <div className="text-[11.5px] text-muted-foreground italic">
-          Agent chat coming in Chunk 5.
-        </div>
+        <ClusterChatPanel
+          propertySlug={propertySlug}
+          clusterId={cluster.id}
+          clusterName={displayName}
+        />
       </Section>
     </DrawerShell>
   );
