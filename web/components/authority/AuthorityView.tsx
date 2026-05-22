@@ -79,13 +79,21 @@ export function AuthorityView(props: AuthorityViewProps) {
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl">
-      <header className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Authority</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Link-building monitoring for{" "}
-          <span className="font-mono">{props.primaryDomain}</span>.{" "}
-          {props.refDomains.length.toLocaleString()} referring domains tracked.
-        </p>
+      <header className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Authority</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Link-building monitoring for{" "}
+            <span className="font-mono">{props.primaryDomain}</span>.{" "}
+            {props.refDomains.length.toLocaleString()} referring domains tracked.
+          </p>
+        </div>
+        <a
+          href={`/properties/${props.propertySlug}/authority/disavow.txt`}
+          className="shrink-0 text-xs px-3 py-1.5 rounded border hover:bg-muted"
+        >
+          Download disavow.txt
+        </a>
       </header>
 
       <nav className="flex gap-1 border-b mb-5 overflow-x-auto">
