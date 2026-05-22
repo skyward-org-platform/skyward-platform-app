@@ -23,6 +23,7 @@ import {
 import { TextFilter, SelectFilter, NumericFilter, parseNumeric } from "@/components/keywords/filters";
 import type { AuthorityViewProps } from "./AuthorityView";
 import type { ReferringDomainRow, RefDomainQuality } from "@/lib/authority";
+import { QualityChip } from "./QualityChip";
 
 const QUALITY_VALUES: RefDomainQuality[] = ["Pending", "Quality", "Spam", "Disavow"];
 
@@ -58,8 +59,13 @@ const QUALITY_TINT: Record<
 
 const PAGE_SIZE = 100;
 
-export function ReferringDomainsTab(props: AuthorityViewProps) {
-  const { refDomains } = props;
+export type ReferringDomainsTabProps = AuthorityViewProps & {
+  /** Called when a row is clicked (or its Open button) — wires the universal drawer. */
+  onRowClick?: (domain: string) => void;
+};
+
+export function ReferringDomainsTab(props: ReferringDomainsTabProps) {
+  const { refDomains, propertySlug, onRowClick } = props;
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -270,7 +276,12 @@ export function ReferringDomainsTab(props: AuthorityViewProps) {
         </thead>
         <tbody>
           {pageRows.map((r) => (
-            <RefDomainRow key={r.id} row={r} />
+            <RefDomainRow
+              key={r.id}
+              row={r}
+              propertySlug={propertySlug}
+              onRowClick={onRowClick}
+            />
           ))}
         </tbody>
       </TableShell>
@@ -285,15 +296,28 @@ export function ReferringDomainsTab(props: AuthorityViewProps) {
   );
 }
 
-function RefDomainRow({ row }: { row: ReferringDomainRow }) {
-  const tint = QUALITY_TINT[row.quality];
+function RefDomainRow({
+  row,
+  propertySlug,
+  onRowClick,
+}: {
+  row: ReferringDomainRow;
+  propertySlug: string;
+  onRowClick?: (domain: string) => void;
+}) {
   const notesPreview = row.notes
     ? row.notes.length > 60
       ? `${row.notes.slice(0, 60)}…`
       : row.notes
     : "";
+  const clickable = !!onRowClick;
   return (
-    <tr className="border-t hover:bg-muted/40">
+    <tr
+      className={
+        "border-t hover:bg-muted/40 " + (clickable ? "cursor-pointer" : "")
+      }
+      onClick={clickable ? () => onRowClick!(row.domain) : undefined}
+    >
       <td className="px-3 py-1.5 font-mono text-[11.5px] truncate max-w-0" title={row.domain}>
         {row.domain}
       </td>
@@ -334,11 +358,7 @@ function RefDomainRow({ row }: { row: ReferringDomainRow }) {
         )}
       </td>
       <td className="px-2 py-1.5">
-        <span
-          className={`inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border ${tint.pill}`}
-        >
-          {row.quality}
-        </span>
+        <QualityChip slug={propertySlug} domain={row.domain} value={row.quality} />
       </td>
       <td
         className="px-2 py-1.5 text-[11px] text-muted-foreground truncate max-w-0"
@@ -349,9 +369,17 @@ function RefDomainRow({ row }: { row: ReferringDomainRow }) {
       <td className="px-2 py-1.5 text-right">
         <button
           type="button"
-          disabled
-          className="text-[11px] px-2 py-0.5 rounded border bg-card text-muted-foreground/60 cursor-not-allowed"
-          title="Drawer wired in Chunk 4"
+          disabled={!clickable}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (clickable) onRowClick!(row.domain);
+          }}
+          className={
+            clickable
+              ? "text-[11px] px-2 py-0.5 rounded border bg-card hover:bg-muted"
+              : "text-[11px] px-2 py-0.5 rounded border bg-card text-muted-foreground/60 cursor-not-allowed"
+          }
+          title={clickable ? "Open drawer" : "Drawer not wired"}
         >
           Open
         </button>
