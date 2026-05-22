@@ -39,16 +39,9 @@ function targetRank6mo(action: ContentActionType): number {
 function targetRank12mo(action: ContentActionType): number {
   return action === "Optimize" || action === "Refresh" ? 4 : 6;
 }
-function estClicks(clusterSv: number, rankTarget: number): number {
-  // 6mo: 7% if top10, else 2%. 12mo: 15% if top5, else 7%.
-  // Caller decides the rank window via rankTarget threshold.
-  if (rankTarget <= 5) return clusterSv * 0.15;
-  if (rankTarget <= 10) return clusterSv * 0.07;
-  return clusterSv * 0.02;
-}
-
-// Helper to apply the per-window curve — 6mo top10 yields 7%, else 2%;
-// 12mo top5 yields 15%, else 7%.
+// Per-window CTR curves:
+//   6mo: top-10 → 7%, else 2%
+//   12mo: top-5 → 15%, else 7%
 function est6moClicks(clusterSv: number, target6mo: number): number {
   return target6mo <= 10 ? clusterSv * 0.07 : clusterSv * 0.02;
 }
