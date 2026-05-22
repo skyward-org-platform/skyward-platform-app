@@ -14,12 +14,13 @@ from live state:
 Query params:
     slug    (required)  property slug, e.g. "buscharter"
     env     (optional)  "dev" (default) | "prod"
-    phase   (optional)  "1" (default) | "2"
+    phase   (optional)  "1" (default) | "2" | "4"
 
 Response: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 attachment. Filename:
   - phase=1: `{slug}-Website-Quality-Audit-{YYYY-MM-DD}.xlsx`
   - phase=2: `{slug}-Technical-SEO-Audit-{YYYY-MM-DD}.xlsx`
+  - phase=4: `{slug}-Content-Workbook-{YYYY-MM-DD}.xlsx`
 
 Auth: optional `Authorization: Bearer <APP_WRITE_TOKEN>` header.
 """
@@ -199,6 +200,41 @@ def _load_check_states(property_id: str) -> dict[str, dict]:
     return {f"{r['url']}\x1f{r['check_id']}": r for r in rows}
 
 
+def _load_content_rows(property_id: str) -> list[dict]:
+    """Fetch all content_row records for the property (paginated)."""
+    page_size = 1000
+    offset = 0
+    out: list[dict] = []
+    while True:
+        rows = _supabase_get(
+            "content_row",
+            params={
+                "select": "*",
+                "property_id": f"eq.{property_id}",
+                "limit": str(page_size),
+                "offset": str(offset),
+            },
+        )
+        if not rows:
+            break
+        out.extend(rows)
+        if len(rows) < page_size:
+            break
+        offset += page_size
+    return out
+
+
+def _load_keyword_clusters(property_id: str) -> list[dict]:
+    """Fetch keyword_cluster rows used to enrich Phase 4 export with SV / KD."""
+    return _supabase_get(
+        "keyword_cluster",
+        params={
+            "select": "id,cluster_number,head_term,name_override,total_sv,max_sv,avg_kd,priority,page_action",
+            "property_id": f"eq.{property_id}",
+        },
+    )
+
+
 # ─── filename helper ────────────────────────────────────────────────────────
 _SAFE_FN = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -236,7 +272,7 @@ class handler(BaseHTTPRequestHandler):
             phase = (q.get("phase", ["1"])[0] or "1").strip()
             if not slug:
                 return self._send_json(400, {"ok": False, "error": "slug query param required."})
-            if phase not in ("1", "2"):
+            if phase not in ("1", "2", "4"):
                 return self._send_json(400, {"ok": False, "error": "unknown phase"})
 
             prop = _resolve_property(slug)
@@ -250,8 +286,61 @@ class handler(BaseHTTPRequestHandler):
                     {"ok": False, "error": f"property {slug!r} has no primary_domain set"},
                 )
 
-            dataset = "SEOPipelineDev" if env == "dev" else "SEOPipeline"
             domain_norm = _normalize_domain(primary_domain)
+            title = (prop.get("name") or slug).strip()
+
+            # Builder imports: deferred so cold-start of unrelated routes
+            # doesn't pay openpyxl + pandas import cost. Vercel runs each
+            # function file in isolation, so we add this dir to sys.path.
+            import sys as _sys
+            _here = os.path.dirname(os.path.abspath(__file__))
+            if _here not in _sys.path:
+                _sys.path.insert(0, _here)
+
+            today = _dt.date.today().isoformat()
+
+            # Phase 4 reads directly from Supabase content_row + keyword_cluster.
+            # It doesn't need the BQ wqa_output backing store at all.
+            if phase == "4":
+                from _phase4_builder import build_phase4_workbook  # type: ignore
+
+                content_rows = _load_content_rows(prop["id"])
+                if not content_rows:
+                    return self._send_json(
+                        404,
+                        {
+                            "ok": False,
+                            "error": (
+                                f"No content_row records found for {slug!r}. "
+                                f"Run `uv run python delivery/tna/phase4_backfill_supabase.py` first."
+                            ),
+                        },
+                    )
+                clusters = _load_keyword_clusters(prop["id"])
+                buf = build_phase4_workbook(
+                    rows=content_rows,
+                    clusters=clusters,
+                    title=title,
+                    domain=domain_norm,
+                )
+                filename = f"{_safe_filename(slug)}-Content-Workbook-{today}.xlsx"
+                data = buf.getvalue()
+
+                self.send_response(200)
+                self.send_header(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                self.send_header(
+                    "Content-Disposition", f'attachment; filename="{filename}"'
+                )
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
+            dataset = "SEOPipelineDev" if env == "dev" else "SEOPipeline"
 
             bq = _get_bq()
             rows = _fetch_latest_rows(bq, dataset, domain_norm)
@@ -269,17 +358,6 @@ class handler(BaseHTTPRequestHandler):
                 )
 
             overrides = _load_overrides(prop["id"])
-            title = (prop.get("name") or slug).strip()
-
-            # Builder imports: deferred so cold-start of unrelated routes
-            # doesn't pay openpyxl + pandas import cost. Vercel runs each
-            # function file in isolation, so we add this dir to sys.path.
-            import sys as _sys
-            _here = os.path.dirname(os.path.abspath(__file__))
-            if _here not in _sys.path:
-                _sys.path.insert(0, _here)
-
-            today = _dt.date.today().isoformat()
 
             if phase == "2":
                 check_states = _load_check_states(prop["id"])
