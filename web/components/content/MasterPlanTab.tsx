@@ -16,7 +16,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { EmptyTab, TabHeader, TableShell } from "@/components/wqa/helpers";
 import { TextFilter, SelectFilter, NumericFilter, parseNumeric } from "../keywords/filters";
-import type { ContentViewProps } from "./ContentView";
+import type { ContentViewProps, ContentRowClickHandler } from "./ContentView";
 import type {
   ContentRow,
   ContentStatus,
@@ -24,6 +24,10 @@ import type {
   ContentSource,
 } from "@/lib/content-rows";
 import type { ClusterRow } from "@/lib/clusters";
+import { StatusChip } from "./StatusChip";
+import { ActionTypeChip } from "./ActionTypeChip";
+import { WriterCell } from "./WriterCell";
+import { SprintCell } from "./SprintCell";
 
 const STATUS_VALUES: ContentStatus[] = [
   "Not Started",
@@ -142,7 +146,12 @@ const SOURCE_TINT: Record<ContentSource, { active: string; idle: string; dot: st
 
 const PAGE_SIZE = 100;
 
-export function MasterPlanTab({ rows, clusters }: ContentViewProps) {
+export function MasterPlanTab({
+  rows,
+  clusters,
+  propertySlug,
+  onRowClick,
+}: ContentViewProps & { onRowClick?: ContentRowClickHandler }) {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -419,7 +428,13 @@ export function MasterPlanTab({ rows, clusters }: ContentViewProps) {
         </thead>
         <tbody>
           {pageRows.map((r) => (
-            <PlanRowView key={r.id} row={r} clusterById={clusterById} />
+            <PlanRowView
+              key={r.id}
+              row={r}
+              clusterById={clusterById}
+              propertySlug={propertySlug}
+              onRowClick={onRowClick}
+            />
           ))}
         </tbody>
       </TableShell>
@@ -437,28 +452,39 @@ export function MasterPlanTab({ rows, clusters }: ContentViewProps) {
 export function PlanRowView({
   row,
   clusterById,
+  propertySlug,
+  onRowClick,
 }: {
   row: ContentRow;
   clusterById: Map<string, ClusterRow>;
+  propertySlug: string;
+  onRowClick?: ContentRowClickHandler;
 }) {
-  const action = row.action_type_override ?? row.action_type;
   const cluster = row.cluster_id ? clusterById.get(row.cluster_id) ?? null : null;
   const clusterName = cluster ? cluster.name_override || cluster.head_term : null;
 
+  function open() {
+    onRowClick?.({ kind: "content", row, cluster });
+  }
+
   return (
-    <tr className="border-t hover:bg-muted/40">
+    <tr
+      className={`border-t hover:bg-muted/40 ${onRowClick ? "cursor-pointer" : ""}`}
+      onClick={onRowClick ? open : undefined}
+    >
       <td className="px-3 py-1.5 text-[11px] font-mono truncate max-w-0" title={row.url}>
         {row.url}
       </td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-[11.5px]">
-        {row.sprint ?? "—"}
+      <td className="px-2 py-1.5 text-right">
+        <SprintCell slug={propertySlug} rowId={row.id} value={row.sprint} />
       </td>
       <td className="px-2 py-1.5">
-        <span
-          className={`inline-flex items-center text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded ${ACTION_TINT[action].chip}`}
-        >
-          {action}
-        </span>
+        <ActionTypeChip
+          slug={propertySlug}
+          rowId={row.id}
+          value={row.action_type}
+          override={row.action_type_override}
+        />
       </td>
       <td className="px-2 py-1.5">
         <PriorityPill tier={row.priority_tier} />
@@ -476,22 +502,20 @@ export function PlanRowView({
         {row.target_keyword ?? <span className="text-muted-foreground">—</span>}
       </td>
       <td className="px-2 py-1.5">
-        <span
-          className={`inline-flex items-center text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded ${STATUS_TINT[row.status].chip}`}
-        >
-          {row.status}
-        </span>
+        <StatusChip slug={propertySlug} rowId={row.id} value={row.status} />
       </td>
-      <td className="px-2 py-1.5 text-[11px]">
-        {row.writer ?? <span className="text-muted-foreground">TBD</span>}
+      <td className="px-2 py-1.5">
+        <WriterCell slug={propertySlug} rowId={row.id} value={row.writer} />
       </td>
       <td className="px-2 py-1.5 text-center">
         <button
           type="button"
-          disabled
-          aria-label="Open content drawer (wired in Chunk 4)"
-          title="Drawer integration lands in Chunk 4"
-          className="text-[11px] px-1.5 py-0.5 rounded border bg-card opacity-50 cursor-not-allowed"
+          onClick={(e) => {
+            e.stopPropagation();
+            open();
+          }}
+          aria-label="Open content drawer"
+          className="text-[11px] px-1.5 py-0.5 rounded border bg-card hover:bg-muted/60"
         >
           Open
         </button>

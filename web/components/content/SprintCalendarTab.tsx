@@ -10,7 +10,7 @@
 import { useMemo } from "react";
 import { EmptyTab, TabHeader, TableShell } from "@/components/wqa/helpers";
 import { PlanRowView } from "./MasterPlanTab";
-import type { ContentViewProps } from "./ContentView";
+import type { ContentViewProps, ContentRowClickHandler } from "./ContentView";
 import type { ContentRow } from "@/lib/content-rows";
 import type { ClusterRow } from "@/lib/clusters";
 
@@ -22,7 +22,12 @@ type SprintGroup = {
   rows: ContentRow[];
 };
 
-export function SprintCalendarTab({ rows, clusters }: ContentViewProps) {
+export function SprintCalendarTab({
+  rows,
+  clusters,
+  propertySlug,
+  onRowClick,
+}: ContentViewProps & { onRowClick?: ContentRowClickHandler }) {
   const clusterById = useMemo(
     () => new Map(clusters.map((c) => [c.id, c])),
     [clusters],
@@ -84,7 +89,13 @@ export function SprintCalendarTab({ rows, clusters }: ContentViewProps) {
 
       <div className="space-y-4">
         {groups.map((g) => (
-          <SprintGroupCard key={g.key} group={g} clusterById={clusterById} />
+          <SprintGroupCard
+            key={g.key}
+            group={g}
+            clusterById={clusterById}
+            propertySlug={propertySlug}
+            onRowClick={onRowClick}
+          />
         ))}
       </div>
     </section>
@@ -94,9 +105,13 @@ export function SprintCalendarTab({ rows, clusters }: ContentViewProps) {
 function SprintGroupCard({
   group,
   clusterById,
+  propertySlug,
+  onRowClick,
 }: {
   group: SprintGroup;
   clusterById: Map<string, ClusterRow>;
+  propertySlug: string;
+  onRowClick?: ContentRowClickHandler;
 }) {
   const heading =
     group.sprint == null ? "Unscheduled" : `Sprint ${group.sprint}`;
@@ -143,7 +158,13 @@ function SprintGroupCard({
         </thead>
         <tbody>
           {group.rows.map((r) => (
-            <PlanRowView key={r.id} row={r} clusterById={clusterById} />
+            <PlanRowView
+              key={r.id}
+              row={r}
+              clusterById={clusterById}
+              propertySlug={propertySlug}
+              onRowClick={onRowClick}
+            />
           ))}
         </tbody>
       </TableShell>
