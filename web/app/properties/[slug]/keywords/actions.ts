@@ -16,6 +16,12 @@ import {
   type ClusterState,
   type ClusterPageAction,
 } from "@/lib/clusters";
+import {
+  appendMessage,
+  getClusterMessages,
+  getOrCreateClusterThread,
+  type ChatMessage,
+} from "@/lib/cluster-chat";
 
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
@@ -169,6 +175,69 @@ export async function setUrlClusterAssignment(
     });
     bust(slug);
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ─── cluster chat ───────────────────────────────────────────────────────────
+// One thread per cluster. Each call appends the user turn, runs the agent
+// (stub here; real runner lands in 5.3), and appends the assistant turn.
+
+export type PostClusterChatResult =
+  | { ok: true; messages: ChatMessage[] }
+  | { ok: false; error: string };
+
+export async function getClusterChatThread(
+  slug: string,
+  clusterId: string,
+): Promise<PostClusterChatResult> {
+  const prop = await resolveProperty(slug);
+  if ("error" in prop) return { ok: false, error: prop.error };
+  try {
+    const threadId = await getOrCreateClusterThread({
+      propertyId: prop.id,
+      clusterId,
+      createdBy: getOperator(),
+    });
+    const messages = await getClusterMessages(threadId);
+    return { ok: true, messages };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function postClusterChatMessage(
+  slug: string,
+  clusterId: string,
+  content: string,
+): Promise<PostClusterChatResult> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("error" in prop) return { ok: false, error: prop.error };
+
+  const trimmed = content.trim();
+  if (!trimmed) return { ok: false, error: "Empty message." };
+
+  const op = getOperator();
+  try {
+    const threadId = await getOrCreateClusterThread({
+      propertyId: prop.id,
+      clusterId,
+      createdBy: op,
+    });
+    await appendMessage(threadId, "user", trimmed);
+
+    // V1 stub assistant reply. Real runner with Anthropic + 4 tools lands
+    // in Task 5.3 — replace this block with `runClusterChat(...)` from
+    // web/inference/cluster-chat/runner.ts.
+    const reply = `(stub) Received: "${trimmed}". Tools wiring lands in 5.3.`;
+    await appendMessage(threadId, "assistant", reply);
+
+    const messages = await getClusterMessages(threadId);
+    bust(slug);
+    return { ok: true, messages };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
