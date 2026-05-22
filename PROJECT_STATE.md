@@ -510,3 +510,54 @@ Single new route `/properties/[slug]/pages` becomes the canonical execution surf
 - `docs/web-app-as-built-2026-05-21.md` — as-built mapping each surface to its source-of-truth SOP
 
 **Session note:** `session-notes/2026-05-21-execution-surface-shipped.md`
+
+### 2026-05-22 — Phase 3 Keyword Surface shipped to preview (NOT merged to main)
+
+`/properties/[slug]/keywords` replaces the prior placeholder with a real workspace mirroring the Phase 3 SOP: keyword universe, SERP-overlap clusters at threshold=4, URL→cluster map, opportunities, per-cluster agent chat. 31 commits on `feat/phase3-surface`. Production unchanged.
+
+**New tables in `seo-platform-dev`:**
+- `keyword` + `keyword_history` + trigger (idempotent ALTER vs legacy keyword table from `20260520_keyword.sql`)
+- `keyword_cluster` + `keyword_cluster_history` + trigger
+- `keyword_cluster_member`
+- `page_cluster_assignment` + history + trigger
+- `cluster_chat_thread` + `cluster_chat_message`
+
+**Backfill state (buscharter only — other 7 TNA properties empty):**
+- 9,003 keywords · 646 clusters · 2,514 members · 115 URL assignments
+- Threshold=4 clustering (up from threshold=3); mega-cluster shrunk from 1,195 to 583 keywords
+
+**New routes / sub-routes:**
+- `/properties/[slug]/keywords` gains Discovery/Optimization mode switcher. Discovery sub-tabs: Universe, Sources, Cluster Map, Action Legend. Optimization sub-tabs: URL Map, Opportunities, Forecasting, Competitive Gap, Coverage (last three are BQ-dependent placeholders).
+
+**New components:**
+- `components/keywords/KeywordsView.tsx`, `KeywordsModeShell.tsx`
+- 9 sub-tab components in `components/keywords/{discovery,optimization}/`
+- `KeywordStatusChip.tsx`, `ClusterPriorityPill.tsx`, `ClusterPageActionChip.tsx`, `ClusterPicker.tsx`, `ClusterChatPanel.tsx`
+
+**New libs:**
+- `lib/keywords.ts`, `lib/clusters.ts`, `lib/cluster-chat.ts`
+- `inference/cluster-chat/runner.ts` — Anthropic (claude-sonnet-4-6) with 4 tools (`find_more_keywords`, `expand_cluster`, `search_serp` [stub], `mark_keyword_excluded`)
+
+**`UrlDrawer.tsx` made polymorphic** — accepts `subject: {kind: 'url'|'keyword'|'cluster', ...}`. Existing callers (PagesView, WqaTabs, AuditModeShell) updated.
+
+**Agency repo (separate):**
+- `delivery/tna/cluster_buscharter.py` — threshold bumped to 4, emits members CSV
+- `delivery/tna/phase3_backfill_supabase.py` — one-shot CSV → Supabase loader
+
+**Preview deploy:** https://skyward-platform-b1y31idg1-skywards-projects-60431a3a.vercel.app/properties/buscharter/keywords
+
+**Followups tracked in `session-notes/2026-05-22-phase3-surface.md`:**
+1. Tier 1 redesign vs reference auto-SEO UI (flatten tabs · pipeline progress strip · Run-pipeline buttons · stat tile Overview · counter strip · color-coded relevance · inline cluster column · per-column filters).
+2. Branch state hiccup mid-Chunk 5 — check `git status` on `fix/wqa-pages-domain-match` for stale changes.
+3. Unrelated `unstable_cache` refactor sitting in working tree (predates session).
+4. `ANTHROPIC_API_KEY` not in local `.env`; chat works on Vercel only.
+5. UrlMapTab row click renders URL as anchor, not drawer (needs wqa_output + execution + check_states load in keywords page.tsx).
+6. Tools auto-execute without proposal-card approval flow.
+7. CSVs gitignored in agency repo — re-run cluster_buscharter.py to regenerate.
+8. `runRecluster` server action specified but not built — re-clustering is CLI-only today.
+
+**Reference docs added this session:**
+- `docs/superpowers/specs/2026-05-22-phase3-surface-design.md`
+- `docs/superpowers/plans/2026-05-22-phase3-surface.md`
+
+**Session note:** `session-notes/2026-05-22-phase3-surface.md`
