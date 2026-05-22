@@ -11,14 +11,9 @@ import {
   TableShell,
   fmtN,
 } from "@/components/wqa/helpers";
+import { KeywordStatusChip } from "../KeywordStatusChip";
 import type { KeywordsViewProps } from "../KeywordsView";
 import type { KeywordRow, KeywordStatus, KeywordSource } from "@/lib/keywords";
-
-const STATUS_TINT: Record<KeywordStatus, { band: string; dot: string }> = {
-  Retained: { band: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  Excluded: { band: "bg-rose-50 text-rose-800", dot: "bg-rose-500" },
-  Candidate: { band: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
-};
 
 const SOURCES: (KeywordSource | "all")[] = [
   "all",
@@ -40,7 +35,7 @@ const STATUSES: (KeywordStatus | "all")[] = [
 const PAGE_SIZE = 100;
 
 export function UniverseTab(props: KeywordsViewProps) {
-  const { keywords, clusters, clusterMembers } = props;
+  const { keywords, clusters, clusterMembers, propertySlug } = props;
 
   // Build keyword → cluster head_term map in O(K+M).
   const clusterByKeyword = useMemo(() => {
@@ -139,6 +134,7 @@ export function UniverseTab(props: KeywordsViewProps) {
               key={k.id}
               row={k}
               clusterName={clusterByKeyword.get(k.keyword) ?? null}
+              propertySlug={propertySlug}
             />
           ))}
         </tbody>
@@ -157,23 +153,23 @@ export function UniverseTab(props: KeywordsViewProps) {
 function KeywordRowView({
   row,
   clusterName,
+  propertySlug,
 }: {
   row: KeywordRow;
   clusterName: string | null;
+  propertySlug: string;
 }) {
-  const tint = STATUS_TINT[row.status];
   return (
     <tr className="border-t hover:bg-muted/40">
       <td className="px-3 py-1.5 text-[11.5px] truncate max-w-0" title={row.keyword}>
         {row.keyword}
       </td>
       <td className="px-2 py-1.5">
-        <span
-          className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded ${tint.band}`}
-        >
-          <span className={`size-1.5 rounded-full ${tint.dot}`} />
-          {row.status}
-        </span>
+        <KeywordStatusChip
+          propertySlug={propertySlug}
+          keyword={row.keyword}
+          initialStatus={row.status}
+        />
       </td>
       <td className="px-2 py-1.5 text-[11px] text-muted-foreground">
         {row.source ?? "—"}
