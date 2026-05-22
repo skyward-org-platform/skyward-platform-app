@@ -4,8 +4,10 @@
 // primary cluster for context. Score is the SERP-overlap pipeline's match
 // confidence (higher = stronger primary). The cluster cell is editable
 // via ClusterPicker; on change → setUrlClusterAssignment server action.
+//
+// Per-column filters: URL (text), cluster (text), score (numeric ≥).
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   EmptyTab,
   TabHeader,
@@ -15,6 +17,7 @@ import {
 } from "@/components/wqa/helpers";
 import { ClusterPicker } from "../ClusterPicker";
 import { setUrlClusterAssignment } from "@/app/properties/[slug]/keywords/actions";
+import { TextFilter, NumericFilter, parseNumeric } from "../filters";
 import type { KeywordsViewProps } from "../KeywordsView";
 import type { ClusterRow } from "@/lib/clusters";
 
@@ -30,6 +33,36 @@ export function UrlMapTab(props: KeywordsViewProps) {
     return [...urlAssignments].sort((a, b) => b.score - a.score);
   }, [urlAssignments]);
 
+  const [colFilters, setColFilters] = useState({
+    url: "",
+    cluster: "",
+    score: "",
+  });
+  const setColFilter = <K extends keyof typeof colFilters>(
+    k: K,
+    v: (typeof colFilters)[K],
+  ) => setColFilters((prev) => ({ ...prev, [k]: v }));
+
+  const filtered = useMemo(() => {
+    const u = colFilters.url.trim().toLowerCase();
+    const c = colFilters.cluster.trim().toLowerCase();
+    const s = parseNumeric(colFilters.score);
+    return rows.filter((a) => {
+      if (u && !a.url.toLowerCase().includes(u)) return false;
+      if (c) {
+        const cluster = clusterById.get(a.primary_cluster_id);
+        const name = (cluster?.name_override || cluster?.head_term || "").toLowerCase();
+        if (!name.includes(c)) return false;
+      }
+      if (s) {
+        if (s.op === ">=" && !(a.score >= s.n)) return false;
+        if (s.op === "<=" && !(a.score <= s.n)) return false;
+        if (s.op === "=" && a.score !== s.n) return false;
+      }
+      return true;
+    });
+  }, [rows, colFilters, clusterById]);
+
   if (urlAssignments.length === 0) {
     return <EmptyTab message="No URL-to-cluster assignments yet." />;
   }
@@ -37,22 +70,22 @@ export function UrlMapTab(props: KeywordsViewProps) {
   return (
     <section>
       <TabHeader
-        title="URL Map"
+        title="Mapping"
         subtitle={
           <>
             Every URL with a primary cluster assignment. Score is the
-            SERP-overlap pipeline&rsquo;s match confidence. Cluster size and
-            cross-cluster reach are surfaced here to spot pages that overload
-            on a single intent.
+            SERP-overlap pipeline&rsquo;s match confidence. Pick a different
+            cluster inline to override the algorithm.
           </>
         }
-        count={rows.length}
+        count={filtered.length}
+        total={urlAssignments.length}
       />
 
       <TableShell>
         <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
           <tr>
-            <th className="text-left px-3 py-2 font-medium min-w-[280px]">URL</th>
+            <th className="text-left px-3 py-2 font-medium min-w-[260px]">URL</th>
             <th className="text-left px-2 py-2 font-medium min-w-[220px]">
               Primary cluster
             </th>
@@ -60,9 +93,34 @@ export function UrlMapTab(props: KeywordsViewProps) {
             <th className="text-right px-2 py-2 font-medium">Cluster size</th>
             <th className="text-right px-2 py-2 font-medium"># clusters</th>
           </tr>
+          <tr className="bg-muted/60 border-t">
+            <th className="px-3 py-1.5">
+              <TextFilter
+                value={colFilters.url}
+                onChange={(v) => setColFilter("url", v)}
+                placeholder="search URL…"
+              />
+            </th>
+            <th className="px-2 py-1.5">
+              <TextFilter
+                value={colFilters.cluster}
+                onChange={(v) => setColFilter("cluster", v)}
+                placeholder="search cluster…"
+              />
+            </th>
+            <th className="px-2 py-1.5">
+              <NumericFilter
+                value={colFilters.score}
+                onChange={(v) => setColFilter("score", v)}
+                placeholder="≥"
+              />
+            </th>
+            <th />
+            <th />
+          </tr>
         </thead>
         <tbody>
-          {rows.map((a) => {
+          {filtered.map((a) => {
             const cluster = clusterById.get(a.primary_cluster_id);
             return (
               <UrlAssignmentRow
