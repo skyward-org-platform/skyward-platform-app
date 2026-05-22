@@ -11,36 +11,13 @@ import {
   TableShell,
   fmtN,
 } from "@/components/wqa/helpers";
+import { ClusterPriorityPill } from "../ClusterPriorityPill";
+import { ClusterPageActionChip } from "../ClusterPageActionChip";
 import type { KeywordsViewProps } from "../KeywordsView";
-import type {
-  ClusterRow,
-  ClusterPriority,
-  ClusterPageAction,
-} from "@/lib/clusters";
-
-const PRIORITY_TINT: Record<ClusterPriority, { band: string; dot: string }> = {
-  High: { band: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  Watch: { band: "bg-amber-50 text-amber-800", dot: "bg-amber-500" },
-  Low: { band: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
-  Unset: { band: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/40" },
-};
-
-const PAGE_ACTION_LABEL: Record<ClusterPageAction, string> = {
-  build_new: "Build new",
-  optimize_existing: "Optimize existing",
-  remove: "Remove",
-  skip: "Skip",
-};
-
-const PAGE_ACTION_TINT: Record<ClusterPageAction, string> = {
-  build_new: "bg-emerald-50 text-emerald-800",
-  optimize_existing: "bg-sky-50 text-sky-700",
-  remove: "bg-rose-50 text-rose-800",
-  skip: "bg-muted text-muted-foreground",
-};
+import type { ClusterRow } from "@/lib/clusters";
 
 export function ClusterMapTab(props: KeywordsViewProps) {
-  const { clusters } = props;
+  const { clusters, propertySlug } = props;
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -98,7 +75,11 @@ export function ClusterMapTab(props: KeywordsViewProps) {
         </thead>
         <tbody>
           {filtered.map((c) => (
-            <ClusterRowView key={c.id} cluster={c} />
+            <ClusterRowView
+              key={c.id}
+              cluster={c}
+              propertySlug={propertySlug}
+            />
           ))}
         </tbody>
       </TableShell>
@@ -106,8 +87,13 @@ export function ClusterMapTab(props: KeywordsViewProps) {
   );
 }
 
-function ClusterRowView({ cluster }: { cluster: ClusterRow }) {
-  const pTint = PRIORITY_TINT[cluster.priority];
+function ClusterRowView({
+  cluster,
+  propertySlug,
+}: {
+  cluster: ClusterRow;
+  propertySlug: string;
+}) {
   const name = cluster.name_override || cluster.head_term;
   return (
     <tr className="border-t hover:bg-muted/40">
@@ -115,12 +101,11 @@ function ClusterRowView({ cluster }: { cluster: ClusterRow }) {
         {cluster.cluster_number}
       </td>
       <td className="px-2 py-1.5">
-        <span
-          className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded ${pTint.band}`}
-        >
-          <span className={`size-1.5 rounded-full ${pTint.dot}`} />
-          {cluster.priority}
-        </span>
+        <ClusterPriorityPill
+          propertySlug={propertySlug}
+          clusterId={cluster.id}
+          initialPriority={cluster.priority}
+        />
       </td>
       <td className="px-3 py-1.5 text-[11.5px] truncate max-w-0">
         <div className="font-medium truncate" title={name}>
@@ -145,15 +130,11 @@ function ClusterRowView({ cluster }: { cluster: ClusterRow }) {
         {cluster.avg_kd != null ? cluster.avg_kd.toFixed(1) : "—"}
       </td>
       <td className="px-2 py-1.5">
-        {cluster.page_action ? (
-          <span
-            className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider ${PAGE_ACTION_TINT[cluster.page_action]}`}
-          >
-            {PAGE_ACTION_LABEL[cluster.page_action]}
-          </span>
-        ) : (
-          <span className="text-muted-foreground text-[11px]">—</span>
-        )}
+        <ClusterPageActionChip
+          propertySlug={propertySlug}
+          clusterId={cluster.id}
+          initialAction={cluster.page_action}
+        />
       </td>
     </tr>
   );
