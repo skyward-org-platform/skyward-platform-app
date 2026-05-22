@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -75,6 +76,12 @@ def _fetch_latest_rows(
     plans this as a single scan with two aggregations."""
     from google.cloud import bigquery as gbq
 
+    # Match the host portion: bare {domain} or www.{domain}. Anchored with
+    # (/|?|#|$) so we don't pull `festdrive.{domain}` rows in. Those are
+    # subdomain content the user typically wants treated as a separate
+    # property, not folded in. The previous LIKE pattern `%//{domain}%`
+    # silently excluded www.-only sites (returning zero rows).
+    domain_re = rf"://(?:www\.)?{re.escape(domain)}(?:[/?#]|$)"
     sql = f"""
         WITH match AS (
           SELECT
@@ -82,7 +89,7 @@ def _fetch_latest_rows(
             MAX(version) AS latest_version,
             COUNT(*) AS row_count
           FROM `data-hub-468216.{dataset}.wqa_output`
-          WHERE LOWER(url) LIKE @pattern
+          WHERE REGEXP_CONTAINS(LOWER(url), @domain_re)
           GROUP BY project_id
           ORDER BY row_count DESC
           LIMIT 1
@@ -106,13 +113,13 @@ def _fetch_latest_rows(
         JOIN match m
           ON w.project_id = m.project_id
          AND w.version = m.latest_version
-        WHERE LOWER(w.url) LIKE @pattern
+        WHERE REGEXP_CONTAINS(LOWER(w.url), @domain_re)
         ORDER BY w.sessions DESC NULLS LAST, w.average_impressions DESC NULLS LAST
         LIMIT @lim
     """
     job_config = gbq.QueryJobConfig(
         query_parameters=[
-            gbq.ScalarQueryParameter("pattern", "STRING", f"%//{domain}%"),
+            gbq.ScalarQueryParameter("domain_re", "STRING", domain_re),
             gbq.ScalarQueryParameter("lim", "INT64", limit),
         ]
     )
