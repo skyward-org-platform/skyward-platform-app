@@ -22,6 +22,10 @@ import {
   getOrCreateClusterThread,
   type ChatMessage,
 } from "@/lib/cluster-chat";
+import {
+  buildClusterContext,
+  runClusterChat,
+} from "@/inference/cluster-chat/runner";
 
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
@@ -229,11 +233,29 @@ export async function postClusterChatMessage(
     });
     await appendMessage(threadId, "user", trimmed);
 
-    // V1 stub assistant reply. Real runner with Anthropic + 4 tools lands
-    // in Task 5.3 — replace this block with `runClusterChat(...)` from
-    // web/inference/cluster-chat/runner.ts.
-    const reply = `(stub) Received: "${trimmed}". Tools wiring lands in 5.3.`;
-    await appendMessage(threadId, "assistant", reply);
+    const ctx = await buildClusterContext({
+      propertyId: prop.id,
+      propertySlug: slug,
+      clusterId,
+    });
+    if ("error" in ctx) {
+      // Persist a synthetic assistant reply so the thread stays coherent.
+      await appendMessage(
+        threadId,
+        "assistant",
+        `Couldn't load cluster context: ${ctx.error}`,
+      );
+    } else {
+      const result = await runClusterChat({
+        threadId,
+        userMessage: trimmed,
+        ctx,
+      });
+      if (!result.ok) {
+        // Runner already appended an assistant turn with the error; nothing
+        // more to do here — just fall through and return the message list.
+      }
+    }
 
     const messages = await getClusterMessages(threadId);
     bust(slug);
