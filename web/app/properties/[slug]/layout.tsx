@@ -117,6 +117,8 @@ function buildTabs(
   if (hasSeo) {
     tabs.push({ kind: "sep" });
     tabs.push({ kind: "tab", href: `/properties/${slug}/keywords`, label: "Keywords" });
+    tabs.push({ kind: "tab", href: `/properties/${slug}/content`, label: "Content" });
+    tabs.push({ kind: "tab", href: `/properties/${slug}/authority`, label: "Authority" });
   }
 
   // Cluster: meta tabs
