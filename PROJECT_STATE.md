@@ -594,3 +594,58 @@ Total: 51,571 keywords · 2,893 clusters · 10,669 memberships · 315 URL assign
 - /properties/[slug]/keywords — Phase 3 surface (all 8 TNA properties populated)
 - Both surfaces live at https://skyward-seo-platform.vercel.app
 - Next natural phase: Phase 4 Content Pipeline (reads Phase 3 page_action decisions + URL→cluster map)
+
+### 2026-05-23 — Phases 4, 5, 6 shipped to production + nav fixed
+
+Massive session. All 5 phase surfaces now live in production for 8 TNA properties.
+
+**Phase 4 content surface shipped via PR #4** (`7ee717a`). `/properties/[slug]/content` with 5 tabs (Overview / Master Plan / Sprint Calendar / Performance Tracker / Action Legend). 1 new Supabase table `content_row` (37 cols / 9 column groups) + history mirror + trigger. Backfilled 3,489 rows across 8 TNA properties. Universal drawer extended with Content subject (4th polymorphic variant). xlsx export at `/api/wqa/export?phase=4`.
+
+**Phase 5 authority surface shipped via PR #5** (`de3d5f3`). `/properties/[slug]/authority` with 3 tabs (Overview / Referring Domains / Audits). 4 new Supabase tables (`site_snapshot`, `referring_domain`, `disavow_entry`, `audit_doc`) + 2 history mirrors + 2 triggers. Backfilled all 8 properties via the new pipeline-trigger pattern. Universal drawer 5th polymorphic variant (RefDomain). disavow.txt download route.
+
+**Phase 5 built the FIRST proper pipeline-trigger endpoint** — `/api/authority/refresh` (Vercel Python calling DataForSEO Backlinks REST + writing to Supabase preserving user overrides). Phase 3 `runRecluster` and Phase 4 `runRecomputeContentPlan` are now unblocked (use this pattern when wiring).
+
+**Phase 6 baseline setup for buscharter** — `delivery/tna/buscharter/phase-6-tracking/buscharter-baseline-2026-05-23.md`. Ahrefs (DR 33 / refdomains 391 / org traffic 1,112 / org value $1,362) + GSC 12-month performance (8,493 clicks / 1.2M impressions / 0.65% CTR / pos 24 avg) + top 20 ranked keywords. GA4 data PENDING Adam's BQ load. First Monthly Report scheduled for early June 2026; first QBR for early July 2026.
+
+**KGA fan-out + audits done earlier same session.** Buscharter Phase 5 diff audit + TNA portfolio audit covered all 8 sites:
+- buscharter = 68% of portfolio organic value ($1,362/mo of $1,997 total)
+- partybusguru hidden gem (DR 1.3 / 1,218 traffic)
+- 5 of 7 satellite sites have hundreds of refdomains but ZERO organic traffic
+- CoachHire DR climbing +12 vs buscharter +7 — gap widening
+
+**Nav fix** (`e6f2128`) — Content + Authority tabs added to property nav in the SEO cluster after Keywords. Routes existed for hours before this; nav wasn't surfacing them.
+
+**DFS Rank vs Ahrefs DR labeling**: Phase 5 uses DataForSEO Backlinks (no AHREFS_API_KEY in `.env`). DFS `rank` is 0-1000, NOT 0-100 like Ahrefs DR. UI labels read "DFS Rank" with "(DataForSEO, 0-1000)" hint. Buscharter shows DFS Rank 268, NOT DR 33.
+
+**DATAFORSEO_LOGIN + DATAFORSEO_PASSWORD added to Vercel production env** during Phase 5 Chunk 5 — they were missing before this session.
+
+**Followups list consolidated** (now 14 items, full list in `session-notes/2026-05-23-phases-4-5-6.md`):
+1. GA4 baseline data — pending Adam
+2. Phase 6 baselines for other 7 TNA properties
+3. Phase 3 runRecluster + Phase 4 runRecomputeContentPlan wiring (pattern now exists)
+4. Buscharter disavow file update (SEOExpress wave + initial quality classification pass)
+5. DR-label polish in `DrTrendChart.tsx` ("DR" still in one spot)
+6. Phase 3 chat tools auto-execute without approval
+7. UrlMapTab row click → URL drawer
+8. Intent counter chips on /keywords All Keywords
+9. Pre-existing `unstable_cache` refactor sitting in working tree
+10. First Monthly Report (June 2026 covering May 2026)
+11. First QBR (July 2026 covering Q2)
+
+**Reference docs added:**
+- `docs/superpowers/specs/2026-05-22-phase4-surface-design.md`
+- `docs/superpowers/plans/2026-05-22-phase4-surface.md`
+- `docs/superpowers/specs/2026-05-22-phase5-surface-design.md`
+- `docs/superpowers/plans/2026-05-22-phase5-surface.md`
+
+**Audit docs + baselines added (agency repo):**
+- `delivery/tna/buscharter/link-building/link-build-strategy/buscharter-link-audit-2026-05-22.md`
+- `delivery/tna/seo/link-building-campaign/tna-portfolio-link-audit-2026-05-22.md`
+- `delivery/tna/buscharter/phase-6-tracking/buscharter-baseline-2026-05-23.md`
+
+**Python runners (agency repo):**
+- `delivery/tna/build_phase4_content.py` — 8-site Phase 4 workbook builder
+- `delivery/tna/phase4_backfill_supabase.py` — Phase 4 → Supabase
+- `delivery/tna/phase5_backfill_supabase.py` — Phase 5 → Supabase via /api/authority/refresh
+
+**Session note:** `session-notes/2026-05-23-phases-4-5-6.md`
