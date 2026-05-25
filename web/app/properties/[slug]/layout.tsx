@@ -3,8 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { apiBase } from "@/lib/api-base";
-import { PhaseStrip, PHASE_NAMES } from "@/components/PhaseStrip";
+import {
+  PhaseStrip,
+  PHASE_NAMES,
+  type PhasePercent,
+} from "@/components/PhaseStrip";
 import { StatusPill, statusVariantFrom } from "@/components/StatusPill";
+import { getWqaDecisions } from "@/lib/wqa-decisions";
+import { getWqaForDomain } from "@/lib/wqa";
 
 type Project = {
   project_type: string;
@@ -55,6 +61,80 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
     brandDnaFilled: filled,
     brandDnaTotal: 12,
   };
+}
+
+// Per-phase completion percentages for the property hero strip. Only
+// phases 0 (Onboard / Brand DNA) and 1 (WQA done %) have concrete signals
+// today; phases 2-6 return null and render as "—" until those data
+// sources land. Each null entry has an inline TODO so the data wiring
+// can be picked up phase-by-phase.
+async function getPhasePercents(
+  slug: string,
+  primaryDomain: string | null,
+): Promise<PhasePercent[]> {
+  // Phase 0: Onboard - Brand DNA section fillage (12 sections target,
+  // dropping the legacy 'competitors' section per getHeroMetrics).
+  let phase0: PhasePercent = {
+    percent: null,
+    title: "Brand DNA sections filled / 12",
+  };
+  try {
+    const { data } = await supabase
+      .from("brand_dna_section")
+      .select("section, property_id, property!inner(slug)")
+      .eq("property.slug", slug);
+    const filled = (data ?? []).filter(
+      (s: { section: string }) => s.section !== "competitors",
+    ).length;
+    phase0 = {
+      percent: Math.min(100, (filled / 12) * 100),
+      title: `${filled} of 12 Brand DNA sections filled`,
+    };
+  } catch {
+    // ignore, keep null
+  }
+
+  // Phase 1: WQA - decisions with status='Done' / total WQA rows on the
+  // primary domain. If the property has no BQ pipeline output we leave
+  // the cell empty rather than rendering 0% (which would imply "started
+  // but unfinished" - misleading).
+  let phase1: PhasePercent = {
+    percent: null,
+    title: "WQA decisions marked Done / total WQA rows",
+  };
+  if (primaryDomain) {
+    try {
+      const [wqa, decisions] = await Promise.all([
+        getWqaForDomain(primaryDomain, "dev"),
+        getWqaDecisions(slug),
+      ]);
+      const total = wqa && "ok" in wqa && wqa.ok ? wqa.rows.length : 0;
+      const done = (decisions ?? []).filter((d) => d.status === "Done").length;
+      if (total > 0) {
+        phase1 = {
+          percent: Math.min(100, (done / total) * 100),
+          title: `${done} of ${total.toLocaleString()} URLs marked Done`,
+        };
+      }
+    } catch {
+      // ignore, keep null
+    }
+  }
+
+  // Phase 2: Tech SEO - TODO: page_check_state done / total checks.
+  // Phase 3: Keywords - TODO: cluster_summary rows present + reviewed.
+  // Phase 4: Content - TODO: page_execution status='done' / planned.
+  // Phase 5: Authority - TODO: link acquisition count vs target.
+  // Phase 6: Tracking - TODO: tracking_setup_complete flag on property.
+  return [
+    phase0,
+    phase1,
+    { percent: null, title: "TODO: wire page_check_state aggregate" },
+    { percent: null, title: "TODO: wire cluster_summary readiness" },
+    { percent: null, title: "TODO: wire page_execution done %" },
+    { percent: null, title: "TODO: wire authority acquisition signal" },
+    { percent: null, title: "TODO: wire tracking-setup flag" },
+  ];
 }
 
 // Plain async — Next 16 unstable_cache factory pattern caused layout
@@ -156,8 +236,12 @@ export default async function PropertyLayout({
   const prop = await getProperty(slug);
   if (!prop) notFound();
 
-  const [{ types: projectTypes, count: projectCount }, metrics] =
-    await Promise.all([getProjectTypes(slug), getHeroMetrics(slug, prop.id)]);
+  const [{ types: projectTypes, count: projectCount }, metrics, phaseMetrics] =
+    await Promise.all([
+      getProjectTypes(slug),
+      getHeroMetrics(slug, prop.id),
+      getPhasePercents(slug, prop.primary_domain),
+    ]);
 
   const tabs = buildTabs(slug, projectTypes, metrics, projectCount);
   const client = prop.client as unknown as {
@@ -212,7 +296,11 @@ export default async function PropertyLayout({
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
               Pipeline · phase {phase} ({phaseName})
             </div>
-            <PhaseStrip currentPhase={phase} showLabels />
+            <PhaseStrip
+              currentPhase={phase}
+              phases={phaseMetrics}
+              showLabels
+            />
           </div>
           <div className="flex gap-8">
             <HeroMetric label="Pages" value={metrics.pages.toLocaleString()} />
