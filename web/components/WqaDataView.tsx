@@ -481,9 +481,11 @@ export function WqaDataView({
         />
       )}
 
-      {/* Action funnel from SOP v5 decision tree. Read-only summary band
-       *  — the actual filter mechanism is the chip strip below. */}
-      <ActionFunnel counts={actionCounts} />
+      {/* WQA Triage Funnel band removed (V1 post-P2). It duplicated the
+       *  filter chip strip's counts using the legacy 10-value enum, which
+       *  confused readers and created two parallel taxonomies on screen.
+       *  The chip strip below carries the same counts in Action7 form +
+       *  is interactive. */}
 
       {/* Filter chip strip — Action / Status / Logic / Override. URL-
        *  persisted via ?action=, ?status=, ?logic=, ?override=. */}
@@ -802,7 +804,7 @@ function FilterChipStrip({
   setLogic: (values: LogicCode[]) => void;
 }) {
   return (
-    <section className="mt-4 mb-4 border rounded-lg bg-card overflow-hidden">
+    <section className="mt-4 mb-4 border rounded-lg bg-card">
       <header className="px-4 py-2 border-b text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-2">
         Filter
         <span className="text-muted-foreground/70 normal-case tracking-normal">
@@ -975,7 +977,7 @@ function LogicMultiSelect({
       )}
       {open && (
         <div
-          className="absolute z-20 mt-1 max-h-[320px] overflow-y-auto bg-card border rounded-md shadow-lg p-1.5 min-w-[280px]"
+          className="absolute z-50 mt-1 max-h-[320px] overflow-y-auto bg-card border rounded-md shadow-lg p-1.5 min-w-[280px]"
           onMouseLeave={() => setOpen(false)}
         >
           {LOGIC_CODE_VALUES.map((code) => {
