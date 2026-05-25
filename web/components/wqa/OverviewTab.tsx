@@ -19,6 +19,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { TabHeader } from "@/components/wqa/helpers";
 import { ACTION_TINT, type TriageAction } from "@/lib/wqa-triage";
+import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps, TriagedRow } from "@/components/wqa/types";
 import type { PageExecutionRow } from "@/lib/page-execution";
 import {
@@ -34,17 +35,17 @@ const SEVERITY_BAND: Record<Severity, string> = {
   Low: "bg-muted text-muted-foreground",
 };
 
+// P2 action semantics v2: 7-action canon. Legacy raw enum values
+// (Evaluate / Leave as 404 / Non-indexable / Non-addressable) are
+// collapsed to Investigate / Keep by toAction7() at read time, so the
+// funnel only renders the 7 canonical buckets.
 const FUNNEL_GROUPS: TriageAction[] = [
   "Optimize",
   "Redirect",
   "Restore",
   "Consolidate",
   "Remove",
-  "Evaluate",
   "Investigate",
-  "Leave as 404",
-  "Non-indexable",
-  "Non-addressable",
 ];
 
 function severityFor(count: number): Severity {
@@ -89,8 +90,8 @@ function buildChecklist(counts: Map<TriageAction, number>): ChecklistItem[] {
     },
     {
       n: 5,
-      title: "Resolve Review + Evaluate items",
-      urls: c("Evaluate") + c("Investigate"),
+      title: "Resolve Investigate items",
+      urls: c("Investigate"),
       dependsOn: "-",
     },
     {
@@ -130,10 +131,15 @@ export function OverviewTab({
   syntheticExecutions?: Map<string, PageExecutionRow>;
 }) {
   const total = all.length;
+  // P2: normalize the raw triage action via toAction7 so legacy Evaluate
+  // / Leave as 404 / Non-indexable / Non-addressable rows roll up into the
+  // 7-action canon (Investigate / Keep) before counting.
   const counts = useMemo(() => {
     const c = new Map<TriageAction, number>();
-    for (const r of all)
-      c.set(r.triage.action, (c.get(r.triage.action) ?? 0) + 1);
+    for (const r of all) {
+      const a = toAction7(r.triage.action) as TriageAction;
+      c.set(a, (c.get(a) ?? 0) + 1);
+    }
     return c;
   }, [all]);
 
@@ -285,8 +291,8 @@ function ActionPlan({
     },
     { title: "Consolidate duplicate template pages", urls: c("Consolidate") },
     {
-      title: "Resolve Review + Evaluate items",
-      urls: c("Evaluate") + c("Investigate"),
+      title: "Resolve Investigate items",
+      urls: c("Investigate"),
     },
     { title: "Audit canonicals on Optimize URLs", urls: c("Optimize") },
     { title: "Re-crawl with Screaming Frog after fixes", urls: 0 },

@@ -12,19 +12,24 @@ import { TabHeader } from "@/components/wqa/helpers";
 import { ACTION_TINT, type TriageAction } from "@/lib/wqa-triage";
 
 type LegendRow = {
-  action: TriageAction | "Review" | "No Action";
+  action: TriageAction | "Keep";
   meaning: string;
   next: string;
 };
 
-// "Review" + "No Action" appear in the SOP legend as bucket labels even
-// though triage emits Investigate/Evaluate + Leave as 404 / Non-* — the
-// rows below keep the same human-facing taxonomy as the workbook.
+// P2 action semantics v2: 7-action canon. Legacy Evaluate / Review / No
+// Action / Leave as 404 / Non-* labels collapse into Investigate or Keep
+// (per the toAction7 mapping). One row per canonical action.
 const LEGEND: LegendRow[] = [
   {
     action: "Optimize",
-    meaning: "URL stays. At least one positive signal — sessions, impressions, refs, or rank.",
+    meaning: "URL stays. At least one positive signal: sessions, impressions, refs, or rank.",
     next: "Enters Phase 2 (Technical SEO) and Phase 3 (Keyword / Cluster) pipelines.",
+  },
+  {
+    action: "Restore",
+    meaning: "4xx or 5xx but should exist. Has rankings, traffic, or links worth preserving.",
+    next: "Listed on the Restore tab with target H1 / Title / Meta. Content specs, dev restores.",
   },
   {
     action: "Redirect",
@@ -32,47 +37,30 @@ const LEGEND: LegendRow[] = [
     next: "Listed on the Redirect tab grouped by type. Developer executes the 301.",
   },
   {
-    action: "Restore",
-    meaning: "404 (or 5xx) but should exist — has rankings, traffic, or links worth preserving.",
-    next: "Listed on the Restore tab with target H1 / Title / Meta. Content specs, dev restores.",
-  },
-  {
-    action: "Remove",
-    meaning: "Live page with zero value signals — no traffic, impressions, refs, or rank.",
-    next: "Listed on the Remove tab. Skyward applies noindex or removes the URL.",
-  },
-  {
     action: "Consolidate",
-    meaning: "Duplicate template page that overlaps a stronger parent in intent.",
+    meaning: "Canonical-mapped to a primary URL. Duplicate template, non-primary variant, near-duplicate.",
     next: "Merge content into the canonical parent and 301 the duplicate URL.",
   },
   {
-    action: "Evaluate",
-    meaning: "Has internal links but no external signals — needs human judgment.",
-    next: "Reviewed at Checkpoint 1; promote to Optimize, redirect, or remove.",
+    action: "Remove",
+    meaning: "Live page with zero value signals. No traffic, impressions, refs, or rank.",
+    next: "Listed on the Remove tab. Skyward applies noindex or removes the URL.",
   },
   {
-    action: "Review",
-    meaning: "Some signals present but the obvious action isn't clear from the rules.",
-    next: "Flagged for review; the Logic column explains which signals are conflicting.",
+    action: "Keep",
+    meaning: "Stay as is. Strategic decision OR system / fragment / parameter URL with no work needed.",
+    next: "No queue. Use logic_code=system_url or legitimate_keep to distinguish the reason.",
   },
   {
     action: "Investigate",
-    meaning: "Data conflict — primary URL serving 3xx, unexpected status code, or 5xx with signals.",
-    next: "Manual investigation by Skyward. Resolve the underlying confusion, then re-triage.",
-  },
-  {
-    action: "No Action",
-    meaning: "Duplicate variant, system URL (wp-content / asset), fragment, or intentionally excluded.",
-    next: "Accounted for, no work needed.",
+    meaning: "Needs human judgment. Internal-links-only, data conflict, or unexpected signals.",
+    next: "Manual judgment by Skyward. logic_code explains which conflict triggered it; resolve and re-triage.",
   },
 ];
 
 function bandFor(action: LegendRow["action"]): { band: string; dot: string } {
-  if (action === "Review")
-    return { band: "bg-yellow-50 text-yellow-800", dot: "bg-yellow-500" };
-  if (action === "No Action")
-    return { band: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/40" };
+  if (action === "Keep")
+    return { band: "bg-slate-100 text-slate-700", dot: "bg-slate-500" };
   return ACTION_TINT[action];
 }
 

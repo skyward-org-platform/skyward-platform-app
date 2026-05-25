@@ -23,15 +23,14 @@ export type ActionTabProps = {
   execByUrl?: Map<string, PageExecutionRow>;
 };
 
+// P2 action semantics v2: 7-action canon. Legacy values (Evaluate / Leave
+// as 404 / Non-indexable / Non-addressable) collapse to Investigate / Keep
+// at read time via toAction7(); they no longer appear as standalone tabs.
 export const TAB_ORDER: TriageAction[] = [
   "Optimize",
   "Restore",
   "Redirect",
   "Consolidate",
   "Remove",
-  "Evaluate",
   "Investigate",
-  "Leave as 404",
-  "Non-indexable",
-  "Non-addressable",
 ];
