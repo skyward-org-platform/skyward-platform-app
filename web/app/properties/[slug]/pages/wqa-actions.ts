@@ -468,3 +468,32 @@ export async function setCheckOwner(
 // with Action7. The legacy → Action7 mapping moved to web/lib/wqa-decisions.ts
 // as `toAction7()` so client-side callers can defensively coerce any
 // pipeline action string until Chunk 5 lands.
+
+// ─── suggestRedirectDestination ───────────────────────────────────────────
+// Powers the "Suggest destination" button on the Redirect tab. Calls the
+// shared lib helper that embeds the source URL's slug text via OpenAI +
+// runs the match_page_embeddings pgvector RPC, returning top-K candidates
+// bucketed by confidence (high / medium / low). Read-only — no writes
+// to wqa_decision or page_execution.
+
+import { suggestDestinationsForUrl } from "@/lib/redirect-suggester";
+
+export async function suggestRedirectDestination(
+  propertySlug: string,
+  sourceUrl: string,
+): Promise<
+  | { ok: true; slugText: string; suggestions: { url: string; similarity: number; confidence: "high" | "medium" | "low" }[] }
+  | { ok: false; error: string }
+> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  try {
+    const res = await suggestDestinationsForUrl(propertySlug, sourceUrl, 3);
+    return { ok: true, ...res };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}

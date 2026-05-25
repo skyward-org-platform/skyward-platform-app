@@ -11,7 +11,10 @@ import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import { VerifyButton } from "@/components/wqa/VerifyButton";
 import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps, TriagedRow } from "@/components/wqa/types";
-import { setExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
+import {
+  setExecutionField,
+  suggestRedirectDestination,
+} from "@/app/properties/[slug]/pages/wqa-actions";
 
 type RedirectType =
   | "HTTP → HTTPS"
@@ -223,9 +226,21 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                               {suggested}
                             </a>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground italic">
-                              (needs destination — cosine match in next pass)
-                            </span>
+                            <SuggestDestinationButton
+                              propertySlug={propertySlug}
+                              sourceUrl={r.row.url}
+                              onPick={(picked) => {
+                                // Save and reload so the editor row re-renders
+                                // with the new defaultValue. Lightweight UX —
+                                // the user only clicks Suggest occasionally.
+                                void setExecutionField(
+                                  propertySlug,
+                                  r.row.url,
+                                  "target_url",
+                                  picked,
+                                ).then(() => window.location.reload());
+                              }}
+                            />
                           )}
                         </td>
                         <td className="px-2 py-1.5 text-[11px] text-muted-foreground italic">
@@ -291,6 +306,154 @@ function DestinationUrlInput({
         <span className="text-[10px] text-rose-700" title={error}>
           !
         </span>
+      )}
+    </div>
+  );
+}
+
+// ─── SuggestDestinationButton ─────────────────────────────────────────────
+// Compact popover that calls suggestRedirectDestination on click,
+// renders top-3 candidates with similarity bars + confidence labels.
+// Clicking a row calls onPick(url) which the parent uses to persist
+// the choice to page_execution.target_url.
+
+type SuggestionRow = {
+  url: string;
+  similarity: number;
+  confidence: "high" | "medium" | "low";
+};
+
+const CONFIDENCE_TINT = {
+  high: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  medium: "bg-amber-50 text-amber-800 border-amber-200",
+  low: "bg-slate-50 text-slate-600 border-slate-200",
+} as const;
+
+function SuggestDestinationButton({
+  propertySlug,
+  sourceUrl,
+  onPick,
+}: {
+  propertySlug: string;
+  sourceUrl: string;
+  onPick: (url: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [slugText, setSlugText] = useState("");
+  const [rows, setRows] = useState<SuggestionRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleOpen = () => {
+    setOpen(true);
+    if (loaded) return;
+    startTransition(async () => {
+      const res = await suggestRedirectDestination(propertySlug, sourceUrl);
+      if (!res.ok) {
+        setError(res.error);
+        setLoaded(true);
+        return;
+      }
+      setSlugText(res.slugText);
+      setRows(res.suggestions);
+      setLoaded(true);
+    });
+  };
+
+  return (
+    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={handleOpen}
+        className="text-[11px] text-foreground hover:text-blue-700 underline decoration-dotted"
+        disabled={pending}
+      >
+        {pending ? "Matching…" : "Suggest destination"}
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div className="absolute z-50 top-full right-0 mt-1 w-[420px] bg-card border rounded-md shadow-lg p-2 text-[11px]">
+            {!loaded || pending ? (
+              <div className="px-2 py-3 text-muted-foreground italic">
+                Embedding slug + cosine matching…
+              </div>
+            ) : error ? (
+              <div className="px-2 py-2 text-rose-700">{error}</div>
+            ) : rows.length === 0 ? (
+              <div className="px-2 py-3 text-muted-foreground">
+                No candidates. The slug text was too short or no page
+                embeddings exist for this property yet.
+              </div>
+            ) : (
+              <>
+                <div className="px-2 py-1 border-b mb-1 text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <span>Top {rows.length} by cosine similarity</span>
+                  <span className="ml-auto font-mono normal-case tracking-normal text-foreground/70">
+                    “{slugText}”
+                  </span>
+                </div>
+                {rows
+                  .filter((r) => r.similarity >= 0.4)
+                  .map((r) => {
+                    const bar = Math.max(2, Math.round(r.similarity * 100));
+                    return (
+                      <button
+                        key={r.url}
+                        type="button"
+                        onClick={() => {
+                          setOpen(false);
+                          onPick(r.url);
+                        }}
+                        className="w-full text-left px-2 py-1.5 rounded hover:bg-muted/50 group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={
+                              "inline-flex items-center text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded border " +
+                              CONFIDENCE_TINT[r.confidence]
+                            }
+                          >
+                            {r.confidence}
+                          </span>
+                          <span className="tabular-nums text-[10.5px] text-muted-foreground w-[42px]">
+                            {r.similarity.toFixed(3)}
+                          </span>
+                          <div className="flex-1 h-1 bg-muted rounded overflow-hidden">
+                            <div
+                              className={
+                                "h-full " +
+                                (r.confidence === "high"
+                                  ? "bg-emerald-500"
+                                  : r.confidence === "medium"
+                                    ? "bg-amber-500"
+                                    : "bg-slate-300")
+                              }
+                              style={{ width: `${bar}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="font-mono text-[11px] text-foreground/90 group-hover:text-blue-700 mt-1 truncate">
+                          {r.url}
+                        </div>
+                      </button>
+                    );
+                  })}
+                {rows.every((r) => r.similarity < 0.4) && (
+                  <div className="px-2 py-2 text-muted-foreground text-[10.5px] italic">
+                    All matches below 0.40 confidence — operator should pick
+                    manually. Slug text was too thin for a reliable signal.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
