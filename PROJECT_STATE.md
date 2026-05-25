@@ -649,3 +649,71 @@ Massive session. All 5 phase surfaces now live in production for 8 TNA propertie
 - `delivery/tna/phase5_backfill_supabase.py` — Phase 5 → Supabase via /api/authority/refresh
 
 **Session note:** `session-notes/2026-05-23-phases-4-5-6.md`
+
+### 2026-05-25 — P2 Pages Action Semantics Overhaul shipped
+
+PR #6 merged (`4624901`). Production live. Pages surface now runs on a clean 7-action noun-decision model + separate 4-state status workflow + 16 closed-set logic codes + override-preservation. Foundational for the rest of the Pages overhaul (P1 / P3 / P4 / P5 / P6 sub-projects).
+
+**Action set collapsed**: 10 → 7. Investigate / Evaluate / Review → single Investigate; Leave as 404 / Non-addressable / Non-indexable → Keep with `logic_code='system_url'`; Optimize flavors lose the parenthetical (revenue_critical / page_1_protect / etc. → logic_code captures them).
+
+**Status workflow added** (Open / In Progress / Done / Drifted). Drifted is auto-only — drift detection (deferred to I1) is the only writer. Manual override blocked.
+
+**Logic codes** — 16-value closed set: revenue_critical · page_1_protect · striking_distance · has_visibility · utility_light_touch · 404_with_inbound_traffic · 404_no_value · 5xx_server_error · redirect_to_relevant · non_primary_variant · duplicate_content · internal_links_no_external_signals · data_conflict · human_judgment · system_url · legitimate_keep. Pipeline-assigned (auto-derived in build_phase1_wqa.py); operator can add free-text logic_notes.
+
+**Override-preservation**: pipeline writes `action` + `logic_code` + `target_url`; operator writes via wqa_decision row (sparse — no row means trust the pipeline). Clearing an override deletes the wqa_decision row.
+
+**Schema changes** (`db/supabase/migrations/20260525_wqa_decision_v2.sql`):
+- Tightened `wqa_decision.action` check constraint to 7-value enum
+- Added `status` (Open default), `logic_notes`, `last_implementation_check_at`, `drift_reason` columns
+- Existing override rows remapped: Evaluate → Investigate; Leave as 404 / Non-addressable / Non-indexable → Keep
+- History trigger extended to fire on the new operator-editable columns
+
+**Lib + types** (`web/lib/wqa-decisions.ts`): `Action7`, `WqaStatus`, `LogicCode` types + `LOGIC_CODE_LABELS`, `ACTION_COLOR`, `STATUS_COLOR`, `TYPICAL_LOGIC_FOR_ACTION` label maps + `toAction7()` legacy mapper.
+
+**Server actions** (`web/app/properties/[slug]/pages/wqa-actions.ts`): `setAction`, `setStatus`, `clearDrift`, `setLogicNotes`, `setTargetUrl`, `verifyTargetUrl`, `clearActionOverride`, `clearTargetUrlOverride`. Plus `/api/verify-url` Next.js route handler (HEAD-follows-redirects up to 10 hops).
+
+**UI changes**:
+- `WqaActionChip` v2 with 7-value dropdown + override indicator + auto-clear when operator picks pipeline value
+- New `WqaStatusChip` (Open / In Progress / Done; Drifted as separate Acknowledge button)
+- New `WqaLogicCell` monospace pill with hover tooltip
+- Filter chip strip (Action / Status / Logic / Override) URL-persisted via `?action=`, `?status=`, `?logic=`, `?override=`
+- Investigate tab merges Evaluate + Review; logic_code as secondary axis
+- Drawer additions: Triage logic section · Target URL editor with Verify button · drift banner with Acknowledge
+
+**Pipeline updates (agency repo, commit `387fe94`)**:
+- `delivery/tna/build_phase1_wqa.py` emits Action7 + logic_code natively
+- `delivery/tna/build_phase4_content.py priority_tier()` back-compat patched
+- Re-ran for 8 TNA sites; per-site distributions look healthy (buscharter: 348 Optimize / 615 Redirect / 468 Remove / 172 Keep / 82 Investigate)
+
+**Two notable concerns flagged**:
+1. **Stopgap cache.ts fix on main** (`276442a`) — Chunk 1's lib referenced symbols (`CACHE_TAGS.wqaDecisions`, `TTL.data`) that lived in Paul's parallel unstaged cache refactor. The Chunk 6 subagent added them defensively without removing existing ones. Paul's WIP cache.ts refactor will conflict; needs reconciliation.
+2. **Adam's BQ pipeline coordination** — agency-repo `build_phase1_wqa.py` is a post-processor (xlsx/CSV outputs). BQ `wqa_output` is written by `skyward.seo_pipeline.modules.website_quality_audit.run.run_wqa` (Adam's package). Until that emits Action7 + logic_code, the Logic column populates empty in the UI. UI ready and waiting.
+
+**Strategic conversation today (not implemented)**:
+- 8-sub-project decomposition of Pages feedback (P1-P6 + N1-N2 + I1-I4 + B1)
+- Skills surface mockup added to v2-ui-mockup.html (Screens 17 + 18) — org-level library + per-property tab + Currently Relevant section + Launch sheet
+- Letaido / Agent A architectural review — concluded NOT to replicate; their Whiteboard + multi-tenant SaaS is months of engineering away
+- 4-app inventory + Path A consolidation strategy (one Supabase, multiple schemas: public + sales + finance)
+- Confirmed Adam's territory boundaries (skyward-common + skyward-platform + BQ Meta untouched)
+
+**Reference docs added today**:
+- `docs/superpowers/specs/2026-05-25-action-semantics-design.md` (P2 spec)
+- `docs/superpowers/plans/2026-05-25-action-semantics.md` (P2 plan)
+- `handoff/design/v2-ui-mockup.html` extended with Screens 17 + 18 (Skills library + per-property tab) — mockup only, not implemented
+
+**Followups carried forward** (17 items, full list in `session-notes/2026-05-25-p2-action-semantics.md`):
+1-10. Earlier session followups (intent counters, Phase 6 fan-out, runRecluster, disavow, DR-label, chat tools approval, UrlMapTab drawer, unstable_cache refactor, June Monthly Report, July QBR)
+11. Skills surface implementation (mockup → app)
+12. Adam's BQ pipeline Action7 + logic_code refresh
+13. cache.ts reconciliation (stopgap + Paul's WIP)
+14. `scripts/backfill_pages.py` ACTION_VERBS for `investigate`
+15. `build_phase1_decks.py` Action7 rename
+16. `HumanReviewTabs.tsx` filename → `InvestigateTab.tsx`
+17. `?action=` URL param namespace cleanup
+
+**Next Pages sub-projects** (per the decomposition):
+- P1 (editable action column + audit log reader + bulk edit) — uses the history trigger P2 just extended
+- P3 (column visibility + per-column sort + filter + external-link icon + URL truncation fix)
+- B1 (drawer "Open full page" 404 fix + history reader implementation)
+
+**Session note:** `session-notes/2026-05-25-p2-action-semantics.md`
