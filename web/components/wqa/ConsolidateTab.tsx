@@ -8,6 +8,7 @@
 import { useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
+import { VerifyButton } from "@/components/wqa/VerifyButton";
 import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps } from "@/components/wqa/types";
 import { setExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
@@ -37,6 +38,7 @@ export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: 
             <th className="text-left px-3 py-2 font-medium min-w-[260px]">Absorbed Duplicate</th>
             <th className="text-left px-2 py-2 font-medium">Action</th>
             <th className="text-left px-2 py-2 font-medium min-w-[280px]">Canonical Keeper</th>
+            <th className="text-left px-2 py-2 font-medium">Verify</th>
             <th className="text-left px-2 py-2 font-medium">Category</th>
             <th className="text-right px-2 py-2 font-medium">Sessions</th>
             <th className="text-right px-2 py-2 font-medium">Inlinks</th>
@@ -72,6 +74,13 @@ export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: 
                   propertySlug={propertySlug}
                   url={r.row.url}
                   defaultValue={execByUrl?.get(r.row.url)?.target_url ?? ""}
+                />
+              </td>
+              <td className="px-2 py-1.5">
+                <VerifyButton
+                  propertySlug={propertySlug}
+                  url={r.row.url}
+                  size="compact"
                 />
               </td>
               <td className="px-2 py-1.5 text-[11px] text-muted-foreground">
