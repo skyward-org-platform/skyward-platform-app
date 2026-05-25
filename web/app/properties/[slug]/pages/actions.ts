@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
+import { CACHE_TAGS } from "@/lib/cache";
 
 const VALID_ACTIONS = new Set([
   "optimize",
@@ -40,6 +41,7 @@ export async function updateAuditAction(
   }
   const { error } = await supabase.from("page").update(patch).eq("id", pageId);
   if (error) return { ok: false, error: error.message };
+  updateTag(CACHE_TAGS.signals);
   revalidatePath(`/properties/${propertySlug}/pages`);
   revalidatePath(`/properties/${propertySlug}`);
   revalidatePath("/activity");
@@ -77,6 +79,7 @@ export async function updateAuditTarget(
     })
     .eq("id", pageId);
   if (error) return { ok: false, error: error.message };
+  updateTag(CACHE_TAGS.signals);
   revalidatePath(`/properties/${propertySlug}/pages`);
   revalidatePath(`/properties/${propertySlug}`);
   revalidatePath("/activity");

@@ -1,15 +1,17 @@
 // Centralized reader for brand_dna_section + chat history + LLM usage
-// rollup. All three are called by multiple components per request (the
-// Brand DNA Overview hero + subnav layout both want sections; the
-// Overview also wants chat history and usage). React.cache() dedupes
-// these to one Supabase query per nav.
+// rollup. All three are called by multiple components per request.
+// React.cache() dedupes within a request; getAllSections also has a
+// cross-request unstable_cache wrapper (busted via CACHE_TAGS.brandDna
+// in any brand DNA mutation).
 //
-// Cross-request caching (via unstable_cache) was removed — the factory
-// pattern was implicated in Next 16 layout throws on newly-created
-// properties. Re-add via "use cache" later.
+// Important: unstable_cache is wrapped non-factory style here. The earlier
+// factory pattern (one cache instance per call, closures over args) was
+// implicated in Next 16 layout throws on newly-created properties.
 
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { supabase } from "./supabase";
+import { CACHE_TAGS, TTL } from "./cache";
 import type { AssistantBlock } from "@/app/properties/[slug]/brand-dna/chat-actions";
 
 export type BrandDnaSection = {
@@ -37,7 +39,13 @@ async function fetchAllSectionsRaw(slug: string): Promise<BrandDnaSection[]> {
   return (data as BrandDnaSection[] | null) ?? [];
 }
 
-export const getAllSections = cache(fetchAllSectionsRaw);
+const fetchAllSectionsCached = unstable_cache(
+  fetchAllSectionsRaw,
+  ["brand-dna-sections"],
+  { revalidate: TTL.data, tags: [CACHE_TAGS.brandDna] },
+);
+
+export const getAllSections = cache(fetchAllSectionsCached);
 
 /** One section by key. */
 export async function getSection(

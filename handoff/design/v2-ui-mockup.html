@@ -318,6 +318,342 @@
   .action-keep        { background: var(--slate-bg);  color: var(--slate); }
   .action-undecided   { background: #f4f4f5; color: #71717a; }
 
+  /* ──── Skill cards (Screens 17, 18) ──── */
+  .skill-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .skill-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    transition: border-color 0.12s, box-shadow 0.12s;
+    display: flex; flex-direction: column;
+  }
+  .skill-card:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 2px 8px -4px rgba(0,0,0,0.06);
+  }
+  .skill-card .cat-bar {
+    height: 3px;
+    width: 100%;
+  }
+  .skill-card .cat-bar.seo-pipeline { background: var(--emerald); }
+  .skill-card .cat-bar.seo-adhoc { background: var(--sky); }
+  .skill-card .cat-bar.sales { background: var(--violet); }
+  .skill-card .cat-bar.ops { background: var(--slate); }
+  .skill-card .cat-bar.reporting { background: var(--indigo); }
+
+  .skill-card-body { padding: 14px 16px 10px; flex: 1; display: flex; flex-direction: column; }
+  .skill-card .skill-slug {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .skill-card .skill-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .skill-card .skill-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0 0 12px;
+    flex: 1;
+  }
+  .skill-card .skill-foot {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+  .skill-card .skill-last {
+    font-size: 10px;
+    color: var(--text-subtle);
+    margin-right: auto;
+  }
+  .skill-card .skill-last strong { color: var(--text-muted); font-weight: 500; }
+  .skill-card .btn-mini {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .skill-card .btn-mini:hover { background: var(--bg); }
+  .skill-card .btn-mini.primary {
+    background: var(--accent); color: white; border-color: var(--accent);
+  }
+
+  .skill-cat-heading {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); font-weight: 600;
+    margin: 24px 0 12px;
+  }
+  .skill-cat-heading::after {
+    content: ""; flex: 1; height: 1px; background: var(--border);
+  }
+  .skill-cat-heading .cat-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .skill-cat-heading .cat-dot.seo-pipeline { background: var(--emerald); }
+  .skill-cat-heading .cat-dot.seo-adhoc { background: var(--sky); }
+  .skill-cat-heading .cat-dot.sales { background: var(--violet); }
+  .skill-cat-heading .cat-dot.ops { background: var(--slate); }
+  .skill-cat-heading .cat-dot.reporting { background: var(--indigo); }
+  .skill-cat-heading .cat-count { color: var(--text-subtle); font-weight: 500; }
+
+  .skill-filters {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .skill-filter-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .skill-filter-chip:hover { background: var(--bg); }
+  .skill-filter-chip.active {
+    background: var(--accent); color: white; border-color: var(--accent);
+  }
+  .skill-filter-chip .filter-count {
+    font-size: 10px;
+    color: var(--text-subtle);
+    background: var(--surface-alt);
+    padding: 0 5px;
+    border-radius: 3px;
+  }
+  .skill-filter-chip.active .filter-count {
+    background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.7);
+  }
+
+  .skill-search {
+    margin-bottom: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--text-subtle);
+    display: flex; align-items: center; gap: 8px;
+    max-width: 320px;
+  }
+
+  /* recent-runs panel */
+  .recent-runs {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .recent-runs-h {
+    padding: 10px 14px;
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); font-weight: 600;
+    display: flex; align-items: center;
+  }
+  .recent-runs-h .view-all {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .recent-runs table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .recent-runs td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .recent-runs tr:last-child td { border-bottom: none; }
+  .recent-runs .run-time { color: var(--text-subtle); width: 80px; }
+  .recent-runs .run-slug { font-family: ui-monospace, monospace; color: var(--text); width: 200px; }
+  .recent-runs .run-scope { color: var(--text-muted); width: 140px; }
+  .recent-runs .run-by { color: var(--text-muted); width: 100px; }
+  .recent-runs .run-cost { font-variant-numeric: tabular-nums; color: var(--text-muted); text-align: right; }
+  .recent-runs .run-status { width: 24px; text-align: right; color: var(--text-subtle); }
+
+  /* ──── Preview modal (Screen 17) ──── */
+  .preview-overlay {
+    position: absolute; inset: 0;
+    background: rgba(15,15,18,0.55);
+    z-index: 10;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 60px 24px 24px;
+    backdrop-filter: blur(2px);
+  }
+  .preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 84vh;
+    overflow-y: auto;
+    box-shadow: 0 16px 48px -16px rgba(0,0,0,0.4);
+  }
+  .preview-h {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 16px;
+  }
+  .preview-h .ph-meta { flex: 1; }
+  .preview-h .ph-slug {
+    font-family: ui-monospace, monospace;
+    font-size: 11px; color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .preview-h h3 {
+    font-size: 16px; font-weight: 600; margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .preview-h .ph-close {
+    color: var(--text-subtle);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+  }
+  .preview-b { padding: 8px 22px 22px; }
+  .preview-b h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 18px 0 8px;
+  }
+  .preview-b h4:first-child { margin-top: 8px; }
+  .preview-b p { font-size: 13px; line-height: 1.6; color: var(--text); margin: 0 0 8px; }
+  .preview-b ul { margin: 4px 0 8px; padding-left: 22px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .preview-b ul li { color: var(--text); }
+  .preview-b ul li code {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--surface-alt);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+  .preview-sample {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-family: ui-monospace, monospace;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .preview-foot {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+  .preview-foot .pf-cost {
+    font-size: 11px; color: var(--text-muted);
+    margin-right: auto;
+  }
+  .preview-foot .pf-cost strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* ──── Launch chat sheet (Screen 17 variant) ──── */
+  .launch-sheet {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .launch-sheet-h {
+    padding: 14px 18px;
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+  }
+  .launch-sheet-h .ls-title { font-size: 13px; font-weight: 600; }
+  .launch-sheet-h .ls-slug {
+    margin-left: 8px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .launch-sheet-b { padding: 16px 18px; }
+  .launch-sheet-b h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .launch-form {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .launch-form label { color: var(--text-muted); padding-top: 5px; }
+  .launch-form input, .launch-form select {
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 5px 8px;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+  }
+  .ctx-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 6px 0 18px;
+  }
+  .ctx-chip {
+    font-size: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--text-muted);
+  }
+  .ctx-chip strong { color: var(--text); font-weight: 500; }
+  .chat-input {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-subtle);
+    display: flex; align-items: center; gap: 8px;
+    font-family: inherit;
+  }
+  .chat-input::before { content: "►"; font-size: 10px; color: var(--text-subtle); }
+  .launch-actions {
+    display: flex; gap: 8px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+
   /* ──── Cards ──── */
   .card {
     background: var(--surface);
@@ -768,6 +1104,8 @@
     <a href="#s14">14 · Brand Terms</a>
     <a href="#s15">15 · Proof Assets</a>
     <a href="#s16">16 · Project Brain</a>
+    <a href="#s17">17 · Skills library (org)</a>
+    <a href="#s18">18 · Skills tab (per-property)</a>
     <a href="#change">Change log</a>
   </nav>
 </div>
@@ -3746,6 +4084,810 @@
 
   <p class="rationale">
     <strong>What's new:</strong> Project Brain is a new top-level property tab (alongside the other operational tabs added: Priorities, Guidelines). Reference-driven layout: <strong>✤ Project Brain</strong> header with the cross-cutting tagline, search + 2 dropdown filters (Categories / Statuses), then a vertical card list. Each entry: prose body (the actual knowledge), source/tool/confidence/date footer, status pill cluster top-right (category + state — e.g. <strong>known issue</strong> + <strong>working</strong>; <strong>decision</strong> + <strong>locked</strong>; <strong>preference</strong> + <strong>active</strong>), and three action glyphs (✓ accept / ✕ reject / 🗑 delete). Five sample entries shown for BusCharter covering all the entry types: known issues from agents, research observations, locked strategic decisions, and a preference rule. This is the working memory that every other Brand DNA / Pages / Projects surface reads from when generating outputs.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 17 · Skills library (org-level)                                      -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s17">
+  <div class="screen-label">Screen 17</div>
+  <h2 class="screen-title">Skills library <span class="muted xsmall" style="margin-left: 6px; font-weight: 400;">org-level launcher for all 16 skills</span></h2>
+  <p class="screen-desc">A discoverable, launchable catalogue of every Skyward skill — across SEO, Sales, Ops, and Reporting domains. Cards parse directly from each skill's <code>SKILL.md</code>. Click Preview to see the canonical shape (Summary / How to ask / What you provide / What you get / Sample output); click Launch to open a chat session with the skill prompt + selected context pre-loaded. Every run logs to <code>skill_invocation</code>.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+        <div class="sb-item"><span class="sb-icon">⊙</span>Prospects <span class="sb-count">4</span></div>
+        <div class="sb-item active"><span class="sb-icon">✦</span>Skills <span class="sb-count">16</span></div>
+        <div class="sb-item"><span class="sb-icon">⚡</span>Signals <span class="sb-count">3</span></div>
+        <div class="sb-item"><span class="sb-icon">⌖</span>Activity</div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">TNA <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot active"></span>buscharter <span class="phase">P5</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P5</span></div>
+        <div class="sb-property"><span class="dot active"></span>bushire-au <span class="phase">P3</span></div>
+        <div class="sb-client" style="margin-top: 8px;">Kitchen Guard <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property"><span class="dot active"></span>kg-provo <span class="phase">P4</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main" style="position: relative;">
+      <div class="topbar">
+        <div class="crumb"><a>Skyward</a> <span class="sep">/</span> <span class="here">Skills</span></div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Skills</h2>
+            <p>16 skills · 47 runs in last 30 days · $4.92 in agent cost</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Filters ▾</button>
+            <button class="btn">+ New skill</button>
+          </div>
+        </div>
+
+        <div class="skill-search">
+          <span>🔍</span><span>Search skills…</span>
+        </div>
+
+        <div class="skill-filters">
+          <div class="skill-filter-chip active">All <span class="filter-count">16</span></div>
+          <div class="skill-filter-chip"><span class="cat-dot seo-pipeline" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--emerald);"></span>SEO Pipeline <span class="filter-count">7</span></div>
+          <div class="skill-filter-chip"><span class="cat-dot seo-adhoc" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sky);"></span>SEO Ad-hoc <span class="filter-count">3</span></div>
+          <div class="skill-filter-chip"><span class="cat-dot sales" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--violet);"></span>Sales <span class="filter-count">3</span></div>
+          <div class="skill-filter-chip"><span class="cat-dot reporting" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--indigo);"></span>Reporting <span class="filter-count">1</span></div>
+          <div class="skill-filter-chip"><span class="cat-dot ops" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--slate);"></span>Operations <span class="filter-count">1</span></div>
+          <div class="skill-filter-chip">⭐ Favourites</div>
+          <div class="skill-filter-chip">Recent</div>
+        </div>
+
+        <div class="recent-runs">
+          <div class="recent-runs-h">Recent runs <span class="view-all">View all 47 →</span></div>
+          <table>
+            <tbody>
+              <tr><td class="run-time">2h ago</td><td class="run-slug">/phase-5-authority</td><td class="run-scope">buscharter</td><td class="run-by">Data S.</td><td class="run-cost">$0.06</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">1d ago</td><td class="run-slug">/phase-4-content</td><td class="run-scope">buscharter</td><td class="run-by">Data S.</td><td class="run-cost">$0.21</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">1d ago</td><td class="run-slug">/phase-3-keywords</td><td class="run-scope">buscharter</td><td class="run-by">Data S.</td><td class="run-cost">$0.18</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">4d ago</td><td class="run-slug">/b2b-proposal-deck</td><td class="run-scope">engagefi</td><td class="run-by">Data S.</td><td class="run-cost">$1.47</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">2w ago</td><td class="run-slug">/franchise-strategy-deck</td><td class="run-scope">kg-provo</td><td class="run-by">Data S.</td><td class="run-cost">$0.94</td><td class="run-status">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot seo-pipeline"></span>SEO Pipeline <span class="cat-count">7 skills</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-0-onboarding</div>
+              <h3 class="skill-title">Phase 0 — Client Onboarding</h3>
+              <p class="skill-desc">Capture client identity, services, competitors, seed keywords, personas. Bootstraps the SEO pipeline data warehouse for a new client.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 12d ago · kg-provo</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-1-wqa</div>
+              <h3 class="skill-title">Phase 1 — Website Quality Audit</h3>
+              <p class="skill-desc">Triage every URL on the site into Optimize / Restore / Remove / Consolidate / Keep. Produces 12-tab workbook + funnel summary deck.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 5d ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-2-technical</div>
+              <h3 class="skill-title">Phase 2 — Technical SEO Audit</h3>
+              <p class="skill-desc">T1-T20, C1-C20, S1-S12 per URL. Classifies each issue Fix Now / Fix Now Revisit / Phase 3 Dependent.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 4d ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card" style="border-color: #18181b; box-shadow: 0 0 0 2px var(--accent-hover);">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-3-keywords</div>
+              <h3 class="skill-title">Phase 3 — Keyword &amp; Prompt Analysis</h3>
+              <p class="skill-desc">KGA + SERP-overlap clustering + 5-factor URL-to-cluster scoring. Resolves Phase 2 yellow items with keyword data.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 1d ago · buscharter · $0.18</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-4-content</div>
+              <h3 class="skill-title">Phase 4 — Content Pipeline</h3>
+              <p class="skill-desc">Master Content Plan + Performance Tracker + Sprint Calendar. Feeds /content-brief for per-page production.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 1d ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-5-authority</div>
+              <h3 class="skill-title">Phase 5 — Authority Building</h3>
+              <p class="skill-desc">Link Gap Audit + Authority Building Workbook + prospect list. Feeds the link-monitoring surface.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 2h ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-6-tracking</div>
+              <h3 class="skill-title">Phase 6 — Tracking &amp; Reporting</h3>
+              <p class="skill-desc">Setup / Weekly / Monthly / Quarterly Business Review modes. Diffs against the captured baseline.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 2d ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot seo-adhoc"></span>SEO Ad-hoc <span class="cat-count">3 skills</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar seo-adhoc"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/seo-audit</div>
+              <h3 class="skill-title">Ad-hoc Technical SEO Audit</h3>
+              <p class="skill-desc">Stand-alone audit of any URL or domain. Lighter than Phase 2 — for spot checks + competitor analysis.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 9d ago</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-adhoc"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/competitor-analysis</div>
+              <h3 class="skill-title">Competitor Analysis</h3>
+              <p class="skill-desc">Side-by-side competitive snapshot. DR, refdomains, organic keywords, content depth, anchor profile.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 18d ago</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-adhoc"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/content-brief</div>
+              <h3 class="skill-title">Content Brief Builder</h3>
+              <p class="skill-desc">Per-page brief with entities + FAQs + fan-out + SERP scrape + outline. Backfills Phase 4 row's Content Inputs.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 6d ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot sales"></span>Sales <span class="cat-count">3 skills</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar sales"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/lead-engagement</div>
+              <h3 class="skill-title">Lead Engagement Package</h3>
+              <p class="skill-desc">Data-driven prospect assessment doc. Demonstrates SEO + AEO opportunity + Skyward expertise. First sales touchpoint.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 6d ago · engagefi</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar sales"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/b2b-proposal-deck</div>
+              <h3 class="skill-title">B2B Mid-Market Proposal Deck</h3>
+              <p class="skill-desc">50-65 slide analytical HTML proposal (1280×720). Per-channel assessment leading to modular pricing close.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 4d ago · engagefi · $1.47</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar sales"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/franchise-strategy-deck</div>
+              <h3 class="skill-title">Franchise Strategy Deck</h3>
+              <p class="skill-desc">21-slide single-location franchise pitch. Paid + Local SEO + Website SEO assessment + locked SOW.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 2w ago · kg-provo</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot reporting"></span>Reporting <span class="cat-count">1 skill</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar reporting"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/client-report</div>
+              <h3 class="skill-title">Client Monthly Report</h3>
+              <p class="skill-desc">Draft a client-facing monthly report from current pipeline data + baseline diff. PDF / slides / Loom format per client preference.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 30d ago · buscharter</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card" style="opacity: 0.5; cursor: not-allowed;">
+            <div class="cat-bar reporting"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">(empty slot)</div>
+              <h3 class="skill-title" style="color: var(--text-subtle);">— add new reporting skill —</h3>
+              <p class="skill-desc">Drop a new <code>.md</code> file into <code>~/.claude/skills/</code> and it appears here automatically.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>—</strong></div>
+              <button class="btn-mini" disabled>Preview</button>
+              <button class="btn-mini" disabled>Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot ops"></span>Operations <span class="cat-count">1 skill</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar ops"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/zenpilot</div>
+              <h3 class="skill-title">ZenPilot ClickUp Playbook</h3>
+              <p class="skill-desc">Reference skill that loads the ZenPilot agency-operations playbook for ClickUp setup, process building, task architecture questions.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last run:</strong> 23d ago</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Preview modal overlay (Phase 3 example) -->
+      <div class="preview-overlay">
+        <div class="preview">
+          <div class="preview-h">
+            <div class="ph-meta">
+              <div class="ph-slug">/phase-3-keywords</div>
+              <h3>Phase 3 — Keyword &amp; Prompt Analysis</h3>
+            </div>
+            <div class="ph-close">✕</div>
+          </div>
+          <div class="preview-b">
+            <h4>Summary</h4>
+            <p>Discovers, expands, enriches, categorises, and clusters keywords for an existing client. Pulls KGA output from BigQuery, runs SERP-overlap clustering, assigns each Optimize URL its primary cluster via 5-factor scoring. Resolves Phase 2 yellow items with keyword data.</p>
+
+            <h4>How to ask</h4>
+            <ul>
+              <li>Run Phase 3 for <code>{client}</code></li>
+              <li>Cluster keywords for buscharter</li>
+              <li>Re-cluster at threshold 4 for tnabushire</li>
+              <li>Pull KGA and build the keyword analysis workbook</li>
+            </ul>
+
+            <h4>What you'll provide</h4>
+            <ul>
+              <li><strong>Client / property slug</strong> (required)</li>
+              <li>Country code (optional, defaults from property)</li>
+              <li>Overlap threshold (optional, default 4)</li>
+              <li>Max keywords per domain (optional, no limit)</li>
+            </ul>
+
+            <h4>What you'll get</h4>
+            <ul>
+              <li>10-tab xlsx workbook (Opportunity Overview, Keyword Universe, Cluster Map, Keyword URL Map, Opportunity Analysis, Forecasting, Competitive Gap, Entity Gaps, Content Enrichment, Coverage Summary)</li>
+              <li>Data populated in Supabase: <code>keyword_cluster</code>, <code>keyword_cluster_member</code>, <code>page_cluster_assignment</code></li>
+              <li>Visible in app at <code>/properties/{slug}/keywords</code></li>
+            </ul>
+
+            <h4>Sample output</h4>
+            <div class="preview-sample">
+              buscharter — 646 clusters · 9,003 keywords<br>
+              Top cluster: "buses" (1,195 kw · 892K SV)<br>
+              115 URLs assigned to a primary cluster<br>
+              Run cost: ~$0.18 · Wall time: ~4 min
+            </div>
+
+            <h4>Recent runs against buscharter</h4>
+            <div class="preview-sample" style="font-family: inherit; font-size: 12px;">
+              <strong>3d ago</strong> · Data S. · 4m 22s · $0.18 · ✓ Success<br>
+              <strong>2w ago</strong> · Data S. · 8m 15s · $0.31 · ✓ Success
+            </div>
+          </div>
+          <div class="preview-foot">
+            <div class="pf-cost">Typical cost: <strong>$0.15-0.40</strong> · Typical duration: <strong>3-8 min</strong></div>
+            <button class="btn">Close</button>
+            <button class="btn btn-primary">Launch in chat ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> a single launcher for every skill across all four domains (SEO Pipeline · SEO Ad-hoc · Sales · Ops · Reporting). Cards parse automatically from <code>~/.claude/skills/*/SKILL.md</code> — drop a new skill in and it appears here. Filter chips at top + recent-runs strip up top for at-a-glance "what got used." Preview modal (shown over the page) follows the canonical Skills shape used industry-wide: Summary / How to ask / What you'll provide / What you'll get / Sample output / Recent runs / Cost + duration. Launch opens a chat session in the next screen with the skill prompt pre-loaded + scope chips visible. Every invocation logs to <code>skill_invocation</code> for telemetry across the org.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<!-- 18 · Skills tab (per-property)                                       -->
+<!-- ─────────────────────────────────────────────────────────────── -->
+<section class="doc-section" id="s18">
+  <div class="screen-label">Screen 18</div>
+  <h2 class="screen-title">Skills tab <span class="muted xsmall" style="margin-left: 6px; font-weight: 400;">per-property, scoped + launch sheet</span></h2>
+  <p class="screen-desc">The same skill library, but scoped to a single property. Top section surfaces "Currently relevant" skills based on the property's pipeline phase + last-run state (e.g. "Phase 6 setup done 2d ago — next: Monthly report due"). Launch flow shows a sheet with scope context auto-bound + optional typed inputs. Recent runs filter to this property only.</p>
+
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-brand"><div class="sb-logo">S</div><div><div class="sb-name">Skyward Platform</div><div class="sb-ver">v2 prototype</div></div></div>
+      <div class="sb-search"><span>🔍</span> Search… <span class="kbd">⌘K</span></div>
+      <div class="sb-group">
+        <div class="sb-heading">Workspace</div>
+        <div class="sb-item"><span class="sb-icon">⌂</span>Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">◉</span>Clients</div>
+        <div class="sb-item"><span class="sb-icon">⊙</span>Prospects <span class="sb-count">4</span></div>
+        <div class="sb-item"><span class="sb-icon">✦</span>Skills <span class="sb-count">16</span></div>
+      </div>
+      <div class="sb-group">
+        <div class="sb-heading">Properties</div>
+        <div class="sb-client">TNA <span class="sb-client-chevron">▾</span></div>
+        <div class="sb-property active"><span class="dot active"></span>buscharter <span class="phase">P5</span></div>
+        <div class="sb-property"><span class="dot active"></span>tnabushire <span class="phase">P5</span></div>
+        <div class="sb-property"><span class="dot active"></span>bushire-au <span class="phase">P3</span></div>
+      </div>
+      <div class="sb-foot"><div class="sb-avatar">PS</div><div>Paul Skirbe<div class="sb-user-meta">Managing Partner</div></div></div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumb"><a>TNA</a> <span class="sep">/</span> <a>BusCharter</a> <span class="sep">/</span> <span class="here">Skills</span></div>
+      </div>
+
+      <div class="tabstrip">
+        <div class="tab">Overview</div>
+        <div class="tab">Brand DNA</div>
+        <div class="tab">Pages</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Keywords</div>
+        <div class="tab">Content</div>
+        <div class="tab">Authority</div>
+        <div class="tab">Reports</div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab active">Skills <span class="tab-badge">16</span></div>
+        <div class="tab-cluster-sep"></div>
+        <div class="tab">Projects</div>
+        <div class="tab">Project Brain</div>
+      </div>
+
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h2>Skills</h2>
+            <p>buscharter.com.au · 12 runs in the last 30 days · all 16 skills available</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn">Run history</button>
+            <button class="btn">View all skills →</button>
+          </div>
+        </div>
+
+        <div class="skill-cat-heading" style="margin-top: 0;"><span class="cat-dot reporting"></span>Currently relevant <span class="cat-count">2 skills due</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card" style="border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-bg);">
+            <div class="cat-bar reporting"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-6-tracking · Monthly mode</div>
+              <h3 class="skill-title">Monthly Report — May 2026</h3>
+              <p class="skill-desc">Diff against baseline captured 2026-05-23. Phase 6 baseline doc inlined; this run produces the May 2026 monthly summary.</p>
+              <div class="ctx-chips" style="margin-top: 4px; margin-bottom: 0;">
+                <span class="ctx-chip"><strong>Due:</strong> June 1</span>
+                <span class="ctx-chip"><strong>Baseline:</strong> 2d ago</span>
+              </div>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> never run for May</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card" style="border-color: var(--sky); box-shadow: 0 0 0 1px var(--sky-bg);">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-5-authority · refresh</div>
+              <h3 class="skill-title">Refresh authority snapshot</h3>
+              <p class="skill-desc">Last DFS pull 2 hours ago. Run again to capture any new referring domains since last refresh. Cost ~$0.06.</p>
+              <div class="ctx-chips" style="margin-top: 4px; margin-bottom: 0;">
+                <span class="ctx-chip"><strong>DR:</strong> 33 → ?</span>
+                <span class="ctx-chip"><strong>RefDomains:</strong> 267 → ?</span>
+              </div>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 2h ago · $0.06</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; margin: 24px 0 12px;">Launch sheet (preview)</h4>
+        <div class="launch-sheet" style="max-width: 720px; margin-bottom: 24px;">
+          <div class="launch-sheet-h">
+            <div class="ls-title">Launch</div>
+            <div class="ls-slug">/phase-6-tracking · Monthly mode</div>
+          </div>
+          <div class="launch-sheet-b">
+            <h4>Context (auto-bound)</h4>
+            <div class="ctx-chips">
+              <span class="ctx-chip"><strong>Property:</strong> buscharter</span>
+              <span class="ctx-chip"><strong>Domain:</strong> buscharter.com.au</span>
+              <span class="ctx-chip"><strong>Client:</strong> TNA</span>
+              <span class="ctx-chip"><strong>Phase:</strong> 5 active</span>
+              <span class="ctx-chip"><strong>Baseline:</strong> 2026-05-23</span>
+              <span class="ctx-chip"><strong>Last Phase 5 refresh:</strong> 2h ago (DR 33, 267 refdomains)</span>
+            </div>
+
+            <h4>Inputs</h4>
+            <div class="launch-form">
+              <label>Reporting period</label>
+              <select><option>May 2026 (full month)</option><option>Custom range…</option></select>
+              <label>Output format</label>
+              <select><option>Markdown + HTML slides</option><option>Markdown only</option><option>Loom-ready script</option></select>
+              <label>Audience</label>
+              <select><option>Client (external)</option><option>Internal team</option></select>
+            </div>
+
+            <h4>Or refine in chat</h4>
+            <div class="chat-input">Focus the report on Phase 5 link acquisition wins. Skip the keyword-rank section.</div>
+          </div>
+          <div class="launch-actions">
+            <button class="btn">Cancel</button>
+            <span style="flex: 1;"></span>
+            <button class="btn">Continue in chat →</button>
+            <button class="btn btn-primary">Run skill ▶</button>
+          </div>
+        </div>
+
+        <div class="skill-filters">
+          <div class="skill-filter-chip active">All <span class="filter-count">16</span></div>
+          <div class="skill-filter-chip"><span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--emerald);"></span>SEO Pipeline <span class="filter-count">7</span></div>
+          <div class="skill-filter-chip"><span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sky);"></span>SEO Ad-hoc <span class="filter-count">3</span></div>
+          <div class="skill-filter-chip"><span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--violet);"></span>Sales <span class="filter-count">3</span></div>
+          <div class="skill-filter-chip"><span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--indigo);"></span>Reporting <span class="filter-count">1</span></div>
+          <div class="skill-filter-chip"><span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--slate);"></span>Operations <span class="filter-count">1</span></div>
+          <div class="skill-filter-chip">⭐ Favourites</div>
+        </div>
+
+        <div class="skill-cat-heading" style="margin-top: 8px;"><span class="cat-dot seo-pipeline"></span>SEO Pipeline <span class="cat-count">7 skills · 9 runs against this property</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-0-onboarding</div>
+              <h3 class="skill-title">Phase 0 — Client Onboarding</h3>
+              <p class="skill-desc">Already completed for buscharter. Re-run to refresh services / competitors / seed keywords.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 47d ago · $0.12</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-1-wqa</div>
+              <h3 class="skill-title">Phase 1 — Website Quality Audit</h3>
+              <p class="skill-desc">Re-triage all 1,701 URLs. Manual override decisions preserved. Output: 12-tab xlsx + Pages tab refresh.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 5d ago · $0.42</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-2-technical</div>
+              <h3 class="skill-title">Phase 2 — Technical SEO Audit</h3>
+              <p class="skill-desc">Re-run T1-T20 / C1-C20 / S1-S12 against the 351 Optimize URLs. Fix-Now / Revisit / Phase 3 Dependent.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 4d ago · $0.55</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-3-keywords</div>
+              <h3 class="skill-title">Phase 3 — Re-cluster keywords</h3>
+              <p class="skill-desc">Re-run SERP-overlap clustering. 646 clusters at threshold 4 last run. Manual cluster + URL overrides preserved.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 1d ago · $0.18</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-4-content</div>
+              <h3 class="skill-title">Phase 4 — Refresh content plan</h3>
+              <p class="skill-desc">Re-derive auto-computed columns from current Phase 1 + Phase 3 state. 833 content rows; user overrides preserved.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 1d ago · $0.21</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-5-authority</div>
+              <h3 class="skill-title">Phase 5 — Refresh authority data</h3>
+              <p class="skill-desc">Pull fresh DataForSEO Backlinks snapshot. Adds new referring domains, preserves quality / notes overrides.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 2h ago · $0.06</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-pipeline"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/phase-6-tracking</div>
+              <h3 class="skill-title">Phase 6 — Tracking &amp; Reporting</h3>
+              <p class="skill-desc">Setup baseline (done 2d ago) / Weekly / Monthly / QBR modes. Diffs against captured baseline.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 2d ago · setup · $0.31</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot seo-adhoc"></span>SEO Ad-hoc <span class="cat-count">3 skills</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar seo-adhoc"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/seo-audit</div>
+              <h3 class="skill-title">Ad-hoc Technical SEO Audit</h3>
+              <p class="skill-desc">Stand-alone audit of any URL or domain. Lighter than Phase 2 — for spot checks + competitor URLs.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> never run for this property</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-adhoc"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/competitor-analysis</div>
+              <h3 class="skill-title">Competitor snapshot</h3>
+              <p class="skill-desc">Refresh side-by-side comparison vs the 9 competitors tracked for buscharter (CoachHire, Murrays, BigBusCo…).</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 18d ago · $0.14</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card">
+            <div class="cat-bar seo-adhoc"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/content-brief</div>
+              <h3 class="skill-title">Build a content brief</h3>
+              <p class="skill-desc">Per-page brief for a Phase 4 row. Pulls entities + FAQs + fan-out + SERP outline. Backfills Content Inputs column.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 6d ago · $0.09</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot sales"></span>Sales <span class="cat-count">3 skills · not typical for existing clients</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card" style="opacity: 0.7;">
+            <div class="cat-bar sales"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/lead-engagement</div>
+              <h3 class="skill-title">Lead Engagement Package</h3>
+              <p class="skill-desc">Typically run against prospects, not existing clients. Use here only if pitching an expansion or new domain under the same client.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> n/a — prospect skill</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card" style="opacity: 0.7;">
+            <div class="cat-bar sales"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/b2b-proposal-deck</div>
+              <h3 class="skill-title">B2B Mid-Market Proposal Deck</h3>
+              <p class="skill-desc">50-65 slide pitch deck. Use here for expansion proposal (new channels, new properties) or renewal.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> n/a — prospect skill</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini">Launch ▶</button>
+            </div>
+          </div>
+
+          <div class="skill-card" style="opacity: 0.7;">
+            <div class="cat-bar sales"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/franchise-strategy-deck</div>
+              <h3 class="skill-title">Franchise Strategy Deck</h3>
+              <p class="skill-desc">Single-location franchise pitch. Not applicable to buscharter (B2B portfolio); shown for completeness.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> n/a — not applicable</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot reporting"></span>Reporting <span class="cat-count">1 skill · 1 run</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card">
+            <div class="cat-bar reporting"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/client-report</div>
+              <h3 class="skill-title">Client Monthly Report</h3>
+              <p class="skill-desc">Draft a client-facing monthly report from current pipeline data + Phase 6 baseline diff. PDF / slides / Loom.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 30d ago · $0.24</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini primary">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="skill-cat-heading"><span class="cat-dot ops"></span>Operations <span class="cat-count">1 skill · reference-only</span></div>
+        <div class="skill-grid">
+
+          <div class="skill-card" style="opacity: 0.7;">
+            <div class="cat-bar ops"></div>
+            <div class="skill-card-body">
+              <div class="skill-slug">/zenpilot</div>
+              <h3 class="skill-title">ZenPilot ClickUp Playbook</h3>
+              <p class="skill-desc">Reference skill (not data-producing). Loads ClickUp + agency-ops guidance into a chat. Used for process building.</p>
+            </div>
+            <div class="skill-foot">
+              <div class="skill-last"><strong>Last:</strong> 23d ago</div>
+              <button class="btn-mini">Preview</button>
+              <button class="btn-mini">Launch ▶</button>
+            </div>
+          </div>
+
+        </div>
+
+        <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; margin: 24px 0 12px;">Recent runs for buscharter</h4>
+        <div class="recent-runs" style="margin-bottom: 0;">
+          <table>
+            <tbody>
+              <tr><td class="run-time">2h ago</td><td class="run-slug">/phase-5-authority</td><td class="run-by">Data S.</td><td class="run-cost">$0.06</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">1d ago</td><td class="run-slug">/phase-4-content</td><td class="run-by">Data S.</td><td class="run-cost">$0.21</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">1d ago</td><td class="run-slug">/phase-3-keywords</td><td class="run-by">Data S.</td><td class="run-cost">$0.18</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">2d ago</td><td class="run-slug">/phase-6-tracking · setup</td><td class="run-by">Data S.</td><td class="run-cost">$0.31</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">5d ago</td><td class="run-slug">/phase-1-wqa</td><td class="run-by">Data S.</td><td class="run-cost">$0.42</td><td class="run-status">✓</td></tr>
+              <tr><td class="run-time">6d ago</td><td class="run-slug">/content-brief</td><td class="run-by">Data S.</td><td class="run-cost">$0.09</td><td class="run-status">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <p class="rationale">
+    <strong>What's new:</strong> the same skill library, but scoped + bound to a property. The <strong>Currently relevant</strong> section is the killer feature — instead of showing all 16 skills equally, the surface infers what the property needs next based on its pipeline state (e.g. "Phase 6 baseline captured 2 days ago → Monthly Report skill is now due"). Each currently-relevant card carries context chips (Due dates, baseline age, last-run deltas) that explain WHY the skill is showing up. The <strong>Launch sheet</strong> opens with the property auto-bound — no "pick a client" step — plus optional typed inputs above a free-text chat refinement. Recent runs filter to just this property. Same skill markdown as Screen 17; this surface adds context.
   </p>
 </section>
 

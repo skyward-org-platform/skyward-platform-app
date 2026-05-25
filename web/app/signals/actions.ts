@@ -5,10 +5,11 @@
 //
 // Schema: db/supabase/migrations/20260518221842_snoozed_signal.sql.
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
+import { CACHE_TAGS } from "@/lib/cache";
 
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
@@ -22,6 +23,7 @@ export async function snoozeSignal(signalId: string): Promise<Ok | Err> {
     snoozed_at: new Date().toISOString(),
   });
   if (error) return { ok: false, error: error.message };
+  updateTag(CACHE_TAGS.signals);
   revalidatePath("/signals");
   revalidatePath("/", "layout");
   return { ok: true };
@@ -35,6 +37,7 @@ export async function unsnoozeSignal(signalId: string): Promise<Ok | Err> {
     .delete()
     .eq("signal_id", signalId);
   if (error) return { ok: false, error: error.message };
+  updateTag(CACHE_TAGS.signals);
   revalidatePath("/signals");
   revalidatePath("/", "layout");
   return { ok: true };

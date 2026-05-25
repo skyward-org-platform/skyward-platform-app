@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
+import { CACHE_TAGS } from "@/lib/cache";
 
 export async function updateBrandDnaBody(
   sectionId: string,
@@ -21,6 +22,8 @@ export async function updateBrandDnaBody(
     })
     .eq("id", sectionId);
   if (error) return { ok: false, error: error.message };
+  updateTag(CACHE_TAGS.brandDna);
+  updateTag(CACHE_TAGS.signals);
   // 'layout' so the sub-layout's count badges + every /brand-dna/[section]
   // child page see the new content on next render.
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
@@ -54,6 +57,8 @@ export async function updateBrandDnaContentKey(
     })
     .eq("id", sectionId);
   if (error) return { ok: false, error: error.message };
+  updateTag(CACHE_TAGS.brandDna);
+  updateTag(CACHE_TAGS.signals);
   // 'layout' so the sub-layout's count badges + every /brand-dna/[section]
   // child page see the new content on next render.
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");

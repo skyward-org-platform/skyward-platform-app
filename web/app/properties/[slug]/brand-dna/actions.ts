@@ -9,10 +9,11 @@
 // click-to-edit JSON flow — this action is separate so the form pages don't
 // need to await a server-side row creation before they render.
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
+import { CACHE_TAGS } from "@/lib/cache";
 
 type Ok = { ok: true; sectionId: string };
 type Err = { ok: false; error: string };
@@ -62,6 +63,8 @@ export async function upsertBrandDnaField(
     if (insertErr || !created) {
       return { ok: false, error: insertErr?.message ?? "Insert failed." };
     }
+    updateTag(CACHE_TAGS.brandDna);
+    updateTag(CACHE_TAGS.signals);
     revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
     return { ok: true, sectionId: created.id };
   }
@@ -79,6 +82,8 @@ export async function upsertBrandDnaField(
     })
     .eq("id", existing.id);
   if (updErr) return { ok: false, error: updErr.message };
+  updateTag(CACHE_TAGS.brandDna);
+  updateTag(CACHE_TAGS.signals);
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
   return { ok: true, sectionId: existing.id };
 }

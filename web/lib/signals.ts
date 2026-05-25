@@ -9,7 +9,9 @@
 // Strategy: three batch queries cover every active property + its pages +
 // its Brand DNA sections. Compute signals in memory.
 
+import { unstable_cache } from "next/cache";
 import { supabase } from "./supabase";
+import { CACHE_TAGS, TTL } from "./cache";
 
 export type SignalSeverity = "urgent" | "watch" | "info";
 
@@ -317,10 +319,15 @@ function sectionToSlug(section: string): string {
 }
 
 /** Cheap count of ACTIVE (non-snoozed) signals — used by the Sidebar to
- *  badge the workspace Signals link. Heavy (3 full-table scans) but runs
- *  uncached for now; cross-request caching to be re-added via "use cache"
- *  after the Next 16 deprecation pattern is sorted. */
-export async function signalCount(): Promise<number> {
+ *  badge the workspace Signals link. Three full-table scans, so wrapped
+ *  in unstable_cache (busted by any signal-affecting mutation). */
+async function computeSignalCount(): Promise<number> {
   const snapshot = await detectSignals();
   return snapshot.active.length;
 }
+
+export const signalCount = unstable_cache(
+  computeSignalCount,
+  ["signal-count"],
+  { revalidate: TTL.fast, tags: [CACHE_TAGS.signals] },
+);
