@@ -5,7 +5,7 @@
 // value / chain fix). Each group collapses to one fix when it represents a
 // single SSL toggle or systemic change.
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import { VerifyButton } from "@/components/wqa/VerifyButton";
@@ -137,9 +137,9 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
               <TableShell>
                 <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
                   <tr>
-                    <th className="text-left px-3 py-2 font-medium min-w-[260px]">Source URL</th>
+                    <th className="text-left px-3 py-2 font-medium min-w-[440px]">Source URL</th>
                     <th className="text-left px-2 py-2 font-medium">Action</th>
-                    <th className="text-left px-2 py-2 font-medium min-w-[280px]">
+                    <th className="text-left px-2 py-2 font-medium min-w-[320px]">
                       Destination URL
                     </th>
                     <th className="text-left px-2 py-2 font-medium">Verify</th>
@@ -147,8 +147,8 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                     <th className="text-right px-2 py-2 font-medium">Sessions</th>
                     <th className="text-right px-2 py-2 font-medium">Refs</th>
                     <th className="text-right px-2 py-2 font-medium">BLs</th>
-                    <th className="text-left px-2 py-2 font-medium min-w-[260px]">Suggested destination</th>
-                    <th className="text-left px-2 py-2 font-medium min-w-[260px]">Triage logic</th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[420px]">Suggested destinations</th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[220px]">Triage logic</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -165,8 +165,26 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                         className={`border-t hover:bg-muted/40 ${onOpenDrawer ? "cursor-pointer" : ""}`}
                         onClick={() => onOpenDrawer?.(r.row.url)}
                       >
-                        <td className="px-3 py-1.5 max-w-0">
-                          <UrlCell url={r.row.url} title={r.row.current_title} />
+                        <td className="px-3 py-1.5">
+                          <div className="space-y-0.5 break-all">
+                            <a
+                              href={r.row.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono text-[11px] text-foreground hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {r.row.url}
+                            </a>
+                            {r.row.current_title && (
+                              <div
+                                className="text-[10.5px] text-muted-foreground"
+                                title={r.row.current_title}
+                              >
+                                {r.row.current_title}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td
                           className="px-2 py-1.5"
@@ -226,13 +244,10 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                               {suggested}
                             </a>
                           ) : (
-                            <SuggestDestinationButton
+                            <InlineSuggestions
                               propertySlug={propertySlug}
                               sourceUrl={r.row.url}
                               onPick={(picked) => {
-                                // Save and reload so the editor row re-renders
-                                // with the new defaultValue. Lightweight UX —
-                                // the user only clicks Suggest occasionally.
                                 void setExecutionField(
                                   propertySlug,
                                   r.row.url,
@@ -311,11 +326,13 @@ function DestinationUrlInput({
   );
 }
 
-// ─── SuggestDestinationButton ─────────────────────────────────────────────
-// Compact popover that calls suggestRedirectDestination on click,
-// renders top-3 candidates with similarity bars + confidence labels.
-// Clicking a row calls onPick(url) which the parent uses to persist
-// the choice to page_execution.target_url.
+// ─── InlineSuggestions ────────────────────────────────────────────────────
+// Replaces the click-to-reveal popover. Each row auto-fetches its top-3
+// cosine matches on mount and renders them inline in the table cell so
+// the operator scans them at a glance and clicks one to set the target
+// URL. Tradeoff: each row fires its own OpenAI call (~$0.0001 / call),
+// total for 449 rows is ~$0.05 / page render. Acceptable for now; cache
+// table is the follow-up if Paul opens this tab frequently.
 
 type SuggestionRow = {
   url: string;
@@ -329,7 +346,7 @@ const CONFIDENCE_TINT = {
   low: "bg-slate-50 text-slate-600 border-slate-200",
 } as const;
 
-function SuggestDestinationButton({
+function InlineSuggestions({
   propertySlug,
   sourceUrl,
   onPick,
@@ -338,123 +355,100 @@ function SuggestDestinationButton({
   sourceUrl: string;
   onPick: (url: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [slugText, setSlugText] = useState("");
+  const [pending, setPending] = useState(true);
   const [rows, setRows] = useState<SuggestionRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const handleOpen = () => {
-    setOpen(true);
-    if (loaded) return;
-    startTransition(async () => {
-      const res = await suggestRedirectDestination(propertySlug, sourceUrl);
-      if (!res.ok) {
-        setError(res.error);
-        setLoaded(true);
-        return;
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await suggestRedirectDestination(propertySlug, sourceUrl);
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(res.error);
+        } else {
+          setRows(res.suggestions);
+        }
+      } finally {
+        if (!cancelled) {
+          setPending(false);
+          setLoaded(true);
+        }
       }
-      setSlugText(res.slugText);
-      setRows(res.suggestions);
-      setLoaded(true);
-    });
-  };
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [propertySlug, sourceUrl]);
 
+  if (pending && !loaded) {
+    return (
+      <span className="text-[10.5px] text-muted-foreground italic">
+        Matching…
+      </span>
+    );
+  }
+  if (error) {
+    return (
+      <span className="text-[10.5px] text-rose-700" title={error}>
+        Match failed
+      </span>
+    );
+  }
+  const renderable = rows.filter((r) => r.similarity >= 0.4);
+  if (renderable.length === 0) {
+    return (
+      <span className="text-[10.5px] text-muted-foreground italic">
+        No confident matches — pick manually
+      </span>
+    );
+  }
   return (
-    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className="text-[11px] text-foreground hover:text-blue-700 underline decoration-dotted"
-        disabled={pending}
-      >
-        {pending ? "Matching…" : "Suggest destination"}
-      </button>
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-            aria-hidden
-          />
-          <div className="absolute z-50 top-full right-0 mt-1 w-[420px] bg-card border rounded-md shadow-lg p-2 text-[11px]">
-            {!loaded || pending ? (
-              <div className="px-2 py-3 text-muted-foreground italic">
-                Embedding slug + cosine matching…
+    <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+      {renderable.map((r) => {
+        const bar = Math.max(2, Math.round(r.similarity * 100));
+        return (
+          <button
+            key={r.url}
+            type="button"
+            onClick={() => onPick(r.url)}
+            className="w-full text-left px-1.5 py-1 rounded hover:bg-muted/40 group transition-colors"
+            title={`Use ${r.url} as destination`}
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className={
+                  "inline-flex items-center text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0 rounded border shrink-0 " +
+                  CONFIDENCE_TINT[r.confidence]
+                }
+              >
+                {r.confidence}
+              </span>
+              <span className="tabular-nums text-[10px] text-muted-foreground w-[36px] shrink-0">
+                {r.similarity.toFixed(3)}
+              </span>
+              <div className="flex-1 h-1 bg-muted rounded overflow-hidden shrink min-w-0">
+                <div
+                  className={
+                    "h-full " +
+                    (r.confidence === "high"
+                      ? "bg-emerald-500"
+                      : r.confidence === "medium"
+                        ? "bg-amber-500"
+                        : "bg-slate-400")
+                  }
+                  style={{ width: `${bar}%` }}
+                />
               </div>
-            ) : error ? (
-              <div className="px-2 py-2 text-rose-700">{error}</div>
-            ) : rows.length === 0 ? (
-              <div className="px-2 py-3 text-muted-foreground">
-                No candidates. The slug text was too short or no page
-                embeddings exist for this property yet.
-              </div>
-            ) : (
-              <>
-                <div className="px-2 py-1 border-b mb-1 text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <span>Top {rows.length} by cosine similarity</span>
-                  <span className="ml-auto font-mono normal-case tracking-normal text-foreground/70">
-                    “{slugText}”
-                  </span>
-                </div>
-                {rows
-                  .filter((r) => r.similarity >= 0.4)
-                  .map((r) => {
-                    const bar = Math.max(2, Math.round(r.similarity * 100));
-                    return (
-                      <button
-                        key={r.url}
-                        type="button"
-                        onClick={() => {
-                          setOpen(false);
-                          onPick(r.url);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded hover:bg-muted/50 group"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={
-                              "inline-flex items-center text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded border " +
-                              CONFIDENCE_TINT[r.confidence]
-                            }
-                          >
-                            {r.confidence}
-                          </span>
-                          <span className="tabular-nums text-[10.5px] text-muted-foreground w-[42px]">
-                            {r.similarity.toFixed(3)}
-                          </span>
-                          <div className="flex-1 h-1 bg-muted rounded overflow-hidden">
-                            <div
-                              className={
-                                "h-full " +
-                                (r.confidence === "high"
-                                  ? "bg-emerald-500"
-                                  : r.confidence === "medium"
-                                    ? "bg-amber-500"
-                                    : "bg-slate-300")
-                              }
-                              style={{ width: `${bar}%` }}
-                            />
-                          </div>
-                        </div>
-                        <div className="font-mono text-[11px] text-foreground/90 group-hover:text-blue-700 mt-1 truncate">
-                          {r.url}
-                        </div>
-                      </button>
-                    );
-                  })}
-                {rows.every((r) => r.similarity < 0.4) && (
-                  <div className="px-2 py-2 text-muted-foreground text-[10.5px] italic">
-                    All matches below 0.40 confidence — operator should pick
-                    manually. Slug text was too thin for a reliable signal.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </>
-      )}
+            </div>
+            <div className="font-mono text-[10.5px] text-foreground group-hover:text-blue-700 mt-0.5 break-all">
+              {r.url}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
