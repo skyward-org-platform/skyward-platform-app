@@ -116,6 +116,9 @@ async function resolvePropertyId(slug: string): Promise<string | null> {
 
 function revalidateCompetitors(propertySlug: string) {
   updateTag(CACHE_TAGS.brandDna);
+  // Same three-path coverage as seed keywords - the Overview reads
+  // hasCompetitors() directly so needs its own path bust.
+  revalidatePath(`/properties/${propertySlug}/brand-dna`);
   revalidatePath(`/properties/${propertySlug}/brand-dna/competitors`);
   revalidatePath(`/properties/${propertySlug}`, "layout");
 }
@@ -276,6 +279,13 @@ type SeedKwErr = { ok: false; error: string };
 
 function revalidateSeedKeywords(propertySlug: string) {
   updateTag(CACHE_TAGS.brandDna);
+  // Three explicit paths because the Brand DNA Overview reads
+  // hasSeedKeywords() directly (no fetch tag), so a tag bust alone
+  // doesn't catch it. Each path covers a different surface:
+  //   - /brand-dna             - Overview (completeness checklist)
+  //   - /brand-dna/seed-keywords - editor page itself
+  //   - /properties/[slug]     - layout (hero badge + phase strip)
+  revalidatePath(`/properties/${propertySlug}/brand-dna`);
   revalidatePath(`/properties/${propertySlug}/brand-dna/seed-keywords`);
   revalidatePath(`/properties/${propertySlug}`, "layout");
 }
