@@ -257,6 +257,7 @@ export function WqaTabs({
         dataset={dataset}
         message={message}
         execByUrl={execByUrl}
+        decisions={decisions}
         onOpenDrawer={(url) => setDrawerUrl(url)}
       />
 
@@ -295,6 +296,7 @@ function Body({
   dataset,
   message,
   execByUrl,
+  decisions,
   onOpenDrawer,
 }: {
   view: SubTab;
@@ -307,6 +309,7 @@ function Body({
   dataset: string;
   message?: string;
   execByUrl: Map<string, PageExecutionRow>;
+  decisions: DecisionRow[];
   onOpenDrawer: (url: string) => void;
 }) {
   if (view === "overview") {
@@ -349,6 +352,8 @@ function Body({
         dataset={dataset}
         message={message}
         onOpenDrawer={onOpenDrawer}
+        propertySlug={propertySlug}
+        decisions={decisions}
       />
     );
   }

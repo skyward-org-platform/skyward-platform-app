@@ -142,11 +142,19 @@ export function toAction7(action: string | null | undefined): Action7 {
 
 // ─── Row shapes ──────────────────────────────────────────────────────────
 
-// Legacy read-only shape kept for back-compat with the v1 consumers
-// (PagesView, WqaTabs, audit/* tabs). Chunk 3 migrates to WqaDecisionRow.
+// Read-only row shape returned by getWqaDecisions(). Extended in P2 to
+// surface status / logic_notes / target_url / drift_reason so the chips
+// and drawer can render without a second round-trip. logic_code stays
+// out of this view because the chip reads it from the BQ wqa_output row
+// (Chunk 5 add); the override side does not duplicate it.
 export type DecisionRow = {
   url: string;
   action: string;
+  target_url: string | null;
+  status: WqaStatus;
+  logic_notes: string | null;
+  drift_reason: string | null;
+  last_implementation_check_at: string | null;
   decided_by: string;
   decided_at: string;
 };
@@ -181,7 +189,9 @@ async function fetchWqaDecisionsRaw(
   if (!prop) return [];
   const { data } = await supabase
     .from("wqa_decision")
-    .select("url, action, decided_by, decided_at")
+    .select(
+      "url, action, target_url, status, logic_notes, drift_reason, last_implementation_check_at, decided_by, decided_at",
+    )
     .eq("property_id", prop.id);
   return (data ?? []) as DecisionRow[];
 }

@@ -16,6 +16,14 @@ import {
   triageRow,
   type TriageAction,
 } from "@/lib/wqa-triage";
+import {
+  toAction7,
+  type Action7,
+  type DecisionRow,
+  type WqaStatus,
+} from "@/lib/wqa-decisions";
+import { WqaActionChip } from "@/components/wqa/WqaActionChip";
+import { WqaStatusChip } from "@/components/wqa/WqaStatusChip";
 
 type SortKey =
   | "sessions"
@@ -74,6 +82,8 @@ export function WqaDataView({
   dataset,
   message,
   onOpenDrawer,
+  propertySlug,
+  decisions,
 }: {
   rows: WqaRow[];
   summary: WqaSiteSummary | null;
@@ -84,6 +94,10 @@ export function WqaDataView({
   /** Optional — when provided, clicking a URL row opens the URL drawer
    *  at the WqaTabs level. Wired through Body in WqaTabs. */
   onOpenDrawer?: (url: string) => void;
+  /** Required for the inline action / status chips. When omitted the
+   *  table falls back to read-only badges (legacy /api/wqa caller). */
+  propertySlug?: string;
+  decisions?: DecisionRow[];
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("sessions");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
@@ -91,10 +105,40 @@ export function WqaDataView({
   const [healthFilter, setHealthFilter] = useState<HealthZone | "all">("all");
   const [actionFilter, setActionFilter] = useState<TriageAction | "all">("all");
 
-  // Compute triage once + cache against the row object.
+  // Build url → wqa_decision map so the chips can render override action
+  // / status / drift without a second round-trip.
+  const decisionByUrl = useMemo(() => {
+    const m = new Map<string, DecisionRow>();
+    for (const d of decisions ?? []) m.set(d.url, d);
+    return m;
+  }, [decisions]);
+
+  // Compute triage once + cache against the row object. We also derive
+  // the displayed Action7 (operator override if present, otherwise the
+  // SOP-derived action mapped to Action7).
   const triaged = useMemo(
-    () => rows.map((r) => ({ row: r, triage: triageRow(r) })),
-    [rows],
+    () =>
+      rows.map((r) => {
+        const sop = triageRow(r);
+        const override = decisionByUrl.get(r.url);
+        const pipelineA7: Action7 = toAction7(sop.action);
+        const overrideA7: Action7 | null = override
+          ? toAction7(override.action)
+          : null;
+        const displayedA7: Action7 = overrideA7 ?? pipelineA7;
+        const status: WqaStatus = override?.status ?? "Open";
+        const driftReason = override?.drift_reason ?? null;
+        return {
+          row: r,
+          triage: sop,
+          pipelineAction: pipelineA7,
+          overrideAction: overrideA7,
+          displayedAction: displayedA7,
+          status,
+          driftReason,
+        };
+      }),
+    [rows, decisionByUrl],
   );
 
   // Aggregate health-zone counts once.
@@ -225,10 +269,13 @@ export function WqaDataView({
                 <th className="text-left px-2 py-2 font-medium min-w-[110px]">
                   Action
                 </th>
+                <th className="text-left px-2 py-2 font-medium min-w-[110px]">
+                  Status
+                </th>
                 <th className="text-left px-3 py-2 font-medium min-w-[280px]">
                   URL
                 </th>
-                <th className="text-right px-2 py-2 font-medium">Status</th>
+                <th className="text-right px-2 py-2 font-medium">HTTP</th>
                 <th className="text-left px-2 py-2 font-medium">Indexable</th>
                 <th className="text-right px-2 py-2 font-medium">Sessions</th>
                 <th className="text-right px-2 py-2 font-medium">Conv</th>
@@ -246,7 +293,9 @@ export function WqaDataView({
               </tr>
             </thead>
             <tbody>
-              {visible.map(({ row: r, triage }) => {
+              {visible.map((row) => {
+                const r = row.row;
+                const triage = row.triage;
                 const zone = healthZoneOf(r);
                 const tint = ACTION_TINT[triage.action];
                 return (
@@ -269,21 +318,48 @@ export function WqaDataView({
                         title={zoneLabel(zone)}
                       />
                     </td>
-                    <td className="px-2 py-1.5">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${tint.band}`}
-                        title={triage.logic}
-                      >
-                        <span
-                          className={`size-1.5 rounded-full ${tint.dot}`}
-                          aria-hidden
+                    <td
+                      className="px-2 py-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {propertySlug ? (
+                        <WqaActionChip
+                          propertySlug={propertySlug}
+                          url={r.url}
+                          pipelineAction={row.pipelineAction}
+                          overrideAction={row.overrideAction}
                         />
-                        {triage.action}
-                      </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${tint.band}`}
+                          title={triage.logic}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full ${tint.dot}`}
+                            aria-hidden
+                          />
+                          {triage.action}
+                        </span>
+                      )}
                       {triage.tier && (
                         <div className="text-[9px] uppercase tracking-wider text-muted-foreground/80 mt-0.5">
                           {triage.tier}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {propertySlug ? (
+                        <WqaStatusChip
+                          propertySlug={propertySlug}
+                          url={r.url}
+                          value={row.status}
+                          action={row.displayedAction}
+                          driftReason={row.driftReason}
+                        />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">
+                          —
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-1.5 max-w-0">
