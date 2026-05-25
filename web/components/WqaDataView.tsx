@@ -20,10 +20,12 @@ import {
   toAction7,
   type Action7,
   type DecisionRow,
+  type LogicCode,
   type WqaStatus,
 } from "@/lib/wqa-decisions";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import { WqaStatusChip } from "@/components/wqa/WqaStatusChip";
+import { WqaLogicCell } from "@/components/wqa/WqaLogicCell";
 
 type SortKey =
   | "sessions"
@@ -128,6 +130,11 @@ export function WqaDataView({
         const displayedA7: Action7 = overrideA7 ?? pipelineA7;
         const status: WqaStatus = override?.status ?? "Open";
         const driftReason = override?.drift_reason ?? null;
+        // logic_code lives in BQ wqa_output; the Python pipeline (Chunk 5)
+        // populates it. Until then every row reports null and the column
+        // renders "—". When BQ adds the column, read it from r as
+        // (r as WqaRow & { logic_code?: LogicCode | null }).logic_code.
+        const logicCode: LogicCode | null = null;
         return {
           row: r,
           triage: sop,
@@ -136,6 +143,7 @@ export function WqaDataView({
           displayedAction: displayedA7,
           status,
           driftReason,
+          logicCode,
         };
       }),
     [rows, decisionByUrl],
@@ -272,6 +280,9 @@ export function WqaDataView({
                 <th className="text-left px-2 py-2 font-medium min-w-[110px]">
                   Status
                 </th>
+                <th className="text-left px-2 py-2 font-medium min-w-[160px]">
+                  Logic
+                </th>
                 <th className="text-left px-3 py-2 font-medium min-w-[280px]">
                   URL
                 </th>
@@ -361,6 +372,9 @@ export function WqaDataView({
                           —
                         </span>
                       )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <WqaLogicCell code={row.logicCode} />
                     </td>
                     <td className="px-3 py-1.5 max-w-0">
                       <div
