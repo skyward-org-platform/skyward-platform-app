@@ -8,7 +8,8 @@
 // Phase B scope: pure viewer. Sorting + sticky header + URL search. No
 // audit-chip integration — that lands in Phase C when WQA drives triage.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
 import {
   ACTION_TINT,
@@ -16,6 +17,104 @@ import {
   triageRow,
   type TriageAction,
 } from "@/lib/wqa-triage";
+import {
+  ACTION_COLOR,
+  LOGIC_CODE_LABELS,
+  toAction7,
+  type Action7,
+  type DecisionRow,
+  type LogicCode,
+  type WqaStatus,
+} from "@/lib/wqa-decisions";
+import { WqaActionChip } from "@/components/wqa/WqaActionChip";
+import { WqaStatusChip } from "@/components/wqa/WqaStatusChip";
+import { WqaLogicCell } from "@/components/wqa/WqaLogicCell";
+
+const ACTION7_VALUES: Action7[] = [
+  "Optimize",
+  "Restore",
+  "Redirect",
+  "Consolidate",
+  "Remove",
+  "Keep",
+  "Investigate",
+];
+
+const STATUS_VALUES: WqaStatus[] = ["Open", "In Progress", "Done", "Drifted"];
+
+const LOGIC_CODE_VALUES = Object.keys(LOGIC_CODE_LABELS) as LogicCode[];
+
+type OverrideFilter = "pipeline" | "operator";
+
+// Tailwind class fragments per action color token. Mirrors the same
+// palette as WqaActionChip but split into idle / active variants for the
+// chip strip's toggle states.
+const ACTION_CHIP_CLS: Record<
+  Action7,
+  { idle: string; active: string; dot: string }
+> = {
+  Optimize: {
+    idle: "bg-sky-50 text-sky-700 border-sky-200",
+    active: "bg-sky-600 text-white border-sky-600",
+    dot: "bg-sky-500",
+  },
+  Restore: {
+    idle: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    active: "bg-emerald-600 text-white border-emerald-600",
+    dot: "bg-emerald-500",
+  },
+  Redirect: {
+    idle: "bg-amber-50 text-amber-800 border-amber-200",
+    active: "bg-amber-600 text-white border-amber-600",
+    dot: "bg-amber-500",
+  },
+  Consolidate: {
+    idle: "bg-violet-50 text-violet-700 border-violet-200",
+    active: "bg-violet-600 text-white border-violet-600",
+    dot: "bg-violet-500",
+  },
+  Remove: {
+    idle: "bg-rose-50 text-rose-700 border-rose-200",
+    active: "bg-rose-600 text-white border-rose-600",
+    dot: "bg-rose-500",
+  },
+  Keep: {
+    idle: "bg-slate-50 text-slate-700 border-slate-200",
+    active: "bg-slate-700 text-white border-slate-700",
+    dot: "bg-slate-400",
+  },
+  Investigate: {
+    idle: "bg-zinc-50 text-zinc-700 border-zinc-200",
+    active: "bg-zinc-700 text-white border-zinc-700",
+    dot: "bg-zinc-500",
+  },
+};
+
+const STATUS_CHIP_CLS: Record<
+  WqaStatus,
+  { idle: string; active: string }
+> = {
+  Open: {
+    idle: "bg-slate-50 text-slate-700 border-slate-200",
+    active: "bg-slate-700 text-white border-slate-700",
+  },
+  "In Progress": {
+    idle: "bg-indigo-50 text-indigo-800 border-indigo-200",
+    active: "bg-indigo-600 text-white border-indigo-600",
+  },
+  Done: {
+    idle: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    active: "bg-emerald-600 text-white border-emerald-600",
+  },
+  Drifted: {
+    idle: "bg-rose-50 text-rose-700 border-rose-200",
+    active: "bg-rose-600 text-white border-rose-600",
+  },
+};
+
+// Suppress unused-import warning while ACTION_COLOR is referenced only
+// indirectly through the per-token Tailwind tables above.
+void ACTION_COLOR;
 
 type SortKey =
   | "sessions"
@@ -74,6 +173,8 @@ export function WqaDataView({
   dataset,
   message,
   onOpenDrawer,
+  propertySlug,
+  decisions,
 }: {
   rows: WqaRow[];
   summary: WqaSiteSummary | null;
@@ -84,17 +185,156 @@ export function WqaDataView({
   /** Optional — when provided, clicking a URL row opens the URL drawer
    *  at the WqaTabs level. Wired through Body in WqaTabs. */
   onOpenDrawer?: (url: string) => void;
+  /** Required for the inline action / status chips. When omitted the
+   *  table falls back to read-only badges (legacy /api/wqa caller). */
+  propertySlug?: string;
+  decisions?: DecisionRow[];
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("sessions");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [query, setQuery] = useState("");
   const [healthFilter, setHealthFilter] = useState<HealthZone | "all">("all");
-  const [actionFilter, setActionFilter] = useState<TriageAction | "all">("all");
 
-  // Compute triage once + cache against the row object.
+  // URL-persisted multi-select filters (Action / Status / Logic / Override).
+  // Each axis is a comma-separated list in its own search param so the
+  // strip toggle survives navigation + deep-linking. Mirrors the
+  // canonical pattern from web/components/keywords/discovery/UniverseTab.tsx.
+  const router = useRouter();
+  const sp = useSearchParams();
+
+  const selectedActions = useMemo<Set<Action7>>(() => {
+    const raw = sp.get("action");
+    if (!raw) return new Set();
+    return new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is Action7 => ACTION7_VALUES.includes(s as Action7)),
+    );
+  }, [sp]);
+
+  const selectedStatuses = useMemo<Set<WqaStatus>>(() => {
+    const raw = sp.get("status");
+    if (!raw) return new Set();
+    return new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is WqaStatus => STATUS_VALUES.includes(s as WqaStatus)),
+    );
+  }, [sp]);
+
+  const selectedLogic = useMemo<Set<LogicCode>>(() => {
+    const raw = sp.get("logic");
+    if (!raw) return new Set();
+    return new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is LogicCode =>
+          (LOGIC_CODE_VALUES as string[]).includes(s),
+        ),
+    );
+  }, [sp]);
+
+  const selectedOverride = useMemo<Set<OverrideFilter>>(() => {
+    const raw = sp.get("override");
+    if (!raw) return new Set();
+    return new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is OverrideFilter => s === "pipeline" || s === "operator"),
+    );
+  }, [sp]);
+
+  const setParam = useCallback(
+    (key: string, values: string[]) => {
+      const params = new URLSearchParams(sp.toString());
+      if (values.length === 0) params.delete(key);
+      else params.set(key, values.join(","));
+      router.push(`?${params.toString()}`, { scroll: false });
+    },
+    [router, sp],
+  );
+
+  const toggleAction = useCallback(
+    (a: Action7) => {
+      const next = new Set(selectedActions);
+      if (next.has(a)) next.delete(a);
+      else next.add(a);
+      setParam("action", Array.from(next));
+    },
+    [selectedActions, setParam],
+  );
+
+  const toggleStatus = useCallback(
+    (s: WqaStatus) => {
+      const next = new Set(selectedStatuses);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      setParam("status", Array.from(next));
+    },
+    [selectedStatuses, setParam],
+  );
+
+  const toggleOverride = useCallback(
+    (v: OverrideFilter) => {
+      const next = new Set(selectedOverride);
+      if (next.has(v)) next.delete(v);
+      else next.add(v);
+      setParam("override", Array.from(next));
+    },
+    [selectedOverride, setParam],
+  );
+
+  const setLogic = useCallback(
+    (values: LogicCode[]) => {
+      setParam("logic", values);
+    },
+    [setParam],
+  );
+
+  // Build url → wqa_decision map so the chips can render override action
+  // / status / drift without a second round-trip.
+  const decisionByUrl = useMemo(() => {
+    const m = new Map<string, DecisionRow>();
+    for (const d of decisions ?? []) m.set(d.url, d);
+    return m;
+  }, [decisions]);
+
+  // Compute triage once + cache against the row object. We also derive
+  // the displayed Action7 (operator override if present, otherwise the
+  // SOP-derived action mapped to Action7).
   const triaged = useMemo(
-    () => rows.map((r) => ({ row: r, triage: triageRow(r) })),
-    [rows],
+    () =>
+      rows.map((r) => {
+        const sop = triageRow(r);
+        const override = decisionByUrl.get(r.url);
+        const pipelineA7: Action7 = toAction7(sop.action);
+        const overrideA7: Action7 | null = override
+          ? toAction7(override.action)
+          : null;
+        const displayedA7: Action7 = overrideA7 ?? pipelineA7;
+        const status: WqaStatus = override?.status ?? "Open";
+        const driftReason = override?.drift_reason ?? null;
+        // logic_code lives in BQ wqa_output; the Python pipeline (Chunk 5)
+        // populates it. Until then every row reports null and the column
+        // renders "—". When BQ adds the column, read it from r as
+        // (r as WqaRow & { logic_code?: LogicCode | null }).logic_code.
+        const logicCode: LogicCode | null = null;
+        return {
+          row: r,
+          triage: sop,
+          pipelineAction: pipelineA7,
+          overrideAction: overrideA7,
+          displayedAction: displayedA7,
+          status,
+          driftReason,
+          logicCode,
+        };
+      }),
+    [rows, decisionByUrl],
   );
 
   // Aggregate health-zone counts once.
@@ -109,7 +349,8 @@ export function WqaDataView({
     return counts;
   }, [rows]);
 
-  // Aggregate action counts.
+  // Aggregate legacy (10-value) action counts — used by the existing
+  // Triage Funnel band which still groups by SOP-derived TriageAction.
   const actionCounts = useMemo(() => {
     const counts: Record<TriageAction, number> = {
       Optimize: 0,
@@ -127,12 +368,68 @@ export function WqaDataView({
     return counts;
   }, [triaged]);
 
+  // Action7 counts for the filter chip strip. These count the displayed
+  // action (override-aware) so the strip reflects what the table shows.
+  const action7Counts = useMemo(() => {
+    const c: Record<Action7, number> = {
+      Optimize: 0,
+      Restore: 0,
+      Redirect: 0,
+      Consolidate: 0,
+      Remove: 0,
+      Keep: 0,
+      Investigate: 0,
+    };
+    for (const row of triaged) c[row.displayedAction] += 1;
+    return c;
+  }, [triaged]);
+
+  const statusCounts = useMemo(() => {
+    const c: Record<WqaStatus, number> = {
+      Open: 0,
+      "In Progress": 0,
+      Done: 0,
+      Drifted: 0,
+    };
+    for (const row of triaged) c[row.status] += 1;
+    return c;
+  }, [triaged]);
+
+  const overrideCounts = useMemo(() => {
+    let pipeline = 0;
+    let operator = 0;
+    for (const row of triaged) {
+      if (row.overrideAction === null) pipeline += 1;
+      else operator += 1;
+    }
+    return { pipeline, operator };
+  }, [triaged]);
+
   // Filter + sort.
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = triaged.filter(({ row: r, triage }) => {
-      if (actionFilter !== "all" && triage.action !== actionFilter) return false;
-      if (healthFilter !== "all" && healthZoneOf(r) !== healthFilter) return false;
+    const filtered = triaged.filter((row) => {
+      const r = row.row;
+      const triage = row.triage;
+      if (
+        selectedActions.size > 0 &&
+        !selectedActions.has(row.displayedAction)
+      )
+        return false;
+      if (selectedStatuses.size > 0 && !selectedStatuses.has(row.status))
+        return false;
+      if (
+        selectedLogic.size > 0 &&
+        (row.logicCode === null || !selectedLogic.has(row.logicCode))
+      )
+        return false;
+      if (selectedOverride.size > 0) {
+        const bucket: OverrideFilter =
+          row.overrideAction === null ? "pipeline" : "operator";
+        if (!selectedOverride.has(bucket)) return false;
+      }
+      if (healthFilter !== "all" && healthZoneOf(r) !== healthFilter)
+        return false;
       if (!q) return true;
       return (
         (r.url ?? "").toLowerCase().includes(q) ||
@@ -150,7 +447,17 @@ export function WqaDataView({
       if (bv === null) return -1;
       return sortDir === "desc" ? bv - av : av - bv;
     });
-  }, [triaged, sortKey, sortDir, query, healthFilter, actionFilter]);
+  }, [
+    triaged,
+    sortKey,
+    sortDir,
+    query,
+    healthFilter,
+    selectedActions,
+    selectedStatuses,
+    selectedLogic,
+    selectedOverride,
+  ]);
 
   if (rows.length === 0) {
     return <EmptyState dataset={dataset} message={message} />;
@@ -174,11 +481,24 @@ export function WqaDataView({
         />
       )}
 
-      {/* Action funnel from SOP v5 decision tree. Click-to-filter. */}
-      <ActionFunnel
-        counts={actionCounts}
-        active={actionFilter}
-        onPick={(a) => setActionFilter((curr) => (curr === a ? "all" : a))}
+      {/* Action funnel from SOP v5 decision tree. Read-only summary band
+       *  — the actual filter mechanism is the chip strip below. */}
+      <ActionFunnel counts={actionCounts} />
+
+      {/* Filter chip strip — Action / Status / Logic / Override. URL-
+       *  persisted via ?action=, ?status=, ?logic=, ?override=. */}
+      <FilterChipStrip
+        actionCounts={action7Counts}
+        statusCounts={statusCounts}
+        overrideCounts={overrideCounts}
+        selectedActions={selectedActions}
+        selectedStatuses={selectedStatuses}
+        selectedLogic={selectedLogic}
+        selectedOverride={selectedOverride}
+        toggleAction={toggleAction}
+        toggleStatus={toggleStatus}
+        toggleOverride={toggleOverride}
+        setLogic={setLogic}
       />
 
       {/* Sort + search controls */}
@@ -225,10 +545,16 @@ export function WqaDataView({
                 <th className="text-left px-2 py-2 font-medium min-w-[110px]">
                   Action
                 </th>
+                <th className="text-left px-2 py-2 font-medium min-w-[110px]">
+                  Status
+                </th>
+                <th className="text-left px-2 py-2 font-medium min-w-[160px]">
+                  Logic
+                </th>
                 <th className="text-left px-3 py-2 font-medium min-w-[280px]">
                   URL
                 </th>
-                <th className="text-right px-2 py-2 font-medium">Status</th>
+                <th className="text-right px-2 py-2 font-medium">HTTP</th>
                 <th className="text-left px-2 py-2 font-medium">Indexable</th>
                 <th className="text-right px-2 py-2 font-medium">Sessions</th>
                 <th className="text-right px-2 py-2 font-medium">Conv</th>
@@ -246,7 +572,9 @@ export function WqaDataView({
               </tr>
             </thead>
             <tbody>
-              {visible.map(({ row: r, triage }) => {
+              {visible.map((row) => {
+                const r = row.row;
+                const triage = row.triage;
                 const zone = healthZoneOf(r);
                 const tint = ACTION_TINT[triage.action];
                 return (
@@ -269,22 +597,52 @@ export function WqaDataView({
                         title={zoneLabel(zone)}
                       />
                     </td>
-                    <td className="px-2 py-1.5">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${tint.band}`}
-                        title={triage.logic}
-                      >
-                        <span
-                          className={`size-1.5 rounded-full ${tint.dot}`}
-                          aria-hidden
+                    <td
+                      className="px-2 py-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {propertySlug ? (
+                        <WqaActionChip
+                          propertySlug={propertySlug}
+                          url={r.url}
+                          pipelineAction={row.pipelineAction}
+                          overrideAction={row.overrideAction}
                         />
-                        {triage.action}
-                      </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${tint.band}`}
+                          title={triage.logic}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full ${tint.dot}`}
+                            aria-hidden
+                          />
+                          {triage.action}
+                        </span>
+                      )}
                       {triage.tier && (
                         <div className="text-[9px] uppercase tracking-wider text-muted-foreground/80 mt-0.5">
                           {triage.tier}
                         </div>
                       )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {propertySlug ? (
+                        <WqaStatusChip
+                          propertySlug={propertySlug}
+                          url={r.url}
+                          value={row.status}
+                          action={row.displayedAction}
+                          driftReason={row.driftReason}
+                        />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">
+                          —
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <WqaLogicCell code={row.logicCode} />
                     </td>
                     <td className="px-3 py-1.5 max-w-0">
                       <div
@@ -378,12 +736,8 @@ export function WqaDataView({
 
 function ActionFunnel({
   counts,
-  active,
-  onPick,
 }: {
   counts: Record<TriageAction, number>;
-  active: TriageAction | "all";
-  onPick: (a: TriageAction) => void;
 }) {
   const total = TRIAGE_ACTIONS.reduce((s, a) => s + counts[a], 0);
   if (total === 0) return null;
@@ -392,23 +746,16 @@ function ActionFunnel({
       <header className="px-5 py-2 border-b text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-2">
         WQA triage funnel
         <span className="text-muted-foreground/70 normal-case tracking-normal">
-          · auto-applied from SOP v5 § 5.2
+          · auto-applied from SOP v5 § 5.2 · use the chip strip below to filter
         </span>
       </header>
       <div className="px-5 py-2.5 grid grid-cols-2 sm:grid-cols-5 gap-2">
         {TRIAGE_ACTIONS.filter((a) => counts[a] > 0).map((a) => {
           const tint = ACTION_TINT[a];
-          const isActive = active === a;
           return (
-            <button
+            <div
               key={a}
-              type="button"
-              onClick={() => onPick(a)}
-              className={`text-left border rounded-md px-2.5 py-1.5 transition-colors ${
-                isActive
-                  ? "bg-foreground text-background border-foreground"
-                  : `${tint.band} border-transparent hover:border-foreground/30`
-              }`}
+              className={`text-left border rounded-md px-2.5 py-1.5 ${tint.band} border-transparent`}
             >
               <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold">
                 <span className={`size-1.5 rounded-full ${tint.dot}`} />
@@ -417,11 +764,252 @@ function ActionFunnel({
               <div className="text-[18px] font-semibold tracking-tight tabular-nums leading-none mt-1">
                 {counts[a].toLocaleString()}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+// ─── FilterChipStrip ──────────────────────────────────────────────────────
+// Four-row chip strip above the data table. Mirrors the canonical
+// UniverseTab pattern: per-axis multi-select OR, click to toggle, count
+// badge inline, URL-persisted via the parent's setParam callback.
+function FilterChipStrip({
+  actionCounts,
+  statusCounts,
+  overrideCounts,
+  selectedActions,
+  selectedStatuses,
+  selectedLogic,
+  selectedOverride,
+  toggleAction,
+  toggleStatus,
+  toggleOverride,
+  setLogic,
+}: {
+  actionCounts: Record<Action7, number>;
+  statusCounts: Record<WqaStatus, number>;
+  overrideCounts: { pipeline: number; operator: number };
+  selectedActions: Set<Action7>;
+  selectedStatuses: Set<WqaStatus>;
+  selectedLogic: Set<LogicCode>;
+  selectedOverride: Set<OverrideFilter>;
+  toggleAction: (a: Action7) => void;
+  toggleStatus: (s: WqaStatus) => void;
+  toggleOverride: (v: OverrideFilter) => void;
+  setLogic: (values: LogicCode[]) => void;
+}) {
+  return (
+    <section className="mt-4 mb-4 border rounded-lg bg-card overflow-hidden">
+      <header className="px-4 py-2 border-b text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-2">
+        Filter
+        <span className="text-muted-foreground/70 normal-case tracking-normal">
+          · click chips to narrow the table; multi-select OR per axis
+        </span>
+      </header>
+      <div className="px-4 py-3 space-y-2 text-[11px]">
+        {/* Action row */}
+        <ChipRow label="Action">
+          {ACTION7_VALUES.map((a) => {
+            const cls = ACTION_CHIP_CLS[a];
+            const active = selectedActions.has(a);
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() => toggleAction(a)}
+                className={
+                  "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors " +
+                  (active ? cls.active : cls.idle)
+                }
+              >
+                <span className={`size-1.5 rounded-full ${cls.dot}`} />
+                <span>{a}</span>
+                <span className="tabular-nums opacity-80 font-normal normal-case tracking-normal">
+                  {(actionCounts[a] ?? 0).toLocaleString()}
+                </span>
+              </button>
+            );
+          })}
+        </ChipRow>
+
+        {/* Status row */}
+        <ChipRow label="Status">
+          {STATUS_VALUES.map((s) => {
+            const cls = STATUS_CHIP_CLS[s];
+            const active = selectedStatuses.has(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggleStatus(s)}
+                className={
+                  "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors " +
+                  (active ? cls.active : cls.idle)
+                }
+              >
+                <span>{s}</span>
+                <span className="tabular-nums opacity-80 font-normal normal-case tracking-normal">
+                  {(statusCounts[s] ?? 0).toLocaleString()}
+                </span>
+              </button>
+            );
+          })}
+        </ChipRow>
+
+        {/* Logic row */}
+        <ChipRow label="Logic">
+          <LogicMultiSelect selected={selectedLogic} onChange={setLogic} />
+        </ChipRow>
+
+        {/* Override row */}
+        <ChipRow label="Override">
+          <OverrideChip
+            value="pipeline"
+            label="Pipeline-only"
+            count={overrideCounts.pipeline}
+            active={selectedOverride.has("pipeline")}
+            onToggle={() => toggleOverride("pipeline")}
+          />
+          <OverrideChip
+            value="operator"
+            label="Operator overrode"
+            count={overrideCounts.operator}
+            active={selectedOverride.has("operator")}
+            onToggle={() => toggleOverride("operator")}
+          />
+        </ChipRow>
+      </div>
+    </section>
+  );
+}
+
+function ChipRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline gap-2 flex-wrap">
+      <span className="w-16 shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5 flex-wrap">{children}</div>
+    </div>
+  );
+}
+
+function OverrideChip({
+  label,
+  count,
+  active,
+  onToggle,
+}: {
+  value: OverrideFilter;
+  label: string;
+  count: number;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const cls = active
+    ? "bg-foreground text-background border-foreground"
+    : "bg-muted/30 text-foreground border-muted hover:border-foreground/30";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={
+        "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors " +
+        cls
+      }
+    >
+      <span>{label}</span>
+      <span className="tabular-nums opacity-80 font-normal normal-case tracking-normal">
+        {count.toLocaleString()}
+      </span>
+    </button>
+  );
+}
+
+function LogicMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: Set<LogicCode>;
+  onChange: (values: LogicCode[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const summary =
+    selected.size === 0
+      ? "All logic codes"
+      : selected.size === 1
+        ? Array.from(selected)[0]
+        : `${selected.size} selected`;
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={
+          "inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border transition-colors " +
+          (selected.size > 0
+            ? "bg-foreground text-background border-foreground"
+            : "bg-muted/30 text-foreground border-muted hover:border-foreground/30")
+        }
+      >
+        <span className="font-mono">{summary}</span>
+        <span aria-hidden>▾</span>
+      </button>
+      {selected.size > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className="ml-1 text-[10px] text-muted-foreground hover:text-foreground underline"
+        >
+          clear
+        </button>
+      )}
+      {open && (
+        <div
+          className="absolute z-20 mt-1 max-h-[320px] overflow-y-auto bg-card border rounded-md shadow-lg p-1.5 min-w-[280px]"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {LOGIC_CODE_VALUES.map((code) => {
+            const checked = selected.has(code);
+            return (
+              <label
+                key={code}
+                className="flex items-start gap-2 text-[11px] px-2 py-1 rounded hover:bg-muted/50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    const next = new Set(selected);
+                    if (checked) next.delete(code);
+                    else next.add(code);
+                    onChange(Array.from(next));
+                  }}
+                  className="mt-0.5"
+                />
+                <div>
+                  <div className="font-mono text-[10.5px] text-foreground">
+                    {code}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground leading-snug">
+                    {LOGIC_CODE_LABELS[code]}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

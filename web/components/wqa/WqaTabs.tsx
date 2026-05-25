@@ -17,14 +17,12 @@ import { RedirectTab } from "@/components/wqa/RedirectTab";
 import { RestoreTab } from "@/components/wqa/RestoreTab";
 import { ConsolidateTab } from "@/components/wqa/ConsolidateTab";
 import { RemoveTab } from "@/components/wqa/RemoveTab";
-import {
-  EvaluateTab,
-  InvestigateTab,
-} from "@/components/wqa/HumanReviewTabs";
+import { InvestigateTab } from "@/components/wqa/HumanReviewTabs";
 import { CanonicalAuditTab } from "@/components/wqa/CanonicalAuditTab";
 import { ActionLegendTab } from "@/components/wqa/ActionLegendTab";
 import { UrlDrawer } from "@/components/UrlDrawer";
 import { ACTION_TINT, triageRow, type TriageAction } from "@/lib/wqa-triage";
+import { toAction7, type Action7 } from "@/lib/wqa-decisions";
 import { buildCtx } from "@/lib/wqa-checks";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
 import type { TriagedRow } from "@/components/wqa/types";
@@ -43,20 +41,29 @@ type SubTab =
   | "redirect"
   | "consolidate"
   | "remove"
-  | "evaluate"
   | "investigate"
   | "canonical-audit"
   | "action-legend";
 
-const TAB_TO_ACTION: Partial<Record<SubTab, TriageAction>> = {
+// Per-tab Action7 filter. Investigate is the consolidated bucket that
+// catches both pipeline-emitted Investigate rows AND legacy Evaluate
+// rows (toAction7 collapses them). Keep / non-addressable / non-indexable
+// have no dedicated tab — those rows surface only in the All URLs view.
+const TAB_TO_ACTION: Partial<Record<SubTab, Action7>> = {
   optimize: "Optimize",
   restore: "Restore",
   redirect: "Redirect",
   consolidate: "Consolidate",
   remove: "Remove",
-  evaluate: "Evaluate",
   investigate: "Investigate",
 };
+
+// Compute the displayed Action7 for a triaged row (override-aware,
+// legacy-collapsing). Used both for the tab counts and for filtering
+// each per-action tab's rows.
+function displayedAction7(r: TriagedRow): Action7 {
+  return toAction7(r.triage.action);
+}
 
 export function WqaTabs({
   propertySlug,
@@ -87,7 +94,10 @@ export function WqaTabs({
 }) {
   const router = useRouter();
   const sp = useSearchParams();
-  const view = (sp.get("action") || "overview") as SubTab;
+  // ?action=evaluate is a legacy URL alias — collapse it onto the
+  // consolidated Investigate tab so old deep-links keep working.
+  const rawView = sp.get("action") || "overview";
+  const view = (rawView === "evaluate" ? "investigate" : rawView) as SubTab;
   const [drawerUrl, setDrawerUrl] = useState<string | null>(null);
 
   // Build url → override map so triage can layer overrides on top of the
@@ -120,10 +130,16 @@ export function WqaTabs({
     [rows, decisionByUrl],
   );
 
+  // Action7-bucket counts power the per-action tab badges. Built on the
+  // displayed (override-aware, legacy-collapsed) action so a row whose
+  // SOP-derived "Evaluate" becomes "Investigate" is counted under
+  // Investigate, not its legacy bucket.
   const counts = useMemo(() => {
-    const c = new Map<TriageAction, number>();
-    for (const r of triaged)
-      c.set(r.triage.action, (c.get(r.triage.action) ?? 0) + 1);
+    const c = new Map<Action7, number>();
+    for (const r of triaged) {
+      const a = displayedAction7(r);
+      c.set(a, (c.get(a) ?? 0) + 1);
+    }
     return c;
   }, [triaged]);
 
@@ -203,12 +219,18 @@ export function WqaTabs({
         <TabButton active={view === "overview"} onClick={() => setView("overview")}>
           Overview
         </TabButton>
-        {(["optimize", "restore", "redirect", "consolidate", "remove", "evaluate", "investigate"] as SubTab[]).map(
+        {(["optimize", "restore", "redirect", "consolidate", "remove", "investigate"] as SubTab[]).map(
           (key) => {
             const action = TAB_TO_ACTION[key];
             const count = action ? counts.get(action) ?? 0 : 0;
             if (count === 0) return null;
-            const tint = action ? ACTION_TINT[action] : undefined;
+            // ACTION_TINT still keys off the legacy TriageAction enum;
+            // since every Action7 value (except "Keep") also exists in
+            // TriageAction the lookup remains valid.
+            const tint =
+              action && action in ACTION_TINT
+                ? ACTION_TINT[action as TriageAction]
+                : undefined;
             return (
               <TabButton
                 key={key}
@@ -257,22 +279,48 @@ export function WqaTabs({
         dataset={dataset}
         message={message}
         execByUrl={execByUrl}
+        decisions={decisions}
         onOpenDrawer={(url) => setDrawerUrl(url)}
       />
 
       <UrlDrawer
         subject={
           drawerUrl && drawerTriaged
-            ? {
-                kind: "url",
-                row: drawerTriaged.row,
-                currentAction: drawerTriaged.triage.action,
-                category: drawerTriaged.row.type ?? "Other",
-                execution: execByUrl.get(drawerUrl) ?? null,
-                checkStatesForUrl:
-                  checkStatesByUrl.get(drawerUrl) ?? new Map(),
-                ctx,
-              }
+            ? (() => {
+                const decision = decisionByUrl.get(drawerUrl) ?? null;
+                const sopAction = drawerTriaged.triage.sopAction
+                  ?? drawerTriaged.triage.action;
+                const pipelineAction = toAction7(sopAction);
+                const overrideAction = drawerTriaged.triage.isOverridden
+                  ? toAction7(drawerTriaged.triage.action)
+                  : null;
+                const displayedAction = overrideAction ?? pipelineAction;
+                return {
+                  kind: "url" as const,
+                  row: drawerTriaged.row,
+                  currentAction: drawerTriaged.triage.action,
+                  category: drawerTriaged.row.type ?? "Other",
+                  execution: execByUrl.get(drawerUrl) ?? null,
+                  checkStatesForUrl:
+                    checkStatesByUrl.get(drawerUrl) ?? new Map(),
+                  ctx,
+                  pipelineAction,
+                  overrideAction,
+                  displayedAction,
+                  // logic_code lives on BQ wqa_output (Chunk 5 will surface it);
+                  // not yet plumbed through DecisionRow.
+                  logicCode: null,
+                  logicNotes: decision?.logic_notes ?? null,
+                  targetUrl: decision?.target_url ?? null,
+                  // pipelineTargetUrl: pipeline doesn't emit a suggested
+                  // destination yet — TODO once the BQ schema adds it.
+                  pipelineTargetUrl: null,
+                  lastImplementationCheckAt:
+                    decision?.last_implementation_check_at ?? null,
+                  status: decision?.status ?? "Open",
+                  driftReason: decision?.drift_reason ?? null,
+                };
+              })()
             : null
         }
         onClose={() => setDrawerUrl(null)}
@@ -295,6 +343,7 @@ function Body({
   dataset,
   message,
   execByUrl,
+  decisions,
   onOpenDrawer,
 }: {
   view: SubTab;
@@ -307,6 +356,7 @@ function Body({
   dataset: string;
   message?: string;
   execByUrl: Map<string, PageExecutionRow>;
+  decisions: DecisionRow[];
   onOpenDrawer: (url: string) => void;
 }) {
   if (view === "overview") {
@@ -349,12 +399,17 @@ function Body({
         dataset={dataset}
         message={message}
         onOpenDrawer={onOpenDrawer}
+        propertySlug={propertySlug}
+        decisions={decisions}
       />
     );
   }
   const action = TAB_TO_ACTION[view];
   if (!action) return null;
-  const rows = triaged.filter((r) => r.triage.action === action);
+  // Filter on the Action7-mapped action so legacy "Evaluate" rows roll
+  // up into the Investigate tab, and legacy "Leave as 404" / "Non-*"
+  // rows wouldn't accidentally appear under any per-action tab.
+  const rows = triaged.filter((r) => displayedAction7(r) === action);
   const props = { rows, all: triaged, propertySlug, onOpenDrawer, execByUrl };
   switch (action) {
     case "Optimize":
@@ -367,8 +422,6 @@ function Body({
       return <ConsolidateTab {...props} />;
     case "Remove":
       return <RemoveTab {...props} />;
-    case "Evaluate":
-      return <EvaluateTab {...props} />;
     case "Investigate":
       return <InvestigateTab {...props} />;
     default:
