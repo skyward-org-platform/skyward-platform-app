@@ -9,7 +9,6 @@
 // audit-chip integration — that lands in Phase C when WQA drives triage.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
 import {
   ACTION_TINT,
@@ -197,105 +196,63 @@ export function WqaDataView({
   const [pageSize, setPageSize] = useState<50 | 100 | 250>(100);
   const [page, setPage] = useState(0);
 
-  // URL-persisted multi-select filters (Action / Status / Logic / Override).
-  // Each axis is a comma-separated list in its own search param so the
-  // strip toggle survives navigation + deep-linking. Mirrors the
-  // canonical pattern from web/components/keywords/discovery/UniverseTab.tsx.
-  const router = useRouter();
-  const sp = useSearchParams();
-
-  const selectedActions = useMemo<Set<Action7>>(() => {
-    const raw = sp.get("action");
-    if (!raw) return new Set();
-    return new Set(
-      raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s): s is Action7 => ACTION7_VALUES.includes(s as Action7)),
-    );
-  }, [sp]);
-
-  const selectedStatuses = useMemo<Set<WqaStatus>>(() => {
-    const raw = sp.get("status");
-    if (!raw) return new Set();
-    return new Set(
-      raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s): s is WqaStatus => STATUS_VALUES.includes(s as WqaStatus)),
-    );
-  }, [sp]);
-
-  const selectedLogic = useMemo<Set<LogicCode>>(() => {
-    const raw = sp.get("logic");
-    if (!raw) return new Set();
-    return new Set(
-      raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s): s is LogicCode =>
-          (LOGIC_CODE_VALUES as string[]).includes(s),
-        ),
-    );
-  }, [sp]);
-
-  const selectedOverride = useMemo<Set<OverrideFilter>>(() => {
-    const raw = sp.get("override");
-    if (!raw) return new Set();
-    return new Set(
-      raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s): s is OverrideFilter => s === "pipeline" || s === "operator"),
-    );
-  }, [sp]);
-
-  const setParam = useCallback(
-    (key: string, values: string[]) => {
-      const params = new URLSearchParams(sp.toString());
-      if (values.length === 0) params.delete(key);
-      else params.set(key, values.join(","));
-      router.push(`?${params.toString()}`, { scroll: false });
-    },
-    [router, sp],
+  // Multi-select filter state lives in local React state. Previously these
+  // were URL search params, but router.push("?...") in Next.js 16 App Router
+  // is treated as navigation - which kicks loading.tsx in and visually
+  // blanks the page on every chip click. Local state keeps interaction
+  // instant; deep-linking can be re-added later via history.replaceState
+  // (no nav side-effects).
+  const [selectedActions, setSelectedActions] = useState<Set<Action7>>(
+    () => new Set(),
+  );
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<WqaStatus>>(
+    () => new Set(),
+  );
+  const [selectedLogic, setSelectedLogicState] = useState<Set<LogicCode>>(
+    () => new Set(),
+  );
+  const [selectedOverride, setSelectedOverride] = useState<Set<OverrideFilter>>(
+    () => new Set(),
   );
 
-  const toggleAction = useCallback(
-    (a: Action7) => {
-      const next = new Set(selectedActions);
+  const toggleAction = useCallback((a: Action7) => {
+    setSelectedActions((prev) => {
+      const next = new Set(prev);
       if (next.has(a)) next.delete(a);
       else next.add(a);
-      setParam("action", Array.from(next));
-    },
-    [selectedActions, setParam],
-  );
+      return next;
+    });
+  }, []);
 
-  const toggleStatus = useCallback(
-    (s: WqaStatus) => {
-      const next = new Set(selectedStatuses);
+  const toggleStatus = useCallback((s: WqaStatus) => {
+    setSelectedStatuses((prev) => {
+      const next = new Set(prev);
       if (next.has(s)) next.delete(s);
       else next.add(s);
-      setParam("status", Array.from(next));
-    },
-    [selectedStatuses, setParam],
-  );
+      return next;
+    });
+  }, []);
 
-  const toggleOverride = useCallback(
-    (v: OverrideFilter) => {
-      const next = new Set(selectedOverride);
+  const toggleOverride = useCallback((v: OverrideFilter) => {
+    setSelectedOverride((prev) => {
+      const next = new Set(prev);
       if (next.has(v)) next.delete(v);
       else next.add(v);
-      setParam("override", Array.from(next));
-    },
-    [selectedOverride, setParam],
-  );
+      return next;
+    });
+  }, []);
 
-  const setLogic = useCallback(
-    (values: LogicCode[]) => {
-      setParam("logic", values);
-    },
-    [setParam],
-  );
+  const setLogic = useCallback((values: LogicCode[]) => {
+    setSelectedLogicState(new Set(values));
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setSelectedActions(new Set());
+    setSelectedStatuses(new Set());
+    setSelectedLogicState(new Set());
+    setSelectedOverride(new Set());
+    setHealthFilter("all");
+  }, []);
 
   // Build url → wqa_decision map so the chips can render override action
   // / status / drift without a second round-trip.
@@ -507,46 +464,91 @@ export function WqaDataView({
         />
       )}
 
-      {/* WQA Triage Funnel band removed (V1 post-P2). It duplicated the
-       *  filter chip strip's counts using the legacy 10-value enum, which
-       *  confused readers and created two parallel taxonomies on screen.
-       *  The chip strip below carries the same counts in Action7 form +
-       *  is interactive. */}
-
-      {/* Filter chip strip — Action / Status / Logic / Override. URL-
-       *  persisted via ?action=, ?status=, ?logic=, ?override=. */}
-      <FilterChipStrip
-        actionCounts={action7Counts}
-        statusCounts={statusCounts}
-        overrideCounts={overrideCounts}
-        selectedActions={selectedActions}
-        selectedStatuses={selectedStatuses}
-        selectedLogic={selectedLogic}
-        selectedOverride={selectedOverride}
-        toggleAction={toggleAction}
-        toggleStatus={toggleStatus}
-        toggleOverride={toggleOverride}
-        setLogic={setLogic}
-      />
-
-      {/* Sort + search controls */}
+      {/* Unified compact toolbar — replaces the legacy 4-row FilterChipStrip
+       *  + separate sort/search header. Mirrors the image #38 reference:
+       *  search + per-axis filter dropdowns + sort + Add filters + Columns
+       *  buttons + count indicator, all on one row (wraps on narrow). The
+       *  ActiveFilterStrip below shows current selections with × buttons. */}
       <div className="border rounded-lg bg-card mt-4 overflow-hidden">
-        <header className="px-4 py-2.5 border-b flex items-center gap-3 flex-wrap text-[11px]">
+        <header className="px-4 py-2.5 border-b flex items-center gap-2 flex-wrap text-[11px]">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search URL, title, keyword…"
-            className="flex-1 min-w-[200px] text-[12px] px-2.5 py-1 border rounded-md bg-card outline-none focus:border-foreground/40 placeholder:text-muted-foreground"
+            className="flex-1 min-w-[180px] text-[12px] px-2.5 py-1 border rounded-md bg-card outline-none focus:border-foreground/40 placeholder:text-muted-foreground"
           />
-          <span className="text-muted-foreground">Sort by:</span>
+          <FilterDropdown
+            label="Action"
+            options={ACTION7_VALUES.map((a) => ({
+              value: a,
+              label: a,
+              count: action7Counts[a],
+              dotClass: ACTION_CHIP_CLS[a].dot,
+            }))}
+            selected={selectedActions as Set<string>}
+            onToggle={(v) => toggleAction(v as Action7)}
+            onClear={() => setSelectedActions(new Set())}
+          />
+          <FilterDropdown
+            label="Status"
+            options={STATUS_VALUES.map((s) => ({
+              value: s,
+              label: s,
+              count: statusCounts[s],
+            }))}
+            selected={selectedStatuses as Set<string>}
+            onToggle={(v) => toggleStatus(v as WqaStatus)}
+            onClear={() => setSelectedStatuses(new Set())}
+          />
+          <FilterDropdown
+            label="Logic"
+            options={LOGIC_CODE_VALUES.map((c) => ({
+              value: c,
+              label: c,
+              sublabel: LOGIC_CODE_LABELS[c],
+              mono: true,
+            }))}
+            selected={selectedLogic as Set<string>}
+            onToggle={(v) => {
+              const next = new Set(selectedLogic);
+              const code = v as LogicCode;
+              if (next.has(code)) next.delete(code);
+              else next.add(code);
+              setSelectedLogicState(next);
+            }}
+            onClear={() => setSelectedLogicState(new Set())}
+          />
+          <FilterDropdown
+            label="Override"
+            options={[
+              {
+                value: "pipeline",
+                label: "Pipeline only",
+                count: overrideCounts.pipeline,
+              },
+              {
+                value: "operator",
+                label: "Operator overrode",
+                count: overrideCounts.operator,
+              },
+            ]}
+            selected={selectedOverride as Set<string>}
+            onToggle={(v) => toggleOverride(v as OverrideFilter)}
+            onClear={() => setSelectedOverride(new Set())}
+          />
+
+          {/* Visual separator */}
+          <span className="w-px h-5 bg-border mx-0.5" aria-hidden />
+
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
             className="text-[11px] px-2 py-1 border rounded-md bg-card outline-none cursor-pointer"
+            title="Sort by"
           >
             {Object.entries(SORT_LABEL).map(([k, v]) => (
               <option key={k} value={k}>
-                {v}
+                Sort: {v}
               </option>
             ))}
           </select>
@@ -558,12 +560,35 @@ export function WqaDataView({
             className="text-[11px] px-2 py-1 border rounded-md hover:bg-muted"
             title="Toggle sort direction"
           >
-            {sortDir === "desc" ? "↓ desc" : "↑ asc"}
+            {sortDir === "desc" ? "↓" : "↑"}
           </button>
-          <span className="ml-auto text-muted-foreground tabular-nums">
-            {visible.length} of {rows.length} rows
+
+          <span className="ml-auto flex items-center gap-2">
+            <AddFiltersStub />
+            <ColumnsStub />
+            <span className="text-muted-foreground tabular-nums">
+              {visible.length.toLocaleString()} URLs
+            </span>
           </span>
         </header>
+
+        <ActiveFilterStrip
+          selectedActions={selectedActions}
+          selectedStatuses={selectedStatuses}
+          selectedLogic={selectedLogic}
+          selectedOverride={selectedOverride}
+          healthFilter={healthFilter}
+          onRemoveAction={(a) => toggleAction(a)}
+          onRemoveStatus={(s) => toggleStatus(s)}
+          onRemoveLogic={(c) => {
+            const next = new Set(selectedLogic);
+            next.delete(c);
+            setSelectedLogicState(next);
+          }}
+          onRemoveOverride={(v) => toggleOverride(v)}
+          onRemoveHealth={() => setHealthFilter("all")}
+          onClearAll={clearAllFilters}
+        />
 
         <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
           <table className="w-full text-[11.5px]">
@@ -840,221 +865,40 @@ export function WqaDataView({
   );
 }
 
-function ActionFunnel({
-  counts,
-}: {
-  counts: Record<TriageAction, number>;
-}) {
-  const total = TRIAGE_ACTIONS.reduce((s, a) => s + counts[a], 0);
-  if (total === 0) return null;
-  return (
-    <section className="border rounded-lg bg-card overflow-hidden mt-4">
-      <header className="px-5 py-2 border-b text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-2">
-        WQA triage funnel
-        <span className="text-muted-foreground/70 normal-case tracking-normal">
-          · auto-applied from SOP v5 § 5.2 · use the chip strip below to filter
-        </span>
-      </header>
-      <div className="px-5 py-2.5 grid grid-cols-2 sm:grid-cols-5 gap-2">
-        {TRIAGE_ACTIONS.filter((a) => counts[a] > 0).map((a) => {
-          const tint = ACTION_TINT[a];
-          return (
-            <div
-              key={a}
-              className={`text-left border rounded-md px-2.5 py-1.5 ${tint.band} border-transparent`}
-            >
-              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold">
-                <span className={`size-1.5 rounded-full ${tint.dot}`} />
-                {a}
-              </div>
-              <div className="text-[18px] font-semibold tracking-tight tabular-nums leading-none mt-1">
-                {counts[a].toLocaleString()}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+// ─── Compact toolbar primitives (image #38 pattern) ───────────────────────
 
-// ─── FilterChipStrip ──────────────────────────────────────────────────────
-// Four-row chip strip above the data table. Mirrors the canonical
-// UniverseTab pattern: per-axis multi-select OR, click to toggle, count
-// badge inline, URL-persisted via the parent's setParam callback.
-function FilterChipStrip({
-  actionCounts,
-  statusCounts,
-  overrideCounts,
-  selectedActions,
-  selectedStatuses,
-  selectedLogic,
-  selectedOverride,
-  toggleAction,
-  toggleStatus,
-  toggleOverride,
-  setLogic,
-}: {
-  actionCounts: Record<Action7, number>;
-  statusCounts: Record<WqaStatus, number>;
-  overrideCounts: { pipeline: number; operator: number };
-  selectedActions: Set<Action7>;
-  selectedStatuses: Set<WqaStatus>;
-  selectedLogic: Set<LogicCode>;
-  selectedOverride: Set<OverrideFilter>;
-  toggleAction: (a: Action7) => void;
-  toggleStatus: (s: WqaStatus) => void;
-  toggleOverride: (v: OverrideFilter) => void;
-  setLogic: (values: LogicCode[]) => void;
-}) {
-  return (
-    <section className="mt-4 mb-4 border rounded-lg bg-card">
-      <header className="px-4 py-2 border-b text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-2">
-        Filter
-        <span className="text-muted-foreground/70 normal-case tracking-normal">
-          · click chips to narrow the table; multi-select OR per axis
-        </span>
-      </header>
-      <div className="px-4 py-3 space-y-2 text-[11px]">
-        {/* Action row */}
-        <ChipRow label="Action">
-          {ACTION7_VALUES.map((a) => {
-            const cls = ACTION_CHIP_CLS[a];
-            const active = selectedActions.has(a);
-            return (
-              <button
-                key={a}
-                type="button"
-                onClick={() => toggleAction(a)}
-                className={
-                  "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors " +
-                  (active ? cls.active : cls.idle)
-                }
-              >
-                <span className={`size-1.5 rounded-full ${cls.dot}`} />
-                <span>{a}</span>
-                <span className="tabular-nums opacity-80 font-normal normal-case tracking-normal">
-                  {(actionCounts[a] ?? 0).toLocaleString()}
-                </span>
-              </button>
-            );
-          })}
-        </ChipRow>
-
-        {/* Status row */}
-        <ChipRow label="Status">
-          {STATUS_VALUES.map((s) => {
-            const cls = STATUS_CHIP_CLS[s];
-            const active = selectedStatuses.has(s);
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => toggleStatus(s)}
-                className={
-                  "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors " +
-                  (active ? cls.active : cls.idle)
-                }
-              >
-                <span>{s}</span>
-                <span className="tabular-nums opacity-80 font-normal normal-case tracking-normal">
-                  {(statusCounts[s] ?? 0).toLocaleString()}
-                </span>
-              </button>
-            );
-          })}
-        </ChipRow>
-
-        {/* Logic row */}
-        <ChipRow label="Logic">
-          <LogicMultiSelect selected={selectedLogic} onChange={setLogic} />
-        </ChipRow>
-
-        {/* Override row */}
-        <ChipRow label="Override">
-          <OverrideChip
-            value="pipeline"
-            label="Pipeline-only"
-            count={overrideCounts.pipeline}
-            active={selectedOverride.has("pipeline")}
-            onToggle={() => toggleOverride("pipeline")}
-          />
-          <OverrideChip
-            value="operator"
-            label="Operator overrode"
-            count={overrideCounts.operator}
-            active={selectedOverride.has("operator")}
-            onToggle={() => toggleOverride("operator")}
-          />
-        </ChipRow>
-      </div>
-    </section>
-  );
-}
-
-function ChipRow({
-  label,
-  children,
-}: {
+type FilterOption = {
+  value: string;
   label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-baseline gap-2 flex-wrap">
-      <span className="w-16 shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-        {label}
-      </span>
-      <div className="flex items-center gap-1.5 flex-wrap">{children}</div>
-    </div>
-  );
-}
+  sublabel?: string;
+  count?: number;
+  dotClass?: string;
+  mono?: boolean;
+};
 
-function OverrideChip({
+/** Generic multi-select dropdown used for Action / Status / Logic / Override
+ *  in the compact toolbar. Trigger button shows the axis label + selection
+ *  count; opens a popover with checkboxes. */
+function FilterDropdown({
   label,
-  count,
-  active,
-  onToggle,
-}: {
-  value: OverrideFilter;
-  label: string;
-  count: number;
-  active: boolean;
-  onToggle: () => void;
-}) {
-  const cls = active
-    ? "bg-foreground text-background border-foreground"
-    : "bg-muted/30 text-foreground border-muted hover:border-foreground/30";
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={
-        "inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors " +
-        cls
-      }
-    >
-      <span>{label}</span>
-      <span className="tabular-nums opacity-80 font-normal normal-case tracking-normal">
-        {count.toLocaleString()}
-      </span>
-    </button>
-  );
-}
-
-function LogicMultiSelect({
+  options,
   selected,
-  onChange,
+  onToggle,
+  onClear,
 }: {
-  selected: Set<LogicCode>;
-  onChange: (values: LogicCode[]) => void;
+  label: string;
+  options: FilterOption[];
+  selected: Set<string>;
+  onToggle: (value: string) => void;
+  onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const summary =
-    selected.size === 0
-      ? "All logic codes"
-      : selected.size === 1
-        ? Array.from(selected)[0]
-        : `${selected.size} selected`;
+  const active = selected.size > 0;
+  const summary = active
+    ? selected.size === 1
+      ? `${label}: ${Array.from(selected)[0]}`
+      : `${label}: ${selected.size}`
+    : label;
   return (
     <div className="relative inline-block">
       <button
@@ -1062,60 +906,270 @@ function LogicMultiSelect({
         onClick={() => setOpen((o) => !o)}
         className={
           "inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border transition-colors " +
-          (selected.size > 0
+          (active
             ? "bg-foreground text-background border-foreground"
-            : "bg-muted/30 text-foreground border-muted hover:border-foreground/30")
+            : "bg-card text-foreground border-border hover:border-foreground/30")
         }
       >
-        <span className="font-mono">{summary}</span>
-        <span aria-hidden>▾</span>
+        <span>{summary}</span>
+        <span className="opacity-70" aria-hidden>
+          ▾
+        </span>
       </button>
-      {selected.size > 0 && (
-        <button
-          type="button"
-          onClick={() => onChange([])}
-          className="ml-1 text-[10px] text-muted-foreground hover:text-foreground underline"
-        >
-          clear
-        </button>
-      )}
       {open && (
-        <div
-          className="absolute z-50 mt-1 max-h-[320px] overflow-y-auto bg-card border rounded-md shadow-lg p-1.5 min-w-[280px]"
-          onMouseLeave={() => setOpen(false)}
-        >
-          {LOGIC_CODE_VALUES.map((code) => {
-            const checked = selected.has(code);
-            return (
-              <label
-                key={code}
-                className="flex items-start gap-2 text-[11px] px-2 py-1 rounded hover:bg-muted/50 cursor-pointer"
+        <>
+          {/* Backdrop catches outside clicks to close the popover */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div className="absolute z-50 mt-1 max-h-[360px] overflow-y-auto bg-card border rounded-md shadow-lg p-1 min-w-[220px]">
+            {active && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClear();
+                  setOpen(false);
+                }}
+                className="w-full text-left text-[10.5px] text-muted-foreground hover:text-foreground px-2 py-1 border-b mb-1"
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => {
-                    const next = new Set(selected);
-                    if (checked) next.delete(code);
-                    else next.add(code);
-                    onChange(Array.from(next));
-                  }}
-                  className="mt-0.5"
-                />
-                <div>
-                  <div className="font-mono text-[10.5px] text-foreground">
-                    {code}
+                Clear {label.toLowerCase()}
+              </button>
+            )}
+            {options.map((opt) => {
+              const checked = selected.has(opt.value);
+              return (
+                <label
+                  key={opt.value}
+                  className="flex items-start gap-2 text-[11px] px-2 py-1 rounded hover:bg-muted/50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggle(opt.value)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={
+                        "flex items-center gap-1.5 " +
+                        (opt.mono ? "font-mono text-[10.5px]" : "")
+                      }
+                    >
+                      {opt.dotClass && (
+                        <span
+                          className={`size-1.5 rounded-full ${opt.dotClass}`}
+                        />
+                      )}
+                      <span>{opt.label}</span>
+                      {opt.count !== undefined && (
+                        <span className="ml-auto text-muted-foreground tabular-nums text-[10px]">
+                          {opt.count.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    {opt.sublabel && (
+                      <div className="text-[10px] text-muted-foreground leading-snug mt-0.5">
+                        {opt.sublabel}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[10px] text-muted-foreground leading-snug">
-                    {LOGIC_CODE_LABELS[code]}
-                  </div>
-                </div>
-              </label>
-            );
-          })}
-        </div>
+                </label>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+/** Stub for "Add more filters" — placeholder button surfacing the future
+ *  filter-builder (range filters on Sessions, Impressions, etc.). The
+ *  popover currently shows a coming-soon message; the four canonical
+ *  filters are already exposed as primary toolbar dropdowns. */
+function AddFiltersStub() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-dashed border-border bg-card hover:border-foreground/30 text-muted-foreground"
+        title="Build column-level filters (coming soon)"
+      >
+        <span aria-hidden>+</span>
+        <span>Add filters</span>
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div className="absolute right-0 z-50 mt-1 bg-card border rounded-md shadow-lg p-3 min-w-[260px] text-[11px]">
+            <div className="font-semibold mb-1">Column filters</div>
+            <p className="text-muted-foreground leading-snug">
+              Coming soon: numeric range filters on Sessions, Impressions, CTR,
+              Backlinks, Refdomains, Inlinks, Words, and Depth. The four
+              primary axes (Action, Status, Logic, Override) are already in
+              the toolbar above.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Stub for "Columns" — placeholder for a future column-visibility picker.
+ *  All 18 columns are currently always-on; this opens a coming-soon panel. */
+function ColumnsStub() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-dashed border-border bg-card hover:border-foreground/30 text-muted-foreground"
+        title="Hide / show columns (coming soon)"
+      >
+        <span aria-hidden>⊞</span>
+        <span>Columns</span>
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div className="absolute right-0 z-50 mt-1 bg-card border rounded-md shadow-lg p-3 min-w-[260px] text-[11px]">
+            <div className="font-semibold mb-1">Column visibility</div>
+            <p className="text-muted-foreground leading-snug">
+              Coming soon: hide / show any of the 18 columns and save the
+              choice per view.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Active-filter chip strip below the toolbar. Renders one removable pill
+ *  per current selection (Action / Status / Logic / Override / Health).
+ *  Hidden entirely when nothing is selected so the toolbar reads clean. */
+function ActiveFilterStrip({
+  selectedActions,
+  selectedStatuses,
+  selectedLogic,
+  selectedOverride,
+  healthFilter,
+  onRemoveAction,
+  onRemoveStatus,
+  onRemoveLogic,
+  onRemoveOverride,
+  onRemoveHealth,
+  onClearAll,
+}: {
+  selectedActions: Set<Action7>;
+  selectedStatuses: Set<WqaStatus>;
+  selectedLogic: Set<LogicCode>;
+  selectedOverride: Set<OverrideFilter>;
+  healthFilter: HealthZone | "all";
+  onRemoveAction: (a: Action7) => void;
+  onRemoveStatus: (s: WqaStatus) => void;
+  onRemoveLogic: (c: LogicCode) => void;
+  onRemoveOverride: (v: OverrideFilter) => void;
+  onRemoveHealth: () => void;
+  onClearAll: () => void;
+}) {
+  const total =
+    selectedActions.size +
+    selectedStatuses.size +
+    selectedLogic.size +
+    selectedOverride.size +
+    (healthFilter !== "all" ? 1 : 0);
+  if (total === 0) return null;
+  return (
+    <div className="px-4 py-2 border-b bg-muted/20 flex items-center gap-1.5 flex-wrap text-[11px]">
+      <span className="text-muted-foreground text-[10px] uppercase tracking-wider font-semibold mr-1">
+        Active
+      </span>
+      {Array.from(selectedActions).map((a) => (
+        <ActivePill
+          key={`a:${a}`}
+          label={`Action: ${a}`}
+          dotClass={ACTION_CHIP_CLS[a].dot}
+          onRemove={() => onRemoveAction(a)}
+        />
+      ))}
+      {Array.from(selectedStatuses).map((s) => (
+        <ActivePill
+          key={`s:${s}`}
+          label={`Status: ${s}`}
+          onRemove={() => onRemoveStatus(s)}
+        />
+      ))}
+      {Array.from(selectedLogic).map((c) => (
+        <ActivePill
+          key={`l:${c}`}
+          label={c}
+          mono
+          onRemove={() => onRemoveLogic(c)}
+        />
+      ))}
+      {Array.from(selectedOverride).map((v) => (
+        <ActivePill
+          key={`o:${v}`}
+          label={v === "pipeline" ? "Pipeline only" : "Operator overrode"}
+          onRemove={() => onRemoveOverride(v)}
+        />
+      ))}
+      {healthFilter !== "all" && (
+        <ActivePill
+          label={`Health: ${healthFilter}`}
+          onRemove={onRemoveHealth}
+        />
+      )}
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="ml-auto text-[10.5px] text-muted-foreground hover:text-foreground underline"
+      >
+        Clear all
+      </button>
+    </div>
+  );
+}
+
+function ActivePill({
+  label,
+  dotClass,
+  mono,
+  onRemove,
+}: {
+  label: string;
+  dotClass?: string;
+  mono?: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 bg-card border rounded-full pl-2 pr-1 py-0.5 text-[10.5px]">
+      {dotClass && <span className={`size-1.5 rounded-full ${dotClass}`} />}
+      <span className={mono ? "font-mono" : ""}>{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-0.5 size-4 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center justify-center"
+        title="Remove filter"
+      >
+        ×
+      </button>
+    </span>
   );
 }
 
