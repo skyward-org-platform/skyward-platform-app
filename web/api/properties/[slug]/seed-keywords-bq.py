@@ -85,14 +85,19 @@ def _seed_keywords_for_domains(domains: list[str]) -> list[dict]:
     bq = _get_bq()
     from google.cloud import bigquery
 
-    # Resolve domains -> BQ project_ids via Meta.projects, then pull every
-    # seed keyword for those project_ids. Dedupe on (keyword) - if the same
-    # keyword appears under multiple projects, keep the most recent.
+    # Resolve domains -> Meta.projects.project_name (the STRING id used as
+    # SEOPipeline.seed_keywords.project_id). Meta.project_domains.project_id
+    # is an INTEGER PK that doesn't match seed_keywords.project_id - we
+    # need the extra hop through Meta.projects to pick up project_name.
+    #
+    # Dedupe on lowercased keyword across all linked projects, keeping
+    # the most recent ingest_timestamp.
     query = f"""
         WITH linked_projects AS (
-          SELECT DISTINCT pd.project_id
+          SELECT DISTINCT p.project_name AS sk_project_id
           FROM `{bq.project_id}.Meta.project_domains` pd
           JOIN `{bq.project_id}.Meta.domains` d ON pd.domain_id = d.domain_id
+          JOIN `{bq.project_id}.Meta.projects` p ON p.project_id = pd.project_id
           WHERE LOWER(d.domain) IN UNNEST(@domains)
         ),
         ranked AS (
@@ -108,7 +113,7 @@ def _seed_keywords_for_domains(domains: list[str]) -> list[dict]:
               ORDER BY sk.ingest_timestamp DESC
             ) AS rn
           FROM `{bq.project_id}.SEOPipeline.seed_keywords` sk
-          JOIN linked_projects lp ON sk.project_id = lp.project_id
+          JOIN linked_projects lp ON sk.project_id = lp.sk_project_id
         )
         SELECT keyword, category, seed_category, source, project_id, ingest_timestamp
         FROM ranked
