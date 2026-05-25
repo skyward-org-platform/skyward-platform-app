@@ -30,6 +30,10 @@ import { WqaStatusChip } from "@/components/wqa/WqaStatusChip";
 import { WqaLogicCell } from "@/components/wqa/WqaLogicCell";
 import { BulkActionBar } from "@/components/wqa/BulkActionBar";
 import { useBulkSelection } from "@/components/wqa/useBulkSelection";
+import {
+  ColumnResizer,
+  useColumnWidths,
+} from "@/components/wqa/useColumnWidths";
 
 const ACTION7_VALUES: Action7[] = [
   "Optimize",
@@ -93,6 +97,32 @@ const COLUMNS: ColumnDef[] = [
   { id: "words", label: "Word count" },
   { id: "depth", label: "Page depth" },
 ];
+
+// Default widths in px. User-resized values persist to localStorage and
+// override these on hydration. Pick values close to the previous min-w
+// constraints so the table doesn't dramatically reshape on the first
+// load after this change ships.
+const DEFAULT_WIDTHS: Record<string, number> = {
+  __select: 36,
+  zone: 44,
+  action: 130,
+  status: 140,
+  logic: 170,
+  url: 320,
+  http: 70,
+  indexable: 110,
+  sessions: 80,
+  conversions: 70,
+  impressions: 80,
+  ctr: 70,
+  bestKeyword: 200,
+  rank: 70,
+  backlinks: 70,
+  refdomains: 70,
+  inlinks: 70,
+  words: 70,
+  depth: 70,
+};
 
 // ─── Numeric range filters ────────────────────────────────────────────────
 // Add-filters popover lets users narrow the table by min/max on any of
@@ -738,6 +768,11 @@ export function WqaDataView({
   const visibleUrls = useMemo(() => paged.map((r) => r.row.url), [paged]);
   const selection = useBulkSelection(visibleUrls);
 
+  // Resizable column widths, persisted per (property, table) in
+  // localStorage. tableId 'all-urls' is unique to this view so the
+  // per-action tabs (when they get resize wired) won't share storage.
+  const colWidths = useColumnWidths(propertySlug, "all-urls", DEFAULT_WIDTHS);
+
   if (rows.length === 0) {
     return <EmptyState dataset={dataset} message={message} />;
   }
@@ -871,6 +906,15 @@ export function WqaDataView({
               onToggle={toggleColumn}
               onReset={resetColumns}
             />
+            <button
+              type="button"
+              onClick={colWidths.reset}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-dashed border-border bg-card hover:border-foreground/30 text-muted-foreground"
+              title="Reset column widths to defaults"
+            >
+              <span aria-hidden>↔</span>
+              <span>Reset widths</span>
+            </button>
             <span className="text-muted-foreground tabular-nums">
               {visible.length.toLocaleString()} URLs
             </span>
@@ -907,10 +951,70 @@ export function WqaDataView({
         )}
 
         <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-          <table className="w-full text-[11.5px]">
+          <table
+            className="text-[11.5px]"
+            style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}
+          >
+            <colgroup>
+              <col style={{ width: `${colWidths.widths.__select ?? 36}px` }} />
+              {vis("zone") && (
+                <col style={{ width: `${colWidths.widths.zone}px` }} />
+              )}
+              {vis("action") && (
+                <col style={{ width: `${colWidths.widths.action}px` }} />
+              )}
+              {vis("status") && (
+                <col style={{ width: `${colWidths.widths.status}px` }} />
+              )}
+              {vis("logic") && (
+                <col style={{ width: `${colWidths.widths.logic}px` }} />
+              )}
+              {vis("url") && (
+                <col style={{ width: `${colWidths.widths.url}px` }} />
+              )}
+              {vis("http") && (
+                <col style={{ width: `${colWidths.widths.http}px` }} />
+              )}
+              {vis("indexable") && (
+                <col style={{ width: `${colWidths.widths.indexable}px` }} />
+              )}
+              {vis("sessions") && (
+                <col style={{ width: `${colWidths.widths.sessions}px` }} />
+              )}
+              {vis("conversions") && (
+                <col style={{ width: `${colWidths.widths.conversions}px` }} />
+              )}
+              {vis("impressions") && (
+                <col style={{ width: `${colWidths.widths.impressions}px` }} />
+              )}
+              {vis("ctr") && (
+                <col style={{ width: `${colWidths.widths.ctr}px` }} />
+              )}
+              {vis("bestKeyword") && (
+                <col style={{ width: `${colWidths.widths.bestKeyword}px` }} />
+              )}
+              {vis("rank") && (
+                <col style={{ width: `${colWidths.widths.rank}px` }} />
+              )}
+              {vis("backlinks") && (
+                <col style={{ width: `${colWidths.widths.backlinks}px` }} />
+              )}
+              {vis("refdomains") && (
+                <col style={{ width: `${colWidths.widths.refdomains}px` }} />
+              )}
+              {vis("inlinks") && (
+                <col style={{ width: `${colWidths.widths.inlinks}px` }} />
+              )}
+              {vis("words") && (
+                <col style={{ width: `${colWidths.widths.words}px` }} />
+              )}
+              {vis("depth") && (
+                <col style={{ width: `${colWidths.widths.depth}px` }} />
+              )}
+            </colgroup>
             <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
               <tr>
-                <th className="px-2 py-2 w-[28px]">
+                <th className="px-2 py-2">
                   <input
                     type="checkbox"
                     checked={selection.allVisibleSelected}
@@ -923,70 +1027,112 @@ export function WqaDataView({
                   />
                 </th>
                 {vis("zone") && (
-                  <th className="text-left px-3 py-2 font-medium w-[36px]">
+                  <th className="relative text-left px-3 py-2 font-medium">
                     Zone
+                    <ColumnResizer columnId="zone" startResize={colWidths.startResize} />
                   </th>
                 )}
                 {vis("action") && (
-                  <th className="text-left px-2 py-2 font-medium min-w-[110px]">
+                  <th className="relative text-left px-2 py-2 font-medium">
                     Action
+                    <ColumnResizer columnId="action" startResize={colWidths.startResize} />
                   </th>
                 )}
                 {vis("status") && (
-                  <th className="text-left px-2 py-2 font-medium min-w-[110px]">
+                  <th className="relative text-left px-2 py-2 font-medium">
                     Status
+                    <ColumnResizer columnId="status" startResize={colWidths.startResize} />
                   </th>
                 )}
                 {vis("logic") && (
-                  <th className="text-left px-2 py-2 font-medium min-w-[160px]">
+                  <th className="relative text-left px-2 py-2 font-medium">
                     Logic
+                    <ColumnResizer columnId="logic" startResize={colWidths.startResize} />
                   </th>
                 )}
                 {vis("url") && (
-                  <th className="text-left px-3 py-2 font-medium min-w-[280px]">
+                  <th className="relative text-left px-3 py-2 font-medium">
                     URL
+                    <ColumnResizer columnId="url" startResize={colWidths.startResize} />
                   </th>
                 )}
                 {vis("http") && (
-                  <th className="text-right px-2 py-2 font-medium">HTTP</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    HTTP
+                    <ColumnResizer columnId="http" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("indexable") && (
-                  <th className="text-left px-2 py-2 font-medium">Indexable</th>
+                  <th className="relative text-left px-2 py-2 font-medium">
+                    Indexable
+                    <ColumnResizer columnId="indexable" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("sessions") && (
-                  <th className="text-right px-2 py-2 font-medium">Sessions</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Sessions
+                    <ColumnResizer columnId="sessions" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("conversions") && (
-                  <th className="text-right px-2 py-2 font-medium">Conv</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Conv
+                    <ColumnResizer columnId="conversions" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("impressions") && (
-                  <th className="text-right px-2 py-2 font-medium">Impr</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Impr
+                    <ColumnResizer columnId="impressions" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("ctr") && (
-                  <th className="text-right px-2 py-2 font-medium">CTR%</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    CTR%
+                    <ColumnResizer columnId="ctr" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("bestKeyword") && (
-                  <th className="text-left px-2 py-2 font-medium min-w-[180px]">
+                  <th className="relative text-left px-2 py-2 font-medium">
                     Best keyword
+                    <ColumnResizer columnId="bestKeyword" startResize={colWidths.startResize} />
                   </th>
                 )}
                 {vis("rank") && (
-                  <th className="text-right px-2 py-2 font-medium">Rank</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Rank
+                    <ColumnResizer columnId="rank" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("backlinks") && (
-                  <th className="text-right px-2 py-2 font-medium">BLs</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    BLs
+                    <ColumnResizer columnId="backlinks" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("refdomains") && (
-                  <th className="text-right px-2 py-2 font-medium">RD</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    RD
+                    <ColumnResizer columnId="refdomains" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("inlinks") && (
-                  <th className="text-right px-2 py-2 font-medium">Inl</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Inl
+                    <ColumnResizer columnId="inlinks" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("words") && (
-                  <th className="text-right px-2 py-2 font-medium">Words</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Words
+                    <ColumnResizer columnId="words" startResize={colWidths.startResize} />
+                  </th>
                 )}
                 {vis("depth") && (
-                  <th className="text-right px-2 py-2 font-medium">Depth</th>
+                  <th className="relative text-right px-2 py-2 font-medium">
+                    Depth
+                    <ColumnResizer columnId="depth" startResize={colWidths.startResize} />
+                  </th>
                 )}
               </tr>
             </thead>
