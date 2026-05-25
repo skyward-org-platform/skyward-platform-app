@@ -8,7 +8,7 @@
 // Phase B scope: pure viewer. Sorting + sticky header + URL search. No
 // audit-chip integration — that lands in Phase C when WQA drives triage.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
 import {
@@ -194,6 +194,8 @@ export function WqaDataView({
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [query, setQuery] = useState("");
   const [healthFilter, setHealthFilter] = useState<HealthZone | "all">("all");
+  const [pageSize, setPageSize] = useState<50 | 100 | 250>(100);
+  const [page, setPage] = useState(0);
 
   // URL-persisted multi-select filters (Action / Status / Logic / Override).
   // Each axis is a comma-separated list in its own search param so the
@@ -459,6 +461,30 @@ export function WqaDataView({
     selectedOverride,
   ]);
 
+  // Reset to first page whenever the filter or sort changes so the user
+  // isn't stranded on an out-of-range page after narrowing the set.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setPage(0), [
+    query,
+    sortKey,
+    sortDir,
+    healthFilter,
+    pageSize,
+    selectedActions,
+    selectedStatuses,
+    selectedLogic,
+    selectedOverride,
+  ]);
+
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageStart = safePage * pageSize;
+  const pageEnd = Math.min(pageStart + pageSize, visible.length);
+  const paged = useMemo(
+    () => visible.slice(pageStart, pageEnd),
+    [visible, pageStart, pageEnd],
+  );
+
   if (rows.length === 0) {
     return <EmptyState dataset={dataset} message={message} />;
   }
@@ -574,7 +600,7 @@ export function WqaDataView({
               </tr>
             </thead>
             <tbody>
-              {visible.map((row) => {
+              {paged.map((row) => {
                 const r = row.row;
                 const triage = row.triage;
                 const zone = healthZoneOf(r);
@@ -647,26 +673,43 @@ export function WqaDataView({
                       <WqaLogicCell code={row.logicCode} />
                     </td>
                     <td className="px-3 py-1.5 max-w-0">
-                      <div
-                        className="font-mono text-[11px] truncate text-foreground"
-                        title={r.url}
-                      >
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {r.url}
-                        </a>
-                      </div>
-                      {r.current_title && (
+                      {r.current_title ? (
+                        <>
+                          <div
+                            className="text-[12px] font-semibold truncate text-foreground"
+                            title={r.current_title}
+                          >
+                            {r.current_title}
+                          </div>
+                          <div
+                            className="font-mono text-[10.5px] truncate text-muted-foreground mt-0.5"
+                            title={r.url}
+                          >
+                            <a
+                              href={r.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {r.url}
+                            </a>
+                          </div>
+                        </>
+                      ) : (
                         <div
-                          className="text-[10.5px] text-muted-foreground truncate mt-0.5"
-                          title={r.current_title}
+                          className="font-mono text-[11px] truncate text-foreground"
+                          title={r.url}
                         >
-                          {r.current_title}
+                          <a
+                            href={r.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {r.url}
+                          </a>
                         </div>
                       )}
                       <div
@@ -731,6 +774,67 @@ export function WqaDataView({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination footer — per image #38 reference. Left: "Showing
+         *  X to Y of Z URLs". Right: per-page selector (50 / 100 / 250)
+         *  + prev / next page arrows. */}
+        <footer className="px-4 py-2.5 border-t flex items-center justify-between gap-3 text-[11px] text-muted-foreground bg-muted/20">
+          <div className="tabular-nums">
+            {visible.length === 0
+              ? "No URLs match the current filters"
+              : `Showing ${(pageStart + 1).toLocaleString()} to ${pageEnd.toLocaleString()} of ${visible.length.toLocaleString()} URLs`}
+            {visible.length !== rows.length && (
+              <span className="text-muted-foreground/60">
+                {" "}
+                · {rows.length.toLocaleString()} total
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground/80">Show</span>
+              {([50, 100, 250] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPageSize(n)}
+                  className={
+                    "px-2 py-0.5 rounded border text-[11px] tabular-nums transition-colors " +
+                    (pageSize === n
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-card hover:border-foreground/30")
+                  }
+                >
+                  {n}
+                </button>
+              ))}
+              <span className="text-muted-foreground/80">per page</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="px-2 py-0.5 rounded border bg-card hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Previous page"
+              >
+                ‹
+              </button>
+              <span className="tabular-nums px-1">
+                {safePage + 1} / {pageCount}
+              </span>
+              <button
+                type="button"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                className="px-2 py-0.5 rounded border bg-card hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Next page"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );
