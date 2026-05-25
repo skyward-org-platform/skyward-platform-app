@@ -36,10 +36,20 @@ import {
 import type { PageCheckStateRow } from "@/lib/page-check-state";
 import type { WqaRow } from "@/lib/wqa";
 import {
+  LOGIC_CODE_LABELS,
+  type Action7,
+  type LogicCode,
+  type WqaStatus,
+} from "@/lib/wqa-decisions";
+import {
+  clearDrift,
   setCheckStatus,
   setExecutionField,
   setExecutionStatus,
+  setLogicNotes,
+  setTargetUrl,
 } from "@/app/properties/[slug]/pages/wqa-actions";
+import { VerifyButton } from "@/components/wqa/VerifyButton";
 import {
   setKeywordStatus,
   setKeywordNotes,
@@ -82,6 +92,31 @@ export type UrlDrawerSubject = {
   /** Per-URL slice of check states, keyed by check_id. */
   checkStatesForUrl: Map<string, PageCheckStateRow>;
   ctx: Ctx;
+
+  // ─── P2 action semantics v2 fields ───────────────────────────────────
+  // All optional/nullable so existing callers compile until the parent
+  // surfaces the wqa_decision row alongside the WqaRow.
+  /** Pipeline-derived action (BQ wqa_output), coerced to Action7. */
+  pipelineAction?: Action7 | null;
+  /** Operator override action (wqa_decision), null if no override. */
+  overrideAction?: Action7 | null;
+  /** Effective displayed action (override ?? pipeline) for gating sections. */
+  displayedAction?: Action7 | null;
+  /** Closed-set logic code from the pipeline (BQ wqa_output). Null until
+   *  Chunk 5 ships pipeline emission. */
+  logicCode?: LogicCode | null;
+  /** Operator notes about the triage decision (wqa_decision.logic_notes). */
+  logicNotes?: string | null;
+  /** Operator-set target URL for Redirect / Consolidate. */
+  targetUrl?: string | null;
+  /** Pipeline-suggested target URL — null until pipeline emits it. */
+  pipelineTargetUrl?: string | null;
+  /** Last time the verify button was run against this row's target. */
+  lastImplementationCheckAt?: string | null;
+  /** Status workflow (Open/In Progress/Done/Drifted). Default Open. */
+  status?: WqaStatus;
+  /** Why the drift detector flagged this row; surfaces in the rose banner. */
+  driftReason?: string | null;
 };
 
 export type KeywordDrawerSubject = {
@@ -220,8 +255,26 @@ function UrlDrawerView({
   propertyId,
   primaryDomain,
 }: { subject: UrlDrawerSubject } & CommonProps) {
-  const { row, currentAction, category, execution, checkStatesForUrl, ctx } =
-    subject;
+  const {
+    row,
+    currentAction,
+    category,
+    execution,
+    checkStatesForUrl,
+    ctx,
+    pipelineAction = null,
+    overrideAction = null,
+    displayedAction = null,
+    logicCode = null,
+    logicNotes = null,
+    targetUrl = null,
+    pipelineTargetUrl = null,
+    lastImplementationCheckAt = null,
+    status = "Open",
+    driftReason = null,
+  } = subject;
+  const showTargetSection =
+    displayedAction === "Redirect" || displayedAction === "Consolidate";
   return (
     <DrawerShell
       ariaLabel="URL details"
@@ -233,11 +286,36 @@ function UrlDrawerView({
         url={row.url}
         onClose={onClose}
       />
+      {status === "Drifted" && (
+        <DriftBanner
+          propertySlug={propertySlug}
+          url={row.url}
+          driftReason={driftReason}
+        />
+      )}
       <SignalsSection row={row} />
       <Phase1Section
         currentAction={currentAction}
         dataSources={row.data_sources}
       />
+      <TriageLogicSection
+        propertySlug={propertySlug}
+        url={row.url}
+        logicCode={logicCode}
+        logicNotes={logicNotes}
+        pipelineAction={pipelineAction}
+        overrideAction={overrideAction}
+      />
+      {showTargetSection && (
+        <TargetUrlSection
+          propertySlug={propertySlug}
+          url={row.url}
+          displayedAction={displayedAction}
+          targetUrl={targetUrl}
+          pipelineTargetUrl={pipelineTargetUrl}
+          lastImplementationCheckAt={lastImplementationCheckAt}
+        />
+      )}
       <Phase2Section
         row={row}
         category={category}
@@ -260,6 +338,270 @@ function UrlDrawerView({
       )}
       <HistorySection />
     </DrawerShell>
+  );
+}
+
+// ─── Drift banner ────────────────────────────────────────────────────────
+// Shown only when status='Drifted'. The Acknowledge button calls clearDrift
+// (Drifted → Open + nulls drift_reason). The banner sits above all other
+// sections so the operator sees it immediately on drawer open.
+function DriftBanner({
+  propertySlug,
+  url,
+  driftReason,
+}: {
+  propertySlug: string;
+  url: string;
+  driftReason: string | null;
+}) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="mx-4 mt-3 mb-1 bg-rose-50 border border-rose-200 rounded p-3 text-xs">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <strong className="text-rose-900">Drift detected</strong>
+          {driftReason && (
+            <span className="text-rose-800 ml-2">{driftReason}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setError(null);
+            start(async () => {
+              const res = await clearDrift(propertySlug, url);
+              if (!res.ok) setError(res.error);
+            });
+          }}
+          className={`text-[11px] px-2 py-1 rounded border border-rose-300 text-rose-900 hover:bg-rose-100 ${pending ? "opacity-60" : ""}`}
+        >
+          {pending ? "Acknowledging…" : "Acknowledge"}
+        </button>
+      </div>
+      {error && (
+        <div className="mt-1.5 text-[10.5px] text-rose-800 font-mono" title={error}>
+          ! {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Triage logic section ────────────────────────────────────────────────
+// Read-only logic_code (with hover tooltip for the human-readable label),
+// "Pipeline said" indicator when the operator overrode the pipeline, and an
+// editable Notes textarea (wqa_decision.logic_notes).
+function TriageLogicSection({
+  propertySlug,
+  url,
+  logicCode,
+  logicNotes,
+  pipelineAction,
+  overrideAction,
+}: {
+  propertySlug: string;
+  url: string;
+  logicCode: LogicCode | null;
+  logicNotes: string | null;
+  pipelineAction: Action7 | null;
+  overrideAction: Action7 | null;
+}) {
+  const label = logicCode ? LOGIC_CODE_LABELS[logicCode] ?? logicCode : null;
+  const showPipelineSaid =
+    pipelineAction !== null &&
+    overrideAction !== null &&
+    pipelineAction !== overrideAction;
+  return (
+    <Section title="Triage logic">
+      <div className="grid gap-2.5">
+        <Field label="Logic code">
+          {logicCode ? (
+            <span
+              className="font-mono text-[11px] inline-block px-1.5 py-0.5 rounded bg-zinc-50 border border-zinc-200 text-zinc-700 w-fit"
+              title={label ?? logicCode}
+            >
+              {logicCode}
+            </span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground italic">
+              — (pipeline will emit once Chunk 5 ships)
+            </span>
+          )}
+        </Field>
+        {showPipelineSaid && (
+          <Field label="Pipeline said">
+            <span
+              className="text-[11.5px] text-muted-foreground"
+              title="Operator overrode the pipeline's decision"
+            >
+              {pipelineAction}
+            </span>
+          </Field>
+        )}
+        <Field label="Notes">
+          <LogicNotesEditor slug={propertySlug} url={url} value={logicNotes} />
+        </Field>
+      </div>
+    </Section>
+  );
+}
+
+function LogicNotesEditor({
+  slug,
+  url,
+  value,
+}: {
+  slug: string;
+  url: string;
+  value: string | null;
+}) {
+  const [local, setLocal] = useState(value ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  function commit() {
+    const next = local.trim() === "" ? null : local;
+    if (next === (value ?? null)) return;
+    setError(null);
+    start(async () => {
+      const res = await setLogicNotes(slug, url, next);
+      if (!res.ok) {
+        setLocal(value ?? "");
+        setError(res.error);
+      }
+    });
+  }
+  return (
+    <span className="inline-flex items-start gap-1 w-full">
+      <textarea
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        disabled={pending}
+        rows={3}
+        placeholder="Why this action? Add context that helps another operator understand the decision."
+        className={`text-[11.5px] px-2 py-1 border rounded bg-background w-full resize-y ${pending ? "opacity-60" : ""}`}
+      />
+      {error && (
+        <span className="text-[10px] text-rose-700" title={error}>
+          !
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Target URL section (Redirect + Consolidate only) ────────────────────
+// Editable target URL input with the pipeline-suggested destination shown
+// muted below, plus a Verify button that hits /api/verify-url and (on
+// success) flips status → Done.
+function TargetUrlSection({
+  propertySlug,
+  url,
+  displayedAction,
+  targetUrl,
+  pipelineTargetUrl,
+  lastImplementationCheckAt,
+}: {
+  propertySlug: string;
+  url: string;
+  displayedAction: Action7 | null;
+  targetUrl: string | null;
+  pipelineTargetUrl: string | null;
+  lastImplementationCheckAt: string | null;
+}) {
+  const sectionTitle =
+    displayedAction === "Redirect" ? "Redirect target" : "Canonical primary";
+  return (
+    <Section title={sectionTitle}>
+      <div className="grid gap-2.5">
+        <Field label="Target">
+          <TargetUrlEditor
+            slug={propertySlug}
+            url={url}
+            value={targetUrl}
+            pipelineTarget={pipelineTargetUrl}
+          />
+        </Field>
+        <Field label="Last verified">
+          <span className="text-[11.5px] font-mono">
+            {lastImplementationCheckAt
+              ? new Date(lastImplementationCheckAt).toLocaleString()
+              : "never"}
+          </span>
+        </Field>
+        <div className="pt-1">
+          <VerifyButton
+            propertySlug={propertySlug}
+            url={url}
+            disabled={!targetUrl}
+          />
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function TargetUrlEditor({
+  slug,
+  url,
+  value,
+  pipelineTarget,
+}: {
+  slug: string;
+  url: string;
+  value: string | null;
+  pipelineTarget: string | null;
+}) {
+  const [local, setLocal] = useState(value ?? "");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  // TODO(Chunk 5): pipelineTarget is null today — the pipeline doesn't emit
+  // a suggested target_url field yet. Once it does, this "Pipeline suggested"
+  // hint + the override ring will start surfacing useful info.
+  const isOverride =
+    value !== null && pipelineTarget !== null && value !== pipelineTarget;
+  function commit() {
+    const next = local.trim() === "" ? null : local.trim();
+    if (next === (value ?? null)) return;
+    setError(null);
+    start(async () => {
+      const res = await setTargetUrl(slug, url, next);
+      if (!res.ok) {
+        setLocal(value ?? "");
+        setError(res.error);
+      }
+    });
+  }
+  return (
+    <div className="flex flex-col gap-1 w-full">
+      <span className="inline-flex items-center gap-1 w-full">
+        <input
+          type="url"
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={commit}
+          onClick={(e) => e.stopPropagation()}
+          disabled={pending}
+          placeholder="https://…"
+          className={`text-[11.5px] font-mono px-2 py-1 border rounded bg-background w-full ${pending ? "opacity-60" : ""}`}
+        />
+        {error && (
+          <span className="text-[10px] text-rose-700" title={error}>
+            !
+          </span>
+        )}
+      </span>
+      {pipelineTarget && pipelineTarget !== local && (
+        <span className="text-[10px] text-muted-foreground">
+          Pipeline suggested:{" "}
+          <span className="font-mono">{pipelineTarget}</span>
+          {isOverride && " · operator override"}
+        </span>
+      )}
+    </div>
   );
 }
 

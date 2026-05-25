@@ -286,16 +286,41 @@ export function WqaTabs({
       <UrlDrawer
         subject={
           drawerUrl && drawerTriaged
-            ? {
-                kind: "url",
-                row: drawerTriaged.row,
-                currentAction: drawerTriaged.triage.action,
-                category: drawerTriaged.row.type ?? "Other",
-                execution: execByUrl.get(drawerUrl) ?? null,
-                checkStatesForUrl:
-                  checkStatesByUrl.get(drawerUrl) ?? new Map(),
-                ctx,
-              }
+            ? (() => {
+                const decision = decisionByUrl.get(drawerUrl) ?? null;
+                const sopAction = drawerTriaged.triage.sopAction
+                  ?? drawerTriaged.triage.action;
+                const pipelineAction = toAction7(sopAction);
+                const overrideAction = drawerTriaged.triage.isOverridden
+                  ? toAction7(drawerTriaged.triage.action)
+                  : null;
+                const displayedAction = overrideAction ?? pipelineAction;
+                return {
+                  kind: "url" as const,
+                  row: drawerTriaged.row,
+                  currentAction: drawerTriaged.triage.action,
+                  category: drawerTriaged.row.type ?? "Other",
+                  execution: execByUrl.get(drawerUrl) ?? null,
+                  checkStatesForUrl:
+                    checkStatesByUrl.get(drawerUrl) ?? new Map(),
+                  ctx,
+                  pipelineAction,
+                  overrideAction,
+                  displayedAction,
+                  // logic_code lives on BQ wqa_output (Chunk 5 will surface it);
+                  // not yet plumbed through DecisionRow.
+                  logicCode: null,
+                  logicNotes: decision?.logic_notes ?? null,
+                  targetUrl: decision?.target_url ?? null,
+                  // pipelineTargetUrl: pipeline doesn't emit a suggested
+                  // destination yet — TODO once the BQ schema adds it.
+                  pipelineTargetUrl: null,
+                  lastImplementationCheckAt:
+                    decision?.last_implementation_check_at ?? null,
+                  status: decision?.status ?? "Open",
+                  driftReason: decision?.drift_reason ?? null,
+                };
+              })()
             : null
         }
         onClose={() => setDrawerUrl(null)}
