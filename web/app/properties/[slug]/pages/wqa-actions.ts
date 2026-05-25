@@ -1,137 +1,280 @@
 "use server";
 
-// Human override of the SOP-derived WQA triage. Writes land in
-// wqa_decision, keyed by (property_id, url). The Pages UI reads the
-// override (if any) and falls back to the SOP-computed action otherwise.
+// Server actions for the Pages surface. Split conceptually into:
+//
+//   1. WQA decision overrides — operator overrides of the pipeline-derived
+//      action / status / logic notes / target URL on the wqa_decision table.
+//      Rewritten in P2 (action semantics v2). New 8-action API:
+//      setAction / setStatus / clearDrift / setLogicNotes / setTargetUrl /
+//      verifyTargetUrl / clearActionOverride / clearTargetUrlOverride.
+//      Back-compat shims at the bottom keep `setWqaDecision` /
+//      `clearWqaDecision` / `WqaActionValue` working until Chunk 3 rewrites
+//      WqaActionChip + downstream callers.
+//
+//   2. page_execution + page_check_state mutations — Execution / Audit
+//      drawer + audit tabs use these. Untouched by P2 (orthogonal table).
 
-import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { revalidatePath, updateTag } from "next/cache";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
+import { apiBase } from "@/lib/api-base";
+import { supabase } from "@/lib/supabase";
+import { CACHE_TAGS } from "@/lib/cache";
+import {
+  upsertWqaDecision,
+  type Action7,
+  type WqaStatus,
+} from "@/lib/wqa-decisions";
 import {
   upsertExecution,
   type ExecutionStatus,
 } from "@/lib/page-execution";
 import { upsertCheckState } from "@/lib/page-check-state";
 
-export type WqaActionValue =
-  | "Optimize"
-  | "Restore"
-  | "Redirect"
-  | "Consolidate"
-  | "Remove"
-  | "Evaluate"
-  | "Leave as 404"
-  | "Non-addressable"
-  | "Non-indexable"
-  | "Investigate";
-
-const VALID_ACTIONS: ReadonlySet<WqaActionValue> = new Set([
-  "Optimize",
-  "Restore",
-  "Redirect",
-  "Consolidate",
-  "Remove",
-  "Evaluate",
-  "Leave as 404",
-  "Non-addressable",
-  "Non-indexable",
-  "Investigate",
-]);
-
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
 
-async function resolveProperty(
-  slug: string,
-): Promise<{ id: string } | { error: string }> {
+async function resolveProperty(slug: string): Promise<{ id: string } | Err> {
   const { data, error } = await supabase
     .from("property")
     .select("id")
     .eq("slug", slug)
     .single();
-  if (error || !data) return { error: error?.message ?? "Property not found" };
+  if (error || !data) return { ok: false, error: error?.message ?? "Property not found" };
   return { id: data.id };
 }
 
-export async function setWqaDecision(
-  propertySlug: string,
-  url: string,
-  action: string,
+function bust(slug: string) {
+  // Bust both the per-route cache and the coarse wqa-decisions tag so
+  // unstable_cache readers (e.g. getWqaDecisions) re-fetch on next render.
+  updateTag(CACHE_TAGS.wqaDecisions);
+  revalidatePath(`/properties/${slug}/pages`);
+}
+
+// ═══ WQA decision overrides (P2 action semantics v2) ══════════════════════
+
+// ─── setAction ────────────────────────────────────────────────────────────
+export async function setAction(
+  slug: string, url: string, action: Action7,
 ): Promise<Ok | Err> {
   const authed = await requireWriteToken();
   if (!authed.ok) return authed;
-
-  if (!VALID_ACTIONS.has(action as WqaActionValue)) {
-    return { ok: false, error: `Invalid action: ${action}` };
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    await upsertWqaDecision({
+      property_id: (prop as { id: string }).id, url, action,
+      decided_by: getOperator(),
+    });
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
-  if (!url) return { ok: false, error: "URL required" };
-
-  const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
-
-  const { error } = await supabase
-    .from("wqa_decision")
-    .upsert(
-      {
-        property_id: prop.id,
-        url,
-        action,
-        decided_by: getOperator(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "property_id,url" },
-    );
-  if (error) return { ok: false, error: error.message };
-  revalidatePath(`/properties/${propertySlug}/pages`);
-  return { ok: true };
 }
 
-/** Remove the override — row reverts to the SOP-computed action. */
-export async function clearWqaDecision(
-  propertySlug: string,
-  url: string,
+// ─── setStatus ────────────────────────────────────────────────────────────
+// Operator can set Open / In Progress / Done; Drifted is auto-only.
+export async function setStatus(
+  slug: string, url: string, status: WqaStatus,
+): Promise<Ok | Err> {
+  if (status === "Drifted") {
+    return { ok: false, error: "Drifted is auto-set only; cannot manually transition" };
+  }
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    await upsertWqaDecision({
+      property_id: (prop as { id: string }).id, url, status,
+      decided_by: getOperator(),
+    });
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ─── clearDrift ───────────────────────────────────────────────────────────
+// Drifted → Open + clear drift_reason. Operator acknowledgement.
+export async function clearDrift(slug: string, url: string): Promise<Ok | Err> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    await upsertWqaDecision({
+      property_id: (prop as { id: string }).id, url,
+      status: "Open",
+      drift_reason: null,
+      decided_by: getOperator(),
+    });
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ─── setLogicNotes ────────────────────────────────────────────────────────
+export async function setLogicNotes(
+  slug: string, url: string, notes: string | null,
 ): Promise<Ok | Err> {
   const authed = await requireWriteToken();
   if (!authed.ok) return authed;
-  const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
-  const { error } = await supabase
-    .from("wqa_decision")
-    .delete()
-    .eq("property_id", prop.id)
-    .eq("url", url);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath(`/properties/${propertySlug}/pages`);
-  return { ok: true };
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    await upsertWqaDecision({
+      property_id: (prop as { id: string }).id, url,
+      logic_notes: notes,
+      decided_by: getOperator(),
+    });
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
-export type DecisionRow = {
-  url: string;
-  action: WqaActionValue;
-  decided_by: string;
-  decided_at: string;
-};
-
-/** Server-side reader — used by the Pages route to overlay overrides onto
- *  the WQA rows before triage runs. */
-export async function getWqaDecisions(
-  propertySlug: string,
-): Promise<DecisionRow[]> {
-  const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return [];
-  const { data } = await supabase
-    .from("wqa_decision")
-    .select("url, action, decided_by, decided_at")
-    .eq("property_id", prop.id);
-  return (data ?? []) as DecisionRow[];
+// ─── setTargetUrl ─────────────────────────────────────────────────────────
+export async function setTargetUrl(
+  slug: string, url: string, targetUrl: string | null,
+): Promise<Ok | Err> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    await upsertWqaDecision({
+      property_id: (prop as { id: string }).id, url,
+      target_url: targetUrl,
+      decided_by: getOperator(),
+    });
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
-// ───── page_execution mutations ───────────────────────────────────────────
-// Mirror the setWqaDecision shape: requireWriteToken -> resolve property ->
-// getOperator -> lib upsert -> updateTag(property). The Pages list reads
-// page_execution via getExecutionByUrl on the next render, which is fresh
-// once the cache tag busts.
+// ─── verifyTargetUrl ──────────────────────────────────────────────────────
+// Live HTTP check against the target. Returns the chain + final status.
+// On success, optionally flips status → Done.
+export type VerifyResult =
+  | {
+      ok: true;
+      finalUrl: string;
+      finalStatus: number;
+      chain: { url: string; status: number }[];
+      flippedStatusToDone: boolean;
+    }
+  | { ok: false; error: string; chain?: { url: string; status: number }[] };
+
+export async function verifyTargetUrl(
+  slug: string, url: string, flipStatusOnSuccess: boolean,
+): Promise<VerifyResult> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+
+  // Read the current target_url for this row
+  const { data: row } = await supabase
+    .from("wqa_decision")
+    .select("target_url")
+    .eq("property_id", propertyId)
+    .eq("url", url)
+    .single();
+  if (!row?.target_url) return { ok: false, error: "No target_url set on this row" };
+
+  // Call the Next route handler that does the live HTTP check
+  const verifyEndpoint = `${apiBase()}/api/verify-url?target=${encodeURIComponent(row.target_url)}`;
+  let chain: { url: string; status: number }[] = [];
+  let finalUrl = row.target_url;
+  let finalStatus = 0;
+  try {
+    const resp = await fetch(verifyEndpoint);
+    if (!resp.ok) return { ok: false, error: `verify endpoint returned ${resp.status}` };
+    const body = await resp.json();
+    chain = body.chain ?? [];
+    finalUrl = body.finalUrl ?? row.target_url;
+    finalStatus = body.finalStatus ?? 0;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+
+  // Stamp last_implementation_check_at on the row + optionally flip status
+  const success = finalStatus >= 200 && finalStatus < 400;
+  try {
+    await upsertWqaDecision({
+      property_id: propertyId, url,
+      last_implementation_check_at: new Date().toISOString(),
+      ...(flipStatusOnSuccess && success ? { status: "Done" as WqaStatus } : {}),
+      decided_by: getOperator(),
+    });
+    bust(slug);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e), chain };
+  }
+
+  return {
+    ok: true,
+    finalUrl,
+    finalStatus,
+    chain,
+    flippedStatusToDone: flipStatusOnSuccess && success,
+  };
+}
+
+// ─── clearActionOverride ──────────────────────────────────────────────────
+// Delete the wqa_decision row entirely (so the joined view falls back to
+// the pipeline's wqa_output action). This is the "trust the pipeline again"
+// affordance from the spec.
+export async function clearActionOverride(slug: string, url: string): Promise<Ok | Err> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    const { error } = await supabase
+      .from("wqa_decision")
+      .delete()
+      .eq("property_id", (prop as { id: string }).id)
+      .eq("url", url);
+    if (error) return { ok: false, error: error.message };
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ─── clearTargetUrlOverride ───────────────────────────────────────────────
+export async function clearTargetUrlOverride(slug: string, url: string): Promise<Ok | Err> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  try {
+    await upsertWqaDecision({
+      property_id: (prop as { id: string }).id, url,
+      target_url: null,
+      decided_by: getOperator(),
+    });
+    bust(slug);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ═══ page_execution mutations ═════════════════════════════════════════════
+// Mirror the WQA-decision shape: requireWriteToken -> resolve property ->
+// getOperator -> lib upsert -> bust. Untouched by P2 — different table.
 
 const VALID_STATUSES: ReadonlySet<ExecutionStatus> = new Set<ExecutionStatus>([
   "To Do",
@@ -170,11 +313,11 @@ export async function setExecutionStatus(
     return { ok: false, error: `Invalid status: ${status}` };
   }
   const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
+  if ("ok" in prop && prop.ok === false) return prop;
 
   try {
     await upsertExecution({
-      property_id: prop.id,
+      property_id: (prop as { id: string }).id,
       url,
       status,
       updated_by: getOperator(),
@@ -199,14 +342,14 @@ export async function setExecutionField(
     return { ok: false, error: `Invalid field: ${field}` };
   }
   const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
+  if ("ok" in prop && prop.ok === false) return prop;
 
   // Normalize empty string -> null so blank inputs don't pollute the DB.
   const normalized = value === "" ? null : value;
 
   try {
     await upsertExecution({
-      property_id: prop.id,
+      property_id: (prop as { id: string }).id,
       url,
       [field]: normalized,
       updated_by: getOperator(),
@@ -218,7 +361,7 @@ export async function setExecutionField(
   return { ok: true };
 }
 
-// ───── page_check_state mutations ─────────────────────────────────────────
+// ═══ page_check_state mutations ═══════════════════════════════════════════
 
 export async function setCheckStatus(
   propertySlug: string,
@@ -234,11 +377,11 @@ export async function setCheckStatus(
     return { ok: false, error: `Invalid status: ${status}` };
   }
   const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
+  if ("ok" in prop && prop.ok === false) return prop;
 
   try {
     await upsertCheckState({
-      property_id: prop.id,
+      property_id: (prop as { id: string }).id,
       url,
       check_id: checkId,
       status,
@@ -266,13 +409,13 @@ export async function setCheckNotes(
   if (!url) return { ok: false, error: "URL required" };
   if (!checkId) return { ok: false, error: "checkId required" };
   const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
+  if ("ok" in prop && prop.ok === false) return prop;
 
   const normalized = notes === "" ? null : notes;
 
   try {
     await upsertCheckState({
-      property_id: prop.id,
+      property_id: (prop as { id: string }).id,
       url,
       check_id: checkId,
       notes: normalized,
@@ -300,13 +443,13 @@ export async function setCheckOwner(
   if (!url) return { ok: false, error: "URL required" };
   if (!checkId) return { ok: false, error: "checkId required" };
   const prop = await resolveProperty(propertySlug);
-  if ("error" in prop) return { ok: false, error: prop.error };
+  if ("ok" in prop && prop.ok === false) return prop;
 
   const normalized = owner === "" ? null : owner;
 
   try {
     await upsertCheckState({
-      property_id: prop.id,
+      property_id: (prop as { id: string }).id,
       url,
       check_id: checkId,
       owner: normalized,
@@ -317,4 +460,78 @@ export async function setCheckOwner(
   }
   bustPagesCache(propertySlug);
   return { ok: true };
+}
+
+// ═══ Back-compat shims (removed in Chunk 3 when WqaActionChip is rewritten) ═
+//
+// The v1 chip + a couple of consumers still call setWqaDecision /
+// clearWqaDecision with the legacy 10-value enum. Map legacy values onto
+// the new 7-action enum (mirrors the SQL backfill in 20260525_wqa_decision_v2.sql)
+// and delegate to the v2 actions so the build stays green until Chunk 3
+// rewrites the chip.
+
+/** Legacy 10-value action enum. Same semantic shape as the v1 type but
+ *  re-typed here so the chip's `TriageAction` (declared in lib/wqa-triage)
+ *  is structurally assignable. */
+export type WqaActionValue =
+  | "Optimize"
+  | "Restore"
+  | "Redirect"
+  | "Consolidate"
+  | "Remove"
+  | "Evaluate"
+  | "Leave as 404"
+  | "Non-addressable"
+  | "Non-indexable"
+  | "Investigate"
+  | "Keep";
+
+const LEGACY_TO_ACTION7: Record<string, Action7> = {
+  Optimize: "Optimize",
+  Restore: "Restore",
+  Redirect: "Redirect",
+  Consolidate: "Consolidate",
+  Remove: "Remove",
+  Keep: "Keep",
+  Investigate: "Investigate",
+  // Legacy values collapse per the SQL backfill.
+  Evaluate: "Investigate",
+  "Leave as 404": "Keep",
+  "Non-addressable": "Keep",
+  "Non-indexable": "Keep",
+};
+
+/** Back-compat shim. The v1 setWqaDecision wrote action + (optionally)
+ *  target_url + note in one call. We map to setAction (+ setTargetUrl /
+ *  setLogicNotes when those args are provided). Removed in Chunk 3. */
+export async function setWqaDecision(
+  propertySlug: string,
+  url: string,
+  action: string,
+  targetUrl?: string | null,
+  note?: string | null,
+): Promise<Ok | Err> {
+  if (!url) return { ok: false, error: "URL required" };
+  const mapped = LEGACY_TO_ACTION7[action];
+  if (!mapped) return { ok: false, error: `Invalid action: ${action}` };
+
+  const ar = await setAction(propertySlug, url, mapped);
+  if (!ar.ok) return ar;
+  if (targetUrl !== undefined) {
+    const tr = await setTargetUrl(propertySlug, url, targetUrl);
+    if (!tr.ok) return tr;
+  }
+  if (note !== undefined) {
+    const nr = await setLogicNotes(propertySlug, url, note);
+    if (!nr.ok) return nr;
+  }
+  return { ok: true };
+}
+
+/** Back-compat shim. Removed in Chunk 3. */
+export async function clearWqaDecision(
+  propertySlug: string,
+  url: string,
+): Promise<Ok | Err> {
+  return clearActionOverride(propertySlug, url);
 }
