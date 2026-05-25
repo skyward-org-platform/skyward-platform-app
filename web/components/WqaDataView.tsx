@@ -39,6 +39,59 @@ const ACTION7_VALUES: Action7[] = [
   "Investigate",
 ];
 
+// ─── Column config ────────────────────────────────────────────────────────
+// All 18 columns rendered by the All URLs table. `url` is always on (it
+// is the row identity). Everything else is toggleable via the Columns
+// picker; visibility persists per-property in localStorage.
+
+type ColumnId =
+  | "zone"
+  | "action"
+  | "status"
+  | "logic"
+  | "url"
+  | "http"
+  | "indexable"
+  | "sessions"
+  | "conversions"
+  | "impressions"
+  | "ctr"
+  | "bestKeyword"
+  | "rank"
+  | "backlinks"
+  | "refdomains"
+  | "inlinks"
+  | "words"
+  | "depth";
+
+type ColumnDef = {
+  id: ColumnId;
+  label: string;
+  /** When true the column cannot be hidden via the picker. */
+  alwaysOn?: boolean;
+};
+
+const COLUMNS: ColumnDef[] = [
+  { id: "zone", label: "Health zone" },
+  { id: "action", label: "Action" },
+  { id: "status", label: "Status" },
+  { id: "logic", label: "Logic code" },
+  { id: "url", label: "URL / title", alwaysOn: true },
+  { id: "http", label: "HTTP status" },
+  { id: "indexable", label: "Indexable" },
+  { id: "sessions", label: "Sessions" },
+  { id: "conversions", label: "Conversions" },
+  { id: "impressions", label: "Impressions" },
+  { id: "ctr", label: "CTR %" },
+  { id: "bestKeyword", label: "Best keyword" },
+  { id: "rank", label: "Rank" },
+  { id: "backlinks", label: "Backlinks" },
+  { id: "refdomains", label: "Refdomains" },
+  { id: "inlinks", label: "Inlinks" },
+  { id: "words", label: "Word count" },
+  { id: "depth", label: "Page depth" },
+];
+
 const STATUS_VALUES: WqaStatus[] = ["Open", "In Progress", "Done", "Drifted"];
 
 const LOGIC_CODE_VALUES = Object.keys(LOGIC_CODE_LABELS) as LogicCode[];
@@ -196,6 +249,62 @@ export function WqaDataView({
   const [pageSize, setPageSize] = useState<50 | 100 | 250>(100);
   const [page, setPage] = useState(0);
 
+  // Column visibility - persisted to localStorage per property so the
+  // user's "show me only what I care about" layout survives navigation.
+  // URL is alwaysOn and cannot be hidden.
+  const colsStorageKey = propertySlug
+    ? `wqa-cols:${propertySlug}`
+    : "wqa-cols:default";
+  const [hiddenColumns, setHiddenColumns] = useState<Set<ColumnId>>(
+    () => new Set(),
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(colsStorageKey);
+      if (!raw) return;
+      const ids = JSON.parse(raw) as ColumnId[];
+      setHiddenColumns(new Set(ids.filter((id) => !COLUMNS.find((c) => c.id === id)?.alwaysOn)));
+    } catch {
+      // ignore malformed storage
+    }
+  }, [colsStorageKey]);
+  const toggleColumn = useCallback(
+    (id: ColumnId) => {
+      setHiddenColumns((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              colsStorageKey,
+              JSON.stringify(Array.from(next)),
+            );
+          } catch {
+            // ignore quota / private-mode errors
+          }
+        }
+        return next;
+      });
+    },
+    [colsStorageKey],
+  );
+  const resetColumns = useCallback(() => {
+    setHiddenColumns(new Set());
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(colsStorageKey);
+      } catch {
+        // ignore
+      }
+    }
+  }, [colsStorageKey]);
+  const vis = useCallback(
+    (id: ColumnId) => !hiddenColumns.has(id),
+    [hiddenColumns],
+  );
+
   // Multi-select filter state lives in local React state. Previously these
   // were URL search params, but router.push("?...") in Next.js 16 App Router
   // is treated as navigation - which kicks loading.tsx in and visually
@@ -253,6 +362,56 @@ export function WqaDataView({
     setSelectedOverride(new Set());
     setHealthFilter("all");
   }, []);
+
+  // URL deep-linking - hydrate filter state from search params on mount,
+  // then mirror state to URL on change via history.replaceState (which
+  // does NOT trigger Next.js router navigation, so the page does not blank).
+  // Format mirrors the original URL pattern: ?action=Optimize,Restore
+  // &status=Open&logic=four_xx_with_value,redirect_chain&override=operator.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const seed = <T extends string>(
+      key: string,
+      allow: readonly T[],
+    ): Set<T> => {
+      const raw = params.get(key);
+      if (!raw) return new Set();
+      return new Set(
+        raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s): s is T => (allow as readonly string[]).includes(s)),
+      );
+    };
+    const a = seed<Action7>("action", ACTION7_VALUES);
+    const s = seed<WqaStatus>("status", STATUS_VALUES);
+    const l = seed<LogicCode>("logic", LOGIC_CODE_VALUES);
+    const o = seed<OverrideFilter>("override", ["pipeline", "operator"]);
+    if (a.size) setSelectedActions(a);
+    if (s.size) setSelectedStatuses(s);
+    if (l.size) setSelectedLogicState(l);
+    if (o.size) setSelectedOverride(o);
+    // mount-only hydration; subsequent URL changes are driven by state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const write = (key: string, vals: Iterable<string>) => {
+      const arr = Array.from(vals);
+      if (arr.length === 0) params.delete(key);
+      else params.set(key, arr.join(","));
+    };
+    write("action", selectedActions);
+    write("status", selectedStatuses);
+    write("logic", selectedLogic);
+    write("override", selectedOverride);
+    const qs = params.toString();
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, "", next);
+  }, [selectedActions, selectedStatuses, selectedLogic, selectedOverride]);
 
   // Build url → wqa_decision map so the chips can render override action
   // / status / drift without a second round-trip.
@@ -565,7 +724,11 @@ export function WqaDataView({
 
           <span className="ml-auto flex items-center gap-2">
             <AddFiltersStub />
-            <ColumnsStub />
+            <ColumnsPicker
+              hidden={hiddenColumns}
+              onToggle={toggleColumn}
+              onReset={resetColumns}
+            />
             <span className="text-muted-foreground tabular-nums">
               {visible.length.toLocaleString()} URLs
             </span>
@@ -594,34 +757,72 @@ export function WqaDataView({
           <table className="w-full text-[11.5px]">
             <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
               <tr>
-                <th className="text-left px-3 py-2 font-medium w-[36px]">Zone</th>
-                <th className="text-left px-2 py-2 font-medium min-w-[110px]">
-                  Action
-                </th>
-                <th className="text-left px-2 py-2 font-medium min-w-[110px]">
-                  Status
-                </th>
-                <th className="text-left px-2 py-2 font-medium min-w-[160px]">
-                  Logic
-                </th>
-                <th className="text-left px-3 py-2 font-medium min-w-[280px]">
-                  URL
-                </th>
-                <th className="text-right px-2 py-2 font-medium">HTTP</th>
-                <th className="text-left px-2 py-2 font-medium">Indexable</th>
-                <th className="text-right px-2 py-2 font-medium">Sessions</th>
-                <th className="text-right px-2 py-2 font-medium">Conv</th>
-                <th className="text-right px-2 py-2 font-medium">Impr</th>
-                <th className="text-right px-2 py-2 font-medium">CTR%</th>
-                <th className="text-left px-2 py-2 font-medium min-w-[180px]">
-                  Best keyword
-                </th>
-                <th className="text-right px-2 py-2 font-medium">Rank</th>
-                <th className="text-right px-2 py-2 font-medium">BLs</th>
-                <th className="text-right px-2 py-2 font-medium">RD</th>
-                <th className="text-right px-2 py-2 font-medium">Inl</th>
-                <th className="text-right px-2 py-2 font-medium">Words</th>
-                <th className="text-right px-2 py-2 font-medium">Depth</th>
+                {vis("zone") && (
+                  <th className="text-left px-3 py-2 font-medium w-[36px]">
+                    Zone
+                  </th>
+                )}
+                {vis("action") && (
+                  <th className="text-left px-2 py-2 font-medium min-w-[110px]">
+                    Action
+                  </th>
+                )}
+                {vis("status") && (
+                  <th className="text-left px-2 py-2 font-medium min-w-[110px]">
+                    Status
+                  </th>
+                )}
+                {vis("logic") && (
+                  <th className="text-left px-2 py-2 font-medium min-w-[160px]">
+                    Logic
+                  </th>
+                )}
+                {vis("url") && (
+                  <th className="text-left px-3 py-2 font-medium min-w-[280px]">
+                    URL
+                  </th>
+                )}
+                {vis("http") && (
+                  <th className="text-right px-2 py-2 font-medium">HTTP</th>
+                )}
+                {vis("indexable") && (
+                  <th className="text-left px-2 py-2 font-medium">Indexable</th>
+                )}
+                {vis("sessions") && (
+                  <th className="text-right px-2 py-2 font-medium">Sessions</th>
+                )}
+                {vis("conversions") && (
+                  <th className="text-right px-2 py-2 font-medium">Conv</th>
+                )}
+                {vis("impressions") && (
+                  <th className="text-right px-2 py-2 font-medium">Impr</th>
+                )}
+                {vis("ctr") && (
+                  <th className="text-right px-2 py-2 font-medium">CTR%</th>
+                )}
+                {vis("bestKeyword") && (
+                  <th className="text-left px-2 py-2 font-medium min-w-[180px]">
+                    Best keyword
+                  </th>
+                )}
+                {vis("rank") && (
+                  <th className="text-right px-2 py-2 font-medium">Rank</th>
+                )}
+                {vis("backlinks") && (
+                  <th className="text-right px-2 py-2 font-medium">BLs</th>
+                )}
+                {vis("refdomains") && (
+                  <th className="text-right px-2 py-2 font-medium">RD</th>
+                )}
+                {vis("inlinks") && (
+                  <th className="text-right px-2 py-2 font-medium">Inl</th>
+                )}
+                {vis("words") && (
+                  <th className="text-right px-2 py-2 font-medium">Words</th>
+                )}
+                {vis("depth") && (
+                  <th className="text-right px-2 py-2 font-medium">Depth</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -636,67 +837,76 @@ export function WqaDataView({
                     className={`border-t hover:bg-muted/40 tabular-nums ${onOpenDrawer ? "cursor-pointer" : ""}`}
                     onClick={() => onOpenDrawer?.(r.url)}
                   >
-                    <td className="px-3 py-1.5">
-                      <span
-                        className={`inline-block size-2 rounded-full ${
-                          zone === "green"
-                            ? "bg-emerald-500"
-                            : zone === "red"
-                              ? "bg-rose-500"
-                              : zone === "gray"
-                                ? "bg-slate-400"
-                                : "bg-muted-foreground/30"
-                        }`}
-                        title={zoneLabel(zone)}
-                      />
-                    </td>
-                    <td
-                      className="px-2 py-1.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {propertySlug ? (
-                        <WqaActionChip
-                          propertySlug={propertySlug}
-                          url={r.url}
-                          pipelineAction={row.pipelineAction}
-                          overrideAction={row.overrideAction}
-                        />
-                      ) : (
+                    {vis("zone") && (
+                      <td className="px-3 py-1.5">
                         <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${tint.band}`}
-                          title={triage.logic}
-                        >
-                          <span
-                            className={`size-1.5 rounded-full ${tint.dot}`}
-                            aria-hidden
-                          />
-                          {triage.action}
-                        </span>
-                      )}
-                      {triage.tier && (
-                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground/80 mt-0.5">
-                          {triage.tier}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      {propertySlug ? (
-                        <WqaStatusChip
-                          propertySlug={propertySlug}
-                          url={r.url}
-                          value={row.status}
-                          action={row.displayedAction}
-                          driftReason={row.driftReason}
+                          className={`inline-block size-2 rounded-full ${
+                            zone === "green"
+                              ? "bg-emerald-500"
+                              : zone === "red"
+                                ? "bg-rose-500"
+                                : zone === "gray"
+                                  ? "bg-slate-400"
+                                  : "bg-muted-foreground/30"
+                          }`}
+                          title={zoneLabel(zone)}
                         />
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">
-                          —
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <WqaLogicCell code={row.logicCode} />
-                    </td>
+                      </td>
+                    )}
+                    {vis("action") && (
+                      <td
+                        className="px-2 py-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {propertySlug ? (
+                          <WqaActionChip
+                            propertySlug={propertySlug}
+                            url={r.url}
+                            pipelineAction={row.pipelineAction}
+                            overrideAction={row.overrideAction}
+                          />
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${tint.band}`}
+                            title={triage.logic}
+                          >
+                            <span
+                              className={`size-1.5 rounded-full ${tint.dot}`}
+                              aria-hidden
+                            />
+                            {triage.action}
+                          </span>
+                        )}
+                        {triage.tier && (
+                          <div className="text-[9px] uppercase tracking-wider text-muted-foreground/80 mt-0.5">
+                            {triage.tier}
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    {vis("status") && (
+                      <td className="px-2 py-1.5">
+                        {propertySlug ? (
+                          <WqaStatusChip
+                            propertySlug={propertySlug}
+                            url={r.url}
+                            value={row.status}
+                            action={row.displayedAction}
+                            driftReason={row.driftReason}
+                          />
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">
+                            —
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {vis("logic") && (
+                      <td className="px-2 py-1.5">
+                        <WqaLogicCell code={row.logicCode} />
+                      </td>
+                    )}
+                    {vis("url") && (
                     <td className="px-3 py-1.5 max-w-0">
                       {r.current_title ? (
                         <>
@@ -744,55 +954,82 @@ export function WqaDataView({
                         {triage.logic}
                       </div>
                     </td>
-                    <td className="px-2 py-1.5 text-right text-muted-foreground">
-                      {r.status_code ?? "—"}
-                    </td>
-                    <td className="px-2 py-1.5 text-muted-foreground text-[10.5px]">
-                      {abbreviateIndexability(r.indexability)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {fmtN(r.sessions)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {fmtN(r.conversions)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {fmtN(r.average_impressions)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-muted-foreground">
-                      {fmtPct(r.average_ctr)}
-                    </td>
-                    <td className="px-2 py-1.5 truncate max-w-0">
-                      <div
-                        className="truncate text-[11px]"
-                        title={r.best_tv_keyword ?? ""}
-                      >
-                        {r.best_tv_keyword || r.best_sv_keyword || "—"}
-                      </div>
-                      {(r.best_tv_kw_sv || r.best_sv_kw_sv) && (
-                        <div className="text-[10px] text-muted-foreground">
-                          SV {fmtN(r.best_tv_kw_sv ?? r.best_sv_kw_sv)}
+                    )}
+                    {vis("http") && (
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">
+                        {r.status_code ?? "—"}
+                      </td>
+                    )}
+                    {vis("indexable") && (
+                      <td className="px-2 py-1.5 text-muted-foreground text-[10.5px]">
+                        {abbreviateIndexability(r.indexability)}
+                      </td>
+                    )}
+                    {vis("sessions") && (
+                      <td className="px-2 py-1.5 text-right">
+                        {fmtN(r.sessions)}
+                      </td>
+                    )}
+                    {vis("conversions") && (
+                      <td className="px-2 py-1.5 text-right">
+                        {fmtN(r.conversions)}
+                      </td>
+                    )}
+                    {vis("impressions") && (
+                      <td className="px-2 py-1.5 text-right">
+                        {fmtN(r.average_impressions)}
+                      </td>
+                    )}
+                    {vis("ctr") && (
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">
+                        {fmtPct(r.average_ctr)}
+                      </td>
+                    )}
+                    {vis("bestKeyword") && (
+                      <td className="px-2 py-1.5 truncate max-w-0">
+                        <div
+                          className="truncate text-[11px]"
+                          title={r.best_tv_keyword ?? ""}
+                        >
+                          {r.best_tv_keyword || r.best_sv_keyword || "—"}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {fmtN(r.best_tv_kw_rank ?? r.best_sv_kw_rank)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {fmtN(r.backlinks)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {fmtN(r.referring_domains)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-muted-foreground">
-                      {fmtN(r.inlinks)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-muted-foreground">
-                      {fmtN(r.word_count)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-muted-foreground">
-                      {fmtN(r.page_depth)}
-                    </td>
+                        {(r.best_tv_kw_sv || r.best_sv_kw_sv) && (
+                          <div className="text-[10px] text-muted-foreground">
+                            SV {fmtN(r.best_tv_kw_sv ?? r.best_sv_kw_sv)}
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    {vis("rank") && (
+                      <td className="px-2 py-1.5 text-right">
+                        {fmtN(r.best_tv_kw_rank ?? r.best_sv_kw_rank)}
+                      </td>
+                    )}
+                    {vis("backlinks") && (
+                      <td className="px-2 py-1.5 text-right">
+                        {fmtN(r.backlinks)}
+                      </td>
+                    )}
+                    {vis("refdomains") && (
+                      <td className="px-2 py-1.5 text-right">
+                        {fmtN(r.referring_domains)}
+                      </td>
+                    )}
+                    {vis("inlinks") && (
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">
+                        {fmtN(r.inlinks)}
+                      </td>
+                    )}
+                    {vis("words") && (
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">
+                        {fmtN(r.word_count)}
+                      </td>
+                    )}
+                    {vis("depth") && (
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">
+                        {fmtN(r.page_depth)}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1024,20 +1261,43 @@ function AddFiltersStub() {
   );
 }
 
-/** Stub for "Columns" — placeholder for a future column-visibility picker.
- *  All 18 columns are currently always-on; this opens a coming-soon panel. */
-function ColumnsStub() {
+/** Real Columns picker. Lists every COLUMNS entry with a checkbox; the
+ *  URL row stays alwaysOn so it cannot be hidden. Selections persist to
+ *  localStorage per property via the parent's toggleColumn callback. */
+function ColumnsPicker({
+  hidden,
+  onToggle,
+  onReset,
+}: {
+  hidden: Set<ColumnId>;
+  onToggle: (id: ColumnId) => void;
+  onReset: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const hiddenCount = hidden.size;
+  const visibleCount = COLUMNS.length - hiddenCount;
   return (
     <div className="relative inline-block">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-dashed border-border bg-card hover:border-foreground/30 text-muted-foreground"
-        title="Hide / show columns (coming soon)"
+        className={
+          "inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border bg-card hover:border-foreground/30 " +
+          (hiddenCount > 0
+            ? "border-foreground/30 text-foreground"
+            : "border-border text-muted-foreground")
+        }
+        title="Hide / show columns"
       >
         <span aria-hidden>⊞</span>
-        <span>Columns</span>
+        <span>
+          Columns
+          {hiddenCount > 0 && (
+            <span className="ml-1 tabular-nums opacity-80">
+              {visibleCount}/{COLUMNS.length}
+            </span>
+          )}
+        </span>
       </button>
       {open && (
         <>
@@ -1046,12 +1306,47 @@ function ColumnsStub() {
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute right-0 z-50 mt-1 bg-card border rounded-md shadow-lg p-3 min-w-[260px] text-[11px]">
-            <div className="font-semibold mb-1">Column visibility</div>
-            <p className="text-muted-foreground leading-snug">
-              Coming soon: hide / show any of the 18 columns and save the
-              choice per view.
-            </p>
+          <div className="absolute right-0 z-50 mt-1 bg-card border rounded-md shadow-lg p-1 min-w-[220px] max-h-[380px] overflow-y-auto text-[11px]">
+            <div className="flex items-center justify-between px-2 py-1 border-b mb-1">
+              <span className="font-semibold">Columns</span>
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onReset()}
+                  className="text-[10.5px] text-muted-foreground hover:text-foreground underline"
+                >
+                  Show all
+                </button>
+              )}
+            </div>
+            {COLUMNS.map((col) => {
+              const visible = !hidden.has(col.id);
+              const locked = col.alwaysOn === true;
+              return (
+                <label
+                  key={col.id}
+                  className={
+                    "flex items-center gap-2 px-2 py-1 rounded " +
+                    (locked
+                      ? "opacity-60 cursor-not-allowed"
+                      : "hover:bg-muted/50 cursor-pointer")
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={visible}
+                    disabled={locked}
+                    onChange={() => !locked && onToggle(col.id)}
+                  />
+                  <span>{col.label}</span>
+                  {locked && (
+                    <span className="ml-auto text-[9.5px] text-muted-foreground uppercase tracking-wider">
+                      always on
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
         </>
       )}
