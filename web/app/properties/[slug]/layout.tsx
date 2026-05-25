@@ -10,6 +10,7 @@ import {
 } from "@/components/PhaseStrip";
 import { StatusPill, statusVariantFrom } from "@/components/StatusPill";
 import { getWqaForDomain } from "@/lib/wqa";
+import { hasCompetitors } from "@/lib/competitors";
 import { approvePhase } from "./actions";
 
 type Project = {
@@ -65,12 +66,12 @@ const getProperty = cache(async (slug: string): Promise<PropertyRow | null> => {
   return data as unknown as PropertyRow | null;
 });
 
-async function getHeroMetrics(slug: string, propertyId: string) {
+async function getHeroMetrics(_slug: string, propertyId: string) {
   // Pages count + optimize count + BrandDNA filled count.
-  // Four reads in parallel; service-role client bypasses RLS. The
-  // competitors fetch hops to the BQ-backed Python API since that's
-  // the source of truth for that section per the Phase 0 SOP.
-  const [pagesRes, optimizeRes, dnaRes, hasCompetitors] = await Promise.all([
+  // Four reads in parallel; service-role client bypasses RLS. Competitor
+  // presence reads from the Supabase property_competitor table (operator
+  // owns this data; BQ Meta is legacy seed only).
+  const [pagesRes, optimizeRes, dnaRes, competitorsFilled] = await Promise.all([
     supabase
       .from("page")
       .select("id", { count: "exact", head: true })
@@ -84,41 +85,23 @@ async function getHeroMetrics(slug: string, propertyId: string) {
       .from("brand_dna_section")
       .select("section")
       .eq("property_id", propertyId),
-    fetchHasCompetitors(slug),
+    hasCompetitors(propertyId),
   ]);
   // Brand DNA: count non-empty sections from brand_dna_section, PLUS 1 if
-  // BQ Meta has any competitor rows for this property. Denominator is 12
+  // Supabase has any competitor rows for this property. Denominator is 12
   // (the strategist-facing section count from COMPLETENESS_SECTIONS).
   const sections = (dnaRes.data ?? []) as { section: string }[];
   const supabaseFilled = sections.filter(
     (s) => s.section !== "competitors",
   ).length;
-  const filled = supabaseFilled + (hasCompetitors ? 1 : 0);
+  const filled = supabaseFilled + (competitorsFilled ? 1 : 0);
   return {
     pages: pagesRes.count ?? 0,
     optimize: optimizeRes.count ?? 0,
     brandDnaFilled: filled,
     brandDnaTotal: 12,
-    hasCompetitors,
+    hasCompetitors: competitorsFilled,
   };
-}
-
-// Lightweight competitor presence check. The full competitors API
-// returns the row payload; here we only need to know whether at least
-// one exists, so we read the 'count' field from the response. If the
-// fetch fails (auth, BQ outage), default to false so the metric doesn't
-// flicker as filled on transient errors.
-async function fetchHasCompetitors(slug: string): Promise<boolean> {
-  try {
-    const r = await fetch(`${apiBase()}/api/properties/${slug}/competitors`, {
-      next: { revalidate: 300 },
-    });
-    if (!r.ok) return false;
-    const j = (await r.json()) as { count?: number };
-    return (j.count ?? 0) > 0;
-  } catch {
-    return false;
-  }
 }
 
 // Per-phase gate states for the property hero strip. Each phase resolves
@@ -153,6 +136,7 @@ type PhaseApprovalRow = {
 
 async function getPhaseGates(
   slug: string,
+  propertyId: string,
   primaryDomain: string | null,
   propertyStatus: string | null,
   approvals: PhaseApprovalRow,
@@ -196,8 +180,7 @@ async function getPhaseGates(
   let phase6HasData = false;
   let phase6Detail = "Property must be active with a primary domain to set up tracking.";
 
-  // Pull all of the Supabase counts in parallel + BQ wqa fetch + the BQ-
-  // backed competitors signal (lives in Meta, not Supabase).
+  // Pull all of the Supabase counts in parallel + BQ wqa fetch.
   try {
     const [
       brandDnaRes,
@@ -205,7 +188,7 @@ async function getPhaseGates(
       contentRowRes,
       auditDocRes,
       wqaRes,
-      hasCompetitors,
+      hasCompetitorsFlag,
     ] = await Promise.all([
       supabase
         .from("brand_dna_section")
@@ -226,7 +209,7 @@ async function getPhaseGates(
       primaryDomain
         ? getWqaForDomain(primaryDomain, "dev")
         : Promise.resolve(null),
-      fetchHasCompetitors(slug),
+      hasCompetitors(propertyId),
     ]);
 
     // Phase 0 — count brand_dna_section rows with content + add 1 for
@@ -243,14 +226,14 @@ async function getPhaseGates(
       }
       return false;
     }).length;
-    const filled = supabaseFilled + (hasCompetitors ? 1 : 0);
+    const filled = supabaseFilled + (hasCompetitorsFlag ? 1 : 0);
     if (filled > 0) {
       phase0HasData = true;
       const parts: string[] = [];
       if (supabaseFilled > 0) {
         parts.push(`${supabaseFilled} Brand DNA section${supabaseFilled === 1 ? "" : "s"}`);
       }
-      if (hasCompetitors) parts.push("competitors");
+      if (hasCompetitorsFlag) parts.push("competitors");
       phase0Detail = `${filled} of 12 populated (${parts.join(" + ")}).`;
     }
 
@@ -428,7 +411,7 @@ export default async function PropertyLayout({
     await Promise.all([
       getProjectTypes(slug),
       getHeroMetrics(slug, prop.id),
-      getPhaseGates(slug, prop.primary_domain, prop.status, prop as PhaseApprovalRow),
+      getPhaseGates(slug, prop.id, prop.primary_domain, prop.status, prop as PhaseApprovalRow),
     ]);
 
   const tabs = buildTabs(slug, projectTypes, metrics, projectCount);

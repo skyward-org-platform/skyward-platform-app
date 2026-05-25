@@ -14,6 +14,11 @@ import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
 import { CACHE_TAGS } from "@/lib/cache";
+import { apiBase } from "@/lib/api-base";
+import {
+  normalizeCompetitorDomain,
+  type CompetitorPriority,
+} from "@/lib/competitors";
 
 type Ok = { ok: true; sectionId: string };
 type Err = { ok: false; error: string };
@@ -86,4 +91,173 @@ export async function upsertBrandDnaField(
   updateTag(CACHE_TAGS.signals);
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
   return { ok: true, sectionId: existing.id };
+}
+
+// ─── Competitor CRUD ───────────────────────────────────────────────────────
+// Operator-owned via property_competitor. BQ Meta is the seed via the
+// importCompetitorsFromBqMeta action; ongoing CRUD lives here.
+
+type CompetitorOk = { ok: true };
+type CompetitorErr = { ok: false; error: string };
+
+async function resolvePropertyId(slug: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("property")
+    .select("id")
+    .eq("slug", slug)
+    .single();
+  return data?.id ?? null;
+}
+
+function revalidateCompetitors(propertySlug: string) {
+  updateTag(CACHE_TAGS.brandDna);
+  revalidatePath(`/properties/${propertySlug}/brand-dna/competitors`);
+  revalidatePath(`/properties/${propertySlug}`, "layout");
+}
+
+export async function addCompetitor(
+  propertySlug: string,
+  rawDomain: string,
+  priority: CompetitorPriority,
+  notes: string | null,
+): Promise<CompetitorOk | CompetitorErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const domain = normalizeCompetitorDomain(rawDomain);
+  if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
+    return { ok: false, error: "Invalid domain. Use host only, e.g. example.com" };
+  }
+  const propertyId = await resolvePropertyId(propertySlug);
+  if (!propertyId) return { ok: false, error: "Property not found." };
+
+  const operator = getOperator();
+  const { error } = await supabase.from("property_competitor").insert({
+    property_id: propertyId,
+    domain,
+    priority,
+    notes: notes && notes.trim().length > 0 ? notes.trim() : null,
+    source: "operator",
+    created_by: operator,
+    updated_by: operator,
+  });
+  if (error) {
+    if (error.code === "23505") {
+      return { ok: false, error: `${domain} is already on the competitor list.` };
+    }
+    return { ok: false, error: error.message };
+  }
+  revalidateCompetitors(propertySlug);
+  return { ok: true };
+}
+
+export async function updateCompetitor(
+  propertySlug: string,
+  competitorId: string,
+  patch: { priority?: CompetitorPriority; notes?: string | null },
+): Promise<CompetitorOk | CompetitorErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const update: Record<string, unknown> = { updated_by: getOperator() };
+  if (patch.priority !== undefined) update.priority = patch.priority;
+  if (patch.notes !== undefined) {
+    update.notes =
+      patch.notes && patch.notes.trim().length > 0 ? patch.notes.trim() : null;
+  }
+  const { error } = await supabase
+    .from("property_competitor")
+    .update(update)
+    .eq("id", competitorId);
+  if (error) return { ok: false, error: error.message };
+  revalidateCompetitors(propertySlug);
+  return { ok: true };
+}
+
+export async function removeCompetitor(
+  propertySlug: string,
+  competitorId: string,
+): Promise<CompetitorOk | CompetitorErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const { error } = await supabase
+    .from("property_competitor")
+    .delete()
+    .eq("id", competitorId);
+  if (error) return { ok: false, error: error.message };
+  revalidateCompetitors(propertySlug);
+  return { ok: true };
+}
+
+/** One-shot seeding from BQ Meta. Hits the existing Python API to read
+ *  the BQ rows, then inserts each as source='bq_meta_import'. Existing
+ *  Supabase rows are NOT overwritten - duplicates are skipped via the
+ *  unique (property_id, domain) constraint. Safe to re-run. */
+export async function importCompetitorsFromBqMeta(
+  propertySlug: string,
+): Promise<{ ok: true; imported: number; skipped: number } | CompetitorErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const propertyId = await resolvePropertyId(propertySlug);
+  if (!propertyId) return { ok: false, error: "Property not found." };
+
+  let bqRows: {
+    domain: string;
+    priority: string | null;
+    notes: string | null;
+  }[] = [];
+  try {
+    const r = await fetch(
+      `${apiBase()}/api/properties/${propertySlug}/competitors`,
+      { cache: "no-store" },
+    );
+    if (!r.ok) return { ok: false, error: `BQ Meta fetch failed (${r.status}).` };
+    const j = (await r.json()) as { competitors: typeof bqRows };
+    bqRows = j.competitors ?? [];
+  } catch (e) {
+    return { ok: false, error: `BQ Meta fetch error: ${(e as Error).message}` };
+  }
+  if (bqRows.length === 0) {
+    return { ok: true, imported: 0, skipped: 0 };
+  }
+
+  const operator = getOperator();
+  const validPriorities: CompetitorPriority[] = ["high", "medium", "low"];
+  const inserts = bqRows
+    .map((r) => ({
+      property_id: propertyId,
+      domain: normalizeCompetitorDomain(r.domain ?? ""),
+      priority: (validPriorities.includes(
+        (r.priority ?? "").toLowerCase() as CompetitorPriority,
+      )
+        ? (r.priority ?? "").toLowerCase()
+        : "medium") as CompetitorPriority,
+      notes: r.notes ?? null,
+      source: "bq_meta_import" as const,
+      created_by: operator,
+      updated_by: operator,
+    }))
+    .filter((r) => r.domain.length > 0);
+
+  // Insert with on-conflict-do-nothing semantics: read existing domains
+  // first, then insert only the new ones. (Supabase JS doesn't expose
+  // a clean upsert-ignore for unique constraints, so we split it.)
+  const { data: existing } = await supabase
+    .from("property_competitor")
+    .select("domain")
+    .eq("property_id", propertyId);
+  const existingDomains = new Set(
+    (existing ?? []).map((r: { domain: string }) => r.domain),
+  );
+  const newRows = inserts.filter((r) => !existingDomains.has(r.domain));
+  if (newRows.length === 0) {
+    revalidateCompetitors(propertySlug);
+    return { ok: true, imported: 0, skipped: inserts.length };
+  }
+  const { error } = await supabase.from("property_competitor").insert(newRows);
+  if (error) return { ok: false, error: error.message };
+  revalidateCompetitors(propertySlug);
+  return {
+    ok: true,
+    imported: newRows.length,
+    skipped: inserts.length - newRows.length,
+  };
 }
