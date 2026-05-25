@@ -6,11 +6,11 @@ import { apiBase } from "@/lib/api-base";
 import {
   PhaseStrip,
   PHASE_NAMES,
-  type PhasePercent,
+  type PhaseGate,
 } from "@/components/PhaseStrip";
 import { StatusPill, statusVariantFrom } from "@/components/StatusPill";
-import { getWqaDecisions } from "@/lib/wqa-decisions";
 import { getWqaForDomain } from "@/lib/wqa";
+import { approvePhase } from "./actions";
 
 type Project = {
   project_type: string;
@@ -21,15 +21,48 @@ type Project = {
 
 // React.cache dedupes within a single request — multiple components calling
 // getProperty(slug) on the same page only hit Supabase once.
-const getProperty = cache(async (slug: string) => {
+type PropertyRow = {
+  id: string;
+  slug: string;
+  name: string;
+  primary_domain: string | null;
+  url_prefix: string | null;
+  pipeline_phase: number | null;
+  status: string | null;
+  phase_0_approved_at: string | null;
+  phase_0_approved_by: string | null;
+  phase_1_approved_at: string | null;
+  phase_1_approved_by: string | null;
+  phase_2_approved_at: string | null;
+  phase_2_approved_by: string | null;
+  phase_3_approved_at: string | null;
+  phase_3_approved_by: string | null;
+  phase_4_approved_at: string | null;
+  phase_4_approved_by: string | null;
+  phase_5_approved_at: string | null;
+  phase_5_approved_by: string | null;
+  phase_6_approved_at: string | null;
+  phase_6_approved_by: string | null;
+  client: { name: string; legal_name: string | null; slug: string } | null;
+};
+
+const getProperty = cache(async (slug: string): Promise<PropertyRow | null> => {
   const { data } = await supabase
     .from("property")
     .select(
-      "id, slug, name, primary_domain, url_prefix, pipeline_phase, status, client:client_id(name, legal_name, slug)",
+      "id, slug, name, primary_domain, url_prefix, pipeline_phase, status, " +
+        "phase_0_approved_at, phase_0_approved_by, " +
+        "phase_1_approved_at, phase_1_approved_by, " +
+        "phase_2_approved_at, phase_2_approved_by, " +
+        "phase_3_approved_at, phase_3_approved_by, " +
+        "phase_4_approved_at, phase_4_approved_by, " +
+        "phase_5_approved_at, phase_5_approved_by, " +
+        "phase_6_approved_at, phase_6_approved_by, " +
+        "client:client_id(name, legal_name, slug)",
     )
     .eq("slug", slug)
     .single();
-  return data;
+  return data as unknown as PropertyRow | null;
 });
 
 async function getHeroMetrics(_slug: string, propertyId: string) {
@@ -63,77 +96,118 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
   };
 }
 
-// Per-phase completion percentages for the property hero strip. Only
-// phases 0 (Onboard / Brand DNA) and 1 (WQA done %) have concrete signals
-// today; phases 2-6 return null and render as "—" until those data
-// sources land. Each null entry has an inline TODO so the data wiring
-// can be picked up phase-by-phase.
-async function getPhasePercents(
+// Per-phase gate states for the property hero strip. Each phase resolves
+// to one of three states per Paul's "commit + push" model:
+//   - gray  : no underlying data exists yet
+//   - black : data is populated and ready for review, but the phase has
+//             not been approved yet (downstream phases see nothing)
+//   - green : phase approved at least once (downstream phases consume
+//             current live state from this phase from now on)
+//
+// Only phases 0 (Brand DNA content present) and 1 (BQ pipeline output
+// exists) have wired data signals today. Phases 2-6 only resolve to
+// gray (no data) or green (approved with no data signal yet); their
+// black state will light up when each upstream data source is wired
+// in Chunk 3.
+type PhaseApprovalRow = {
+  phase_0_approved_at: string | null;
+  phase_0_approved_by: string | null;
+  phase_1_approved_at: string | null;
+  phase_1_approved_by: string | null;
+  phase_2_approved_at: string | null;
+  phase_2_approved_by: string | null;
+  phase_3_approved_at: string | null;
+  phase_3_approved_by: string | null;
+  phase_4_approved_at: string | null;
+  phase_4_approved_by: string | null;
+  phase_5_approved_at: string | null;
+  phase_5_approved_by: string | null;
+  phase_6_approved_at: string | null;
+  phase_6_approved_by: string | null;
+};
+
+async function getPhaseGates(
   slug: string,
   primaryDomain: string | null,
-): Promise<PhasePercent[]> {
-  // Phase 0: Onboard - Brand DNA section fillage (12 sections target,
-  // dropping the legacy 'competitors' section per getHeroMetrics).
-  let phase0: PhasePercent = {
-    percent: null,
-    title: "Brand DNA sections filled / 12",
-  };
+  approvals: PhaseApprovalRow,
+): Promise<PhaseGate[]> {
+  // Phase 0 data signal: any brand_dna_section row exists with non-empty
+  // content. Content lives in JSONB, not the legacy body column, so we
+  // check both.
+  let phase0HasData = false;
+  let phase0Detail = "Brand DNA sections not started.";
   try {
     const { data } = await supabase
       .from("brand_dna_section")
-      .select("section, property_id, property!inner(slug)")
+      .select("section, body, content, property!inner(slug)")
       .eq("property.slug", slug);
-    const filled = (data ?? []).filter(
-      (s: { section: string }) => s.section !== "competitors",
-    ).length;
-    phase0 = {
-      percent: Math.min(100, (filled / 12) * 100),
-      title: `${filled} of 12 Brand DNA sections filled`,
-    };
+    const rows = (data ?? []) as {
+      section: string;
+      body: string | null;
+      content: unknown;
+    }[];
+    const filled = rows.filter((r) => {
+      if (r.body && r.body.length > 0) return true;
+      if (r.content && typeof r.content === "object") {
+        return Object.keys(r.content as Record<string, unknown>).length > 0;
+      }
+      return false;
+    }).length;
+    if (filled > 0) {
+      phase0HasData = true;
+      phase0Detail = `${filled} Brand DNA section${filled === 1 ? "" : "s"} populated.`;
+    }
   } catch {
-    // ignore, keep null
+    // ignore
   }
 
-  // Phase 1: WQA - decisions with status='Done' / total WQA rows on the
-  // primary domain. If the property has no BQ pipeline output we leave
-  // the cell empty rather than rendering 0% (which would imply "started
-  // but unfinished" - misleading).
-  let phase1: PhasePercent = {
-    percent: null,
-    title: "WQA decisions marked Done / total WQA rows",
-  };
+  // Phase 1 data signal: BQ wqa_pipeline_output has rows for this
+  // domain. We don't gate on row count > some threshold; any rows means
+  // the pipeline has run successfully for this property.
+  let phase1HasData = false;
+  let phase1Detail = "WQA pipeline has not run for this domain.";
   if (primaryDomain) {
     try {
-      const [wqa, decisions] = await Promise.all([
-        getWqaForDomain(primaryDomain, "dev"),
-        getWqaDecisions(slug),
-      ]);
-      const total = wqa && "ok" in wqa && wqa.ok ? wqa.rows.length : 0;
-      const done = (decisions ?? []).filter((d) => d.status === "Done").length;
-      if (total > 0) {
-        phase1 = {
-          percent: Math.min(100, (done / total) * 100),
-          title: `${done} of ${total.toLocaleString()} URLs marked Done`,
-        };
+      const wqa = await getWqaForDomain(primaryDomain, "dev");
+      if (wqa && "ok" in wqa && wqa.ok && wqa.rows.length > 0) {
+        phase1HasData = true;
+        phase1Detail = `${wqa.rows.length.toLocaleString()} URLs in WQA pipeline output.`;
       }
     } catch {
-      // ignore, keep null
+      // ignore
     }
   }
 
-  // Phase 2: Tech SEO - TODO: page_check_state done / total checks.
-  // Phase 3: Keywords - TODO: cluster_summary rows present + reviewed.
-  // Phase 4: Content - TODO: page_execution status='done' / planned.
-  // Phase 5: Authority - TODO: link acquisition count vs target.
-  // Phase 6: Tracking - TODO: tracking_setup_complete flag on property.
+  const make = (
+    approvedAt: string | null,
+    approvedBy: string | null,
+    hasData: boolean,
+    detail: string,
+  ): PhaseGate => {
+    if (approvedAt) {
+      return {
+        state: "green",
+        approvedAt,
+        approvedBy,
+        detail,
+      };
+    }
+    return {
+      state: hasData ? "black" : "gray",
+      approvedAt: null,
+      approvedBy: null,
+      detail,
+    };
+  };
+
   return [
-    phase0,
-    phase1,
-    { percent: null, title: "TODO: wire page_check_state aggregate" },
-    { percent: null, title: "TODO: wire cluster_summary readiness" },
-    { percent: null, title: "TODO: wire page_execution done %" },
-    { percent: null, title: "TODO: wire authority acquisition signal" },
-    { percent: null, title: "TODO: wire tracking-setup flag" },
+    make(approvals.phase_0_approved_at, approvals.phase_0_approved_by, phase0HasData, phase0Detail),
+    make(approvals.phase_1_approved_at, approvals.phase_1_approved_by, phase1HasData, phase1Detail),
+    make(approvals.phase_2_approved_at, approvals.phase_2_approved_by, false, "Tech SEO data source not wired yet."),
+    make(approvals.phase_3_approved_at, approvals.phase_3_approved_by, false, "Keyword cluster data source not wired yet."),
+    make(approvals.phase_4_approved_at, approvals.phase_4_approved_by, false, "Content pipeline data source not wired yet."),
+    make(approvals.phase_5_approved_at, approvals.phase_5_approved_by, false, "Authority data source not wired yet."),
+    make(approvals.phase_6_approved_at, approvals.phase_6_approved_by, false, "Tracking setup signal not wired yet."),
   ];
 }
 
@@ -236,11 +310,11 @@ export default async function PropertyLayout({
   const prop = await getProperty(slug);
   if (!prop) notFound();
 
-  const [{ types: projectTypes, count: projectCount }, metrics, phaseMetrics] =
+  const [{ types: projectTypes, count: projectCount }, metrics, phaseGates] =
     await Promise.all([
       getProjectTypes(slug),
       getHeroMetrics(slug, prop.id),
-      getPhasePercents(slug, prop.primary_domain),
+      getPhaseGates(slug, prop.primary_domain, prop as PhaseApprovalRow),
     ]);
 
   const tabs = buildTabs(slug, projectTypes, metrics, projectCount);
@@ -298,8 +372,12 @@ export default async function PropertyLayout({
             </div>
             <PhaseStrip
               currentPhase={phase}
-              phases={phaseMetrics}
+              phases={phaseGates}
               showLabels
+              onApprove={async (phaseIndex: number) => {
+                "use server";
+                await approvePhase(prop.id, phaseIndex, slug);
+              }}
             />
           </div>
           <div className="flex gap-8">
