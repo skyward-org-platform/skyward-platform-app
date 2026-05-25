@@ -469,6 +469,101 @@ export async function setCheckOwner(
 // as `toAction7()` so client-side callers can defensively coerce any
 // pipeline action string until Chunk 5 lands.
 
+// ═══ Bulk operations ══════════════════════════════════════════════════════
+// One Supabase upsert call per bulk action across N URLs. Avoids the N
+// round-trip loop that single-URL setAction would require for large
+// selections. Bulk results return { ok, updated } so the BulkActionBar
+// can show the count of rows actually mutated.
+
+type BulkOk = { ok: true; updated: number };
+type BulkErr = { ok: false; error: string };
+
+export async function bulkSetAction(
+  slug: string,
+  urls: string[],
+  action: Action7,
+): Promise<BulkOk | BulkErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  if (urls.length === 0) return { ok: true, updated: 0 };
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+  const operator = getOperator();
+  const now = new Date().toISOString();
+  const rows = urls.map((url) => ({
+    property_id: propertyId,
+    url,
+    action,
+    decided_by: operator,
+    updated_at: now,
+  }));
+  const { data, error } = await supabase
+    .from("wqa_decision")
+    .upsert(rows, { onConflict: "property_id,url" })
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  bust(slug);
+  return { ok: true, updated: data?.length ?? 0 };
+}
+
+export async function bulkSetStatus(
+  slug: string,
+  urls: string[],
+  status: WqaStatus,
+): Promise<BulkOk | BulkErr> {
+  if (status === "Drifted") {
+    return { ok: false, error: "Drifted is auto-set only; cannot bulk-set" };
+  }
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  if (urls.length === 0) return { ok: true, updated: 0 };
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+  const operator = getOperator();
+  const now = new Date().toISOString();
+  const rows = urls.map((url) => ({
+    property_id: propertyId,
+    url,
+    status,
+    decided_by: operator,
+    updated_at: now,
+  }));
+  const { data, error } = await supabase
+    .from("wqa_decision")
+    .upsert(rows, { onConflict: "property_id,url" })
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  bust(slug);
+  return { ok: true, updated: data?.length ?? 0 };
+}
+
+/** Bulk-clear the operator action override - the wqa_decision rows are
+ *  deleted so the rows fall back to the pipeline-derived action.
+ *  Existing status / logic_notes on those rows are lost; intentional, the
+ *  override IS the row. Operator should re-set status separately if needed. */
+export async function bulkClearActionOverride(
+  slug: string,
+  urls: string[],
+): Promise<BulkOk | BulkErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  if (urls.length === 0) return { ok: true, updated: 0 };
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+  const { data, error } = await supabase
+    .from("wqa_decision")
+    .delete()
+    .eq("property_id", propertyId)
+    .in("url", urls)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  bust(slug);
+  return { ok: true, updated: data?.length ?? 0 };
+}
+
 // ─── suggestRedirectDestination ───────────────────────────────────────────
 // Powers the "Suggest destination" button on the Redirect tab. Calls the
 // shared lib helper that embeds the source URL's slug text via OpenAI +
