@@ -480,9 +480,13 @@ export function WqaDataView({
 
   // URL deep-linking - hydrate filter state from search params on mount,
   // then mirror state to URL on change via history.replaceState (which
-  // does NOT trigger Next.js router navigation, so the page does not blank).
-  // Format mirrors the original URL pattern: ?action=Optimize,Restore
-  // &status=Open&logic=four_xx_with_value,redirect_chain&override=operator.
+  // does NOT trigger Next.js router navigation, so the page doesn't blank).
+  //
+  // Params are namespaced with an `f_` prefix to avoid colliding with the
+  // tab strip in WqaTabs which uses `?action=<tabname>` for the active
+  // sub-tab. Earlier the filter mirror was stomping `?action=all` →
+  // empty, which bounced the user from the All URLs tab back to Overview
+  // on every mount (the "flash and disappear" bug Paul reported).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -499,10 +503,10 @@ export function WqaDataView({
           .filter((s): s is T => (allow as readonly string[]).includes(s)),
       );
     };
-    const a = seed<Action7>("action", ACTION7_VALUES);
-    const s = seed<WqaStatus>("status", STATUS_VALUES);
-    const l = seed<LogicCode>("logic", LOGIC_CODE_VALUES);
-    const o = seed<OverrideFilter>("override", ["pipeline", "operator"]);
+    const a = seed<Action7>("f_action", ACTION7_VALUES);
+    const s = seed<WqaStatus>("f_status", STATUS_VALUES);
+    const l = seed<LogicCode>("f_logic", LOGIC_CODE_VALUES);
+    const o = seed<OverrideFilter>("f_override", ["pipeline", "operator"]);
     if (a.size) setSelectedActions(a);
     if (s.size) setSelectedStatuses(s);
     if (l.size) setSelectedLogicState(l);
@@ -519,10 +523,10 @@ export function WqaDataView({
       if (arr.length === 0) params.delete(key);
       else params.set(key, arr.join(","));
     };
-    write("action", selectedActions);
-    write("status", selectedStatuses);
-    write("logic", selectedLogic);
-    write("override", selectedOverride);
+    write("f_action", selectedActions);
+    write("f_status", selectedStatuses);
+    write("f_logic", selectedLogic);
+    write("f_override", selectedOverride);
     const qs = params.toString();
     const next = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", next);
