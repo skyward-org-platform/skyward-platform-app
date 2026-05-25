@@ -9,6 +9,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import { VerifyButton } from "@/components/wqa/VerifyButton";
+import { BulkActionBar } from "@/components/wqa/BulkActionBar";
+import { useBulkSelection } from "@/components/wqa/useBulkSelection";
 import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps, TriagedRow } from "@/components/wqa/types";
 import {
@@ -99,6 +101,15 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
       .filter((g) => g.items.length > 0);
   }, [rows]);
 
+  // Flatten every row across every group into a single URL list so the
+  // bulk selection is unified — one BulkActionBar at the top operates on
+  // selections from any/all groups.
+  const visibleUrls = useMemo(
+    () => grouped.flatMap((g) => g.items.map((r) => r.row.url)),
+    [grouped],
+  );
+  const selection = useBulkSelection(visibleUrls);
+
   return (
     <section>
       <TabHeader
@@ -112,6 +123,14 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
         }
         count={rows.length}
       />
+
+      {propertySlug && (
+        <BulkActionBar
+          propertySlug={propertySlug}
+          urls={selection.selected}
+          onClear={selection.clear}
+        />
+      )}
 
       <div className="space-y-5">
         {grouped.map((g) => {
@@ -137,6 +156,22 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
               <TableShell>
                 <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
                   <tr>
+                    <th className="px-2 py-2 w-[28px]">
+                      <input
+                        type="checkbox"
+                        checked={g.items.every((r) => selection.selected.has(r.row.url))}
+                        ref={(el) => {
+                          if (el) {
+                            const some = g.items.some((r) => selection.selected.has(r.row.url));
+                            const all = g.items.every((r) => selection.selected.has(r.row.url));
+                            el.indeterminate = some && !all;
+                          }
+                        }}
+                        onChange={() => selection.toggleAll(g.items.map((r) => r.row.url))}
+                        aria-label={`Select all in ${g.type}`}
+                        className="cursor-pointer"
+                      />
+                    </th>
                     <th className="text-left px-3 py-2 font-medium min-w-[440px]">Source URL</th>
                     <th className="text-left px-2 py-2 font-medium">Action</th>
                     <th className="text-left px-2 py-2 font-medium min-w-[320px]">
@@ -159,12 +194,27 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                     if (g.type === "HTTP → HTTPS") {
                       suggested = r.row.url.replace(/^http:\/\//i, "https://");
                     }
+                    const isSelected = selection.selected.has(r.row.url);
                     return (
                       <tr
                         key={r.row.url}
-                        className={`border-t hover:bg-muted/40 ${onOpenDrawer ? "cursor-pointer" : ""}`}
+                        className={`border-t ${
+                          isSelected ? "bg-blue-50/60" : "hover:bg-muted/40"
+                        } ${onOpenDrawer ? "cursor-pointer" : ""}`}
                         onClick={() => onOpenDrawer?.(r.row.url)}
                       >
+                        <td
+                          className="px-2 py-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => selection.toggle(r.row.url)}
+                            aria-label={`Select ${r.row.url}`}
+                            className="cursor-pointer"
+                          />
+                        </td>
                         <td className="px-3 py-1.5">
                           <div className="space-y-0.5 break-all">
                             <a

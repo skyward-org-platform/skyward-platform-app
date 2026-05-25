@@ -6,15 +6,20 @@
 // can from WQA data; the spec scaffolding (Title/Meta/Schema) is the
 // follow-up enrichment pass.
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
+import { BulkActionBar } from "@/components/wqa/BulkActionBar";
+import { useBulkSelection } from "@/components/wqa/useBulkSelection";
 import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps } from "@/components/wqa/types";
 import type { ExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
 import { setExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
 
 export function RestoreTab({ rows, propertySlug, onOpenDrawer, execByUrl }: ActionTabProps) {
+  const visibleUrls = useMemo(() => rows.map((r) => r.row.url), [rows]);
+  const selection = useBulkSelection(visibleUrls);
+
   if (rows.length === 0) {
     return (
       <EmptyTab message="No URLs are tagged Restore. Pages 404 with rank ≤ 20 or sessions > 20 would land here." />
@@ -36,9 +41,29 @@ export function RestoreTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Acti
         count={rows.length}
       />
 
+      {propertySlug && (
+        <BulkActionBar
+          propertySlug={propertySlug}
+          urls={selection.selected}
+          onClear={selection.clear}
+        />
+      )}
+
       <TableShell>
         <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
           <tr>
+            <th className="px-2 py-2 w-[28px]">
+              <input
+                type="checkbox"
+                checked={selection.allVisibleSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = selection.someVisibleSelected;
+                }}
+                onChange={() => selection.toggleAll(visibleUrls)}
+                aria-label="Select all visible rows"
+                className="cursor-pointer"
+              />
+            </th>
             <th className="text-left px-3 py-2 font-medium min-w-[260px]">URL</th>
             <th className="text-left px-2 py-2 font-medium">Action</th>
             <th className="text-right px-2 py-2 font-medium">Status</th>
@@ -62,9 +87,25 @@ export function RestoreTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Acti
             return (
               <tr
                 key={r.row.url}
-                className={`border-t hover:bg-muted/40 ${onOpenDrawer ? "cursor-pointer" : ""}`}
+                className={`border-t ${
+                  selection.selected.has(r.row.url)
+                    ? "bg-blue-50/60"
+                    : "hover:bg-muted/40"
+                } ${onOpenDrawer ? "cursor-pointer" : ""}`}
                 onClick={() => onOpenDrawer?.(r.row.url)}
               >
+                <td
+                  className="px-2 py-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selection.selected.has(r.row.url)}
+                    onChange={() => selection.toggle(r.row.url)}
+                    aria-label={`Select ${r.row.url}`}
+                    className="cursor-pointer"
+                  />
+                </td>
                 <td className="px-3 py-1.5 max-w-0">
                   <UrlCell url={r.row.url} title={r.row.current_title} />
                 </td>

@@ -5,15 +5,20 @@
 // canonical parent (the "keeper"). Canonical Keeper is editable per row
 // and persists to page_execution.target_url.
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import { VerifyButton } from "@/components/wqa/VerifyButton";
+import { BulkActionBar } from "@/components/wqa/BulkActionBar";
+import { useBulkSelection } from "@/components/wqa/useBulkSelection";
 import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps } from "@/components/wqa/types";
 import { setExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
 
 export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: ActionTabProps) {
+  const visibleUrls = useMemo(() => rows.map((r) => r.row.url), [rows]);
+  const selection = useBulkSelection(visibleUrls);
+
   if (rows.length === 0) {
     return <EmptyTab message="No URLs are tagged Consolidate." />;
   }
@@ -32,9 +37,29 @@ export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: 
         count={rows.length}
       />
 
+      {propertySlug && (
+        <BulkActionBar
+          propertySlug={propertySlug}
+          urls={selection.selected}
+          onClear={selection.clear}
+        />
+      )}
+
       <TableShell>
         <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">
           <tr>
+            <th className="px-2 py-2 w-[28px]">
+              <input
+                type="checkbox"
+                checked={selection.allVisibleSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = selection.someVisibleSelected;
+                }}
+                onChange={() => selection.toggleAll(visibleUrls)}
+                aria-label="Select all visible rows"
+                className="cursor-pointer"
+              />
+            </th>
             <th className="text-left px-3 py-2 font-medium min-w-[260px]">Absorbed Duplicate</th>
             <th className="text-left px-2 py-2 font-medium">Action</th>
             <th className="text-left px-2 py-2 font-medium min-w-[280px]">Canonical Keeper</th>
@@ -46,12 +71,28 @@ export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: 
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const isSelected = selection.selected.has(r.row.url);
+            return (
             <tr
               key={r.row.url}
-              className={`border-t hover:bg-muted/40 ${onOpenDrawer ? "cursor-pointer" : ""}`}
+              className={`border-t tabular-nums ${
+                isSelected ? "bg-blue-50/60" : "hover:bg-muted/40"
+              } ${onOpenDrawer ? "cursor-pointer" : ""}`}
               onClick={() => onOpenDrawer?.(r.row.url)}
             >
+              <td
+                className="px-2 py-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => selection.toggle(r.row.url)}
+                  aria-label={`Select ${r.row.url}`}
+                  className="cursor-pointer"
+                />
+              </td>
               <td className="px-3 py-1.5 max-w-0">
                 <UrlCell url={r.row.url} title={r.row.current_title} />
               </td>
@@ -96,7 +137,8 @@ export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: 
                 {r.triage.logic}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </TableShell>
     </section>
