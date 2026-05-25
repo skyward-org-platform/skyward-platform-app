@@ -19,6 +19,8 @@ import {
   getCachedChatHistory,
   getCachedUsageForProperty,
 } from "@/lib/brand-dna-data";
+import { hasCompetitors } from "@/lib/competitors";
+import { hasSeedKeywords } from "@/lib/seed-keywords";
 
 function computeFilled(
   sections: Awaited<ReturnType<typeof getAllSections>>,
@@ -57,7 +59,14 @@ export default async function BrandDnaOverview({
   ]);
   const domain = prop?.primary_domain ?? null;
   const name = prop?.name ?? slug;
+  // Two completeness signals come from dedicated Supabase tables, not
+  // from brand_dna_section. Parallelize alongside the main fetches.
+  const [hasCompetitorsFlag, hasSeedKeywordsFlag] = prop
+    ? await Promise.all([hasCompetitors(prop.id), hasSeedKeywords(prop.id)])
+    : [false, false];
   const filled = computeFilled(sections);
+  if (hasCompetitorsFlag) filled.add("competitors");
+  if (hasSeedKeywordsFlag) filled.add("seed_keywords");
   const completeCount = COMPLETENESS_SECTIONS.filter((s) =>
     filled.has(s.key),
   ).length;

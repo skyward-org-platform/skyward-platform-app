@@ -11,6 +11,7 @@ import {
 import { StatusPill, statusVariantFrom } from "@/components/StatusPill";
 import { getWqaForDomain } from "@/lib/wqa";
 import { hasCompetitors } from "@/lib/competitors";
+import { hasSeedKeywords } from "@/lib/seed-keywords";
 import { approvePhase } from "./actions";
 
 type Project = {
@@ -68,10 +69,16 @@ const getProperty = cache(async (slug: string): Promise<PropertyRow | null> => {
 
 async function getHeroMetrics(_slug: string, propertyId: string) {
   // Pages count + optimize count + BrandDNA filled count.
-  // Four reads in parallel; service-role client bypasses RLS. Competitor
-  // presence reads from the Supabase property_competitor table (operator
-  // owns this data; BQ Meta is legacy seed only).
-  const [pagesRes, optimizeRes, dnaRes, competitorsFilled] = await Promise.all([
+  // Five reads in parallel; service-role client bypasses RLS. Competitor
+  // and seed-keyword presence read from dedicated Supabase tables -
+  // brand_dna_section.body/content is no longer the only source.
+  const [
+    pagesRes,
+    optimizeRes,
+    dnaRes,
+    competitorsFilled,
+    seedKeywordsFilled,
+  ] = await Promise.all([
     supabase
       .from("page")
       .select("id", { count: "exact", head: true })
@@ -86,21 +93,27 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
       .select("section")
       .eq("property_id", propertyId),
     hasCompetitors(propertyId),
+    hasSeedKeywords(propertyId),
   ]);
-  // Brand DNA: count non-empty sections from brand_dna_section, PLUS 1 if
-  // Supabase has any competitor rows for this property. Denominator is 12
-  // (the strategist-facing section count from COMPLETENESS_SECTIONS).
+  // Brand DNA: count rows in brand_dna_section EXCEPT competitors and
+  // seed_keywords (which live in their own tables now). Then add 1 each
+  // if those Supabase tables have rows. Denominator aligns with
+  // COMPLETENESS_SECTIONS (11 entries, the actual UI tabs).
   const sections = (dnaRes.data ?? []) as { section: string }[];
   const supabaseFilled = sections.filter(
-    (s) => s.section !== "competitors",
+    (s) => s.section !== "competitors" && s.section !== "seed_keywords",
   ).length;
-  const filled = supabaseFilled + (competitorsFilled ? 1 : 0);
+  const filled =
+    supabaseFilled +
+    (competitorsFilled ? 1 : 0) +
+    (seedKeywordsFilled ? 1 : 0);
   return {
     pages: pagesRes.count ?? 0,
     optimize: optimizeRes.count ?? 0,
     brandDnaFilled: filled,
-    brandDnaTotal: 12,
+    brandDnaTotal: 11,
     hasCompetitors: competitorsFilled,
+    hasSeedKeywords: seedKeywordsFilled,
   };
 }
 
@@ -189,6 +202,7 @@ async function getPhaseGates(
       auditDocRes,
       wqaRes,
       hasCompetitorsFlag,
+      hasSeedKeywordsFlag,
     ] = await Promise.all([
       supabase
         .from("brand_dna_section")
@@ -210,31 +224,41 @@ async function getPhaseGates(
         ? getWqaForDomain(primaryDomain, "dev")
         : Promise.resolve(null),
       hasCompetitors(propertyId),
+      hasSeedKeywords(propertyId),
     ]);
 
-    // Phase 0 — count brand_dna_section rows with content + add 1 for
-    // competitors when BQ Meta has any. Matches the hero badge math.
+    // Phase 0 — count brand_dna_section rows (excluding competitors +
+    // seed_keywords which live in their own tables) + 1 each for the
+    // Supabase tables when populated. Matches the hero badge math + the
+    // 11-entry COMPLETENESS_SECTIONS denominator.
     const dnaRows = (brandDnaRes.data ?? []) as {
       section: string;
       body: string | null;
       content: unknown;
     }[];
     const supabaseFilled = dnaRows.filter((r) => {
+      if (r.section === "competitors" || r.section === "seed_keywords") {
+        return false;
+      }
       if (r.body && r.body.length > 0) return true;
       if (r.content && typeof r.content === "object") {
         return Object.keys(r.content as Record<string, unknown>).length > 0;
       }
       return false;
     }).length;
-    const filled = supabaseFilled + (hasCompetitorsFlag ? 1 : 0);
+    const filled =
+      supabaseFilled +
+      (hasCompetitorsFlag ? 1 : 0) +
+      (hasSeedKeywordsFlag ? 1 : 0);
     if (filled > 0) {
       phase0HasData = true;
       const parts: string[] = [];
       if (supabaseFilled > 0) {
-        parts.push(`${supabaseFilled} Brand DNA section${supabaseFilled === 1 ? "" : "s"}`);
+        parts.push(`${supabaseFilled} section${supabaseFilled === 1 ? "" : "s"}`);
       }
       if (hasCompetitorsFlag) parts.push("competitors");
-      phase0Detail = `${filled} of 12 populated (${parts.join(" + ")}).`;
+      if (hasSeedKeywordsFlag) parts.push("seed keywords");
+      phase0Detail = `${filled} of 11 populated (${parts.join(" + ")}).`;
     }
 
     // Phase 1 + Phase 2 (share the WQA BQ output signal)

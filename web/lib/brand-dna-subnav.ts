@@ -38,22 +38,31 @@ export function findSubnav(slug: string): SubnavItem | undefined {
   return BRAND_DNA_SUBNAV.find((i) => i.slug === slug);
 }
 
-/** The 12 schema-level sections rendered as the Completeness checklist on
- *  the Brand DNA Overview. Distinct from the subnav (which is 11 items,
- *  some of which don't map to schema sections). */
+/** Sections rendered as the Completeness checklist on the Brand DNA
+ *  Overview. Aligned with BRAND_DNA_SUBNAV so the denominator only
+ *  counts sections that actually have a UI tab to fill in.
+ *
+ *  Previous incorrect entries dropped:
+ *   - 'brand_story' and 'positioning' are sub-fields inside the Identity
+ *     section, not standalone sections (per identity/page.tsx). Including
+ *     them as separate completeness items made 100% unreachable.
+ *
+ *  Two entries map to Supabase tables (not brand_dna_section):
+ *   - 'competitors' lives in property_competitor
+ *   - 'seed_keywords' lives in property_seed_keyword
+ *  The Overview's computeFilled handles those two special-case lookups. */
 export const COMPLETENESS_SECTIONS: { key: string; label: string }[] = [
   { key: "identity",        label: "Identity" },
-  { key: "brand_story",     label: "Brand Story" },
   { key: "voice_tone",      label: "Voice & Tone" },
+  { key: "offerings",       label: "Offerings" },
   { key: "brand_terms",     label: "Brand Terms" },
   { key: "proof",           label: "Proof" },
+  { key: "site_structure",  label: "Site Structure" },
+  { key: "competitors",     label: "Competitors" },
+  { key: "goals",           label: "Commercial Policy" },
   { key: "future_audience", label: "Audiences" },
   { key: "personas",        label: "Personas" },
-  { key: "offerings",       label: "Offerings" },
-  { key: "site_structure",  label: "Site Structure" },
-  { key: "goals",           label: "Commercial Policy" },
-  { key: "positioning",     label: "Positioning" },
-  { key: "competitors",     label: "Competitors" },
+  { key: "seed_keywords",   label: "Seed Keywords" },
 ];
 
 /** Map a section key to the subnav URL slug if the section is navigable. */
