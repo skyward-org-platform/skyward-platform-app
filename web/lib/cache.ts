@@ -20,10 +20,21 @@ export const CACHE_TAGS = {
   brandDna: (slug: string) => `brand-dna:${slug}`,
   /** LLM usage rollup per property. Bust after any LLM call lands. */
   llmUsage: (slug: string) => `llm-usage:${slug}`,
+  /** wqa_decision reads (P2 action semantics). Bust on any wqa_decision write. */
+  wqaDecisions: "wqa-decisions",
 } as const;
 
-/** Default TTL for "rarely changes" data — sidebar, property metadata.
+/** Default TTL for "rarely changes" data (sidebar, property metadata).
  *  After a user action busts the relevant tag, the next render is fresh. */
 export const DEFAULT_TTL = 60;
 /** Shorter TTL for live-edited data (hero metrics, signals). */
 export const HOT_TTL = 30;
+
+/** Grouped TTL constants (P2 action semantics + future consumers).
+ *  Prefer this shape going forward; DEFAULT_TTL / HOT_TTL kept for back-compat. */
+export const TTL = {
+  /** wqa_decision and similar occasionally-edited rows. */
+  data: 60,
+  /** Sidebar badge counts; should feel fresh. */
+  fast: 30,
+};
