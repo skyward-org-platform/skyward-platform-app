@@ -14,6 +14,7 @@ import {
   fmtN,
 } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
+import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps, TriagedRow } from "@/components/wqa/types";
 
 const TIER_ORDER = [
@@ -155,9 +156,14 @@ export function OptimizeTab({ rows, propertySlug, onOpenDrawer }: ActionTabProps
                         <WqaActionChip
                           propertySlug={propertySlug}
                           url={r.row.url}
-                          sopAction={r.triage.sopAction ?? r.triage.action}
-                          initialAction={r.triage.action}
-                          isOverridden={!!r.triage.isOverridden}
+                          pipelineAction={toAction7(
+                            r.triage.sopAction ?? r.triage.action,
+                          )}
+                          overrideAction={
+                            r.triage.isOverridden
+                              ? toAction7(r.triage.action)
+                              : null
+                          }
                         />
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{fmtN(r.row.sessions)}</td>

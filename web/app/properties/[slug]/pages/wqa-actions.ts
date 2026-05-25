@@ -4,12 +4,12 @@
 //
 //   1. WQA decision overrides — operator overrides of the pipeline-derived
 //      action / status / logic notes / target URL on the wqa_decision table.
-//      Rewritten in P2 (action semantics v2). New 8-action API:
+//      Rewritten in P2 (action semantics v2). 8-action API:
 //      setAction / setStatus / clearDrift / setLogicNotes / setTargetUrl /
 //      verifyTargetUrl / clearActionOverride / clearTargetUrlOverride.
-//      Back-compat shims at the bottom keep `setWqaDecision` /
-//      `clearWqaDecision` / `WqaActionValue` working until Chunk 3 rewrites
-//      WqaActionChip + downstream callers.
+//      Chunk 3 deleted the v1 back-compat shims (setWqaDecision /
+//      clearWqaDecision / WqaActionValue / LEGACY_TO_ACTION7) — callers
+//      now invoke the v2 actions directly with Action7.
 //
 //   2. page_execution + page_check_state mutations — Execution / Audit
 //      drawer + audit tabs use these. Untouched by P2 (orthogonal table).
@@ -462,76 +462,9 @@ export async function setCheckOwner(
   return { ok: true };
 }
 
-// ═══ Back-compat shims (removed in Chunk 3 when WqaActionChip is rewritten) ═
-//
-// The v1 chip + a couple of consumers still call setWqaDecision /
-// clearWqaDecision with the legacy 10-value enum. Map legacy values onto
-// the new 7-action enum (mirrors the SQL backfill in 20260525_wqa_decision_v2.sql)
-// and delegate to the v2 actions so the build stays green until Chunk 3
-// rewrites the chip.
-
-/** Legacy 10-value action enum. Same semantic shape as the v1 type but
- *  re-typed here so the chip's `TriageAction` (declared in lib/wqa-triage)
- *  is structurally assignable. */
-export type WqaActionValue =
-  | "Optimize"
-  | "Restore"
-  | "Redirect"
-  | "Consolidate"
-  | "Remove"
-  | "Evaluate"
-  | "Leave as 404"
-  | "Non-addressable"
-  | "Non-indexable"
-  | "Investigate"
-  | "Keep";
-
-const LEGACY_TO_ACTION7: Record<string, Action7> = {
-  Optimize: "Optimize",
-  Restore: "Restore",
-  Redirect: "Redirect",
-  Consolidate: "Consolidate",
-  Remove: "Remove",
-  Keep: "Keep",
-  Investigate: "Investigate",
-  // Legacy values collapse per the SQL backfill.
-  Evaluate: "Investigate",
-  "Leave as 404": "Keep",
-  "Non-addressable": "Keep",
-  "Non-indexable": "Keep",
-};
-
-/** Back-compat shim. The v1 setWqaDecision wrote action + (optionally)
- *  target_url + note in one call. We map to setAction (+ setTargetUrl /
- *  setLogicNotes when those args are provided). Removed in Chunk 3. */
-export async function setWqaDecision(
-  propertySlug: string,
-  url: string,
-  action: string,
-  targetUrl?: string | null,
-  note?: string | null,
-): Promise<Ok | Err> {
-  if (!url) return { ok: false, error: "URL required" };
-  const mapped = LEGACY_TO_ACTION7[action];
-  if (!mapped) return { ok: false, error: `Invalid action: ${action}` };
-
-  const ar = await setAction(propertySlug, url, mapped);
-  if (!ar.ok) return ar;
-  if (targetUrl !== undefined) {
-    const tr = await setTargetUrl(propertySlug, url, targetUrl);
-    if (!tr.ok) return tr;
-  }
-  if (note !== undefined) {
-    const nr = await setLogicNotes(propertySlug, url, note);
-    if (!nr.ok) return nr;
-  }
-  return { ok: true };
-}
-
-/** Back-compat shim. Removed in Chunk 3. */
-export async function clearWqaDecision(
-  propertySlug: string,
-  url: string,
-): Promise<Ok | Err> {
-  return clearActionOverride(propertySlug, url);
-}
+// Back-compat shims (setWqaDecision / clearWqaDecision / WqaActionValue /
+// LEGACY_TO_ACTION7) were removed when WqaActionChip was rewritten in
+// Chunk 3. Callers now invoke setAction / clearActionOverride directly
+// with Action7. The legacy → Action7 mapping moved to web/lib/wqa-decisions.ts
+// as `toAction7()` so client-side callers can defensively coerce any
+// pipeline action string until Chunk 5 lands.

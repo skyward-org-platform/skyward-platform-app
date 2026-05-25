@@ -109,6 +109,37 @@ export const STATUS_COLOR: Record<WqaStatus, string> = {
   Drifted: "rose",
 };
 
+// ─── Legacy → Action7 mapping ────────────────────────────────────────────
+// The Python pipeline (build_phase1_wqa.py) still emits the old 10-value
+// enum until Chunk 5 lands. Until then the UI must defensively map any
+// legacy action string from BQ wqa_output (or the in-memory triageRow
+// result) into the canonical 7-value enum. Mirrors the SQL backfill in
+// db/supabase/migrations/20260525_wqa_decision_v2.sql.
+//
+// Removed once Chunk 5 ships and BQ writes only Action7 values.
+const LEGACY_TO_ACTION7: Record<string, Action7> = {
+  Optimize: "Optimize",
+  Restore: "Restore",
+  Redirect: "Redirect",
+  Consolidate: "Consolidate",
+  Remove: "Remove",
+  Keep: "Keep",
+  Investigate: "Investigate",
+  // Legacy values collapse per the SQL backfill.
+  Evaluate: "Investigate",
+  "Leave as 404": "Keep",
+  "Non-addressable": "Keep",
+  "Non-indexable": "Keep",
+};
+
+/** Defensive mapper: accepts any action string (legacy 10-value or new
+ *  7-value enum) and returns the canonical Action7. Falls back to
+ *  "Investigate" for unknown values so the UI never blanks out. */
+export function toAction7(action: string | null | undefined): Action7 {
+  if (!action) return "Investigate";
+  return LEGACY_TO_ACTION7[action] ?? "Investigate";
+}
+
 // ─── Row shapes ──────────────────────────────────────────────────────────
 
 // Legacy read-only shape kept for back-compat with the v1 consumers

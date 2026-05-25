@@ -8,6 +8,7 @@
 import { useState, useTransition } from "react";
 import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
+import { toAction7 } from "@/lib/wqa-decisions";
 import type { ActionTabProps } from "@/components/wqa/types";
 import { setExecutionField } from "@/app/properties/[slug]/pages/wqa-actions";
 
@@ -56,9 +57,14 @@ export function ConsolidateTab({ rows, propertySlug, onOpenDrawer, execByUrl }: 
                 <WqaActionChip
                   propertySlug={propertySlug}
                   url={r.row.url}
-                  sopAction={r.triage.sopAction ?? r.triage.action}
-                  initialAction={r.triage.action}
-                  isOverridden={!!r.triage.isOverridden}
+                  pipelineAction={toAction7(
+                    r.triage.sopAction ?? r.triage.action,
+                  )}
+                  overrideAction={
+                    r.triage.isOverridden
+                      ? toAction7(r.triage.action)
+                      : null
+                  }
                 />
               </td>
               <td className="px-2 py-1.5">
