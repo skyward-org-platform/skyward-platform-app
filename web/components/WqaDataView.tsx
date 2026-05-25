@@ -92,6 +92,63 @@ const COLUMNS: ColumnDef[] = [
   { id: "depth", label: "Page depth" },
 ];
 
+// ─── Numeric range filters ────────────────────────────────────────────────
+// Add-filters popover lets users narrow the table by min/max on any of
+// these dimensions. Each range is independent and applied on top of the
+// chip-strip filters (AND across axes).
+
+type NumericFilterId =
+  | "sessions"
+  | "conversions"
+  | "impressions"
+  | "ctr"
+  | "backlinks"
+  | "refdomains"
+  | "inlinks"
+  | "words"
+  | "depth";
+
+type NumericRange = { min: number | null; max: number | null };
+
+const NUMERIC_FILTERS: {
+  id: NumericFilterId;
+  label: string;
+  getter: (r: WqaRow) => number | null;
+  hint?: string;
+}[] = [
+  { id: "sessions", label: "Sessions", getter: (r) => r.sessions ?? null },
+  {
+    id: "conversions",
+    label: "Conversions",
+    getter: (r) => r.conversions ?? null,
+  },
+  {
+    id: "impressions",
+    label: "Impressions",
+    getter: (r) => r.average_impressions ?? null,
+  },
+  {
+    id: "ctr",
+    label: "CTR %",
+    getter: (r) =>
+      r.average_ctr === null || r.average_ctr === undefined
+        ? null
+        : r.average_ctr <= 1
+          ? r.average_ctr * 100
+          : r.average_ctr,
+    hint: "0-100",
+  },
+  { id: "backlinks", label: "Backlinks", getter: (r) => r.backlinks ?? null },
+  {
+    id: "refdomains",
+    label: "Refdomains",
+    getter: (r) => r.referring_domains ?? null,
+  },
+  { id: "inlinks", label: "Inlinks", getter: (r) => r.inlinks ?? null },
+  { id: "words", label: "Word count", getter: (r) => r.word_count ?? null },
+  { id: "depth", label: "Page depth", getter: (r) => r.page_depth ?? null },
+];
+
 const STATUS_VALUES: WqaStatus[] = ["Open", "In Progress", "Done", "Drifted"];
 
 const LOGIC_CODE_VALUES = Object.keys(LOGIC_CODE_LABELS) as LogicCode[];
@@ -305,6 +362,53 @@ export function WqaDataView({
     [hiddenColumns],
   );
 
+  // Numeric range filters - populated by the AddFilters popover. Each
+  // dimension is { min, max }, both nullable. A row passes if every
+  // configured range contains the row's value (or the row has no value
+  // for that dimension - we keep null-valued rows visible).
+  const [numericRanges, setNumericRanges] = useState<
+    Record<NumericFilterId, NumericRange>
+  >(() => ({
+    sessions: { min: null, max: null },
+    conversions: { min: null, max: null },
+    impressions: { min: null, max: null },
+    ctr: { min: null, max: null },
+    backlinks: { min: null, max: null },
+    refdomains: { min: null, max: null },
+    inlinks: { min: null, max: null },
+    words: { min: null, max: null },
+    depth: { min: null, max: null },
+  }));
+  const setRange = useCallback(
+    (id: NumericFilterId, next: NumericRange) =>
+      setNumericRanges((prev) => ({ ...prev, [id]: next })),
+    [],
+  );
+  const activeRangeIds = useMemo(
+    () =>
+      (Object.entries(numericRanges) as [NumericFilterId, NumericRange][])
+        .filter(([, r]) => r.min !== null || r.max !== null)
+        .map(([id]) => id),
+    [numericRanges],
+  );
+  const clearRange = useCallback(
+    (id: NumericFilterId) => setRange(id, { min: null, max: null }),
+    [setRange],
+  );
+  const clearAllRanges = useCallback(() => {
+    setNumericRanges({
+      sessions: { min: null, max: null },
+      conversions: { min: null, max: null },
+      impressions: { min: null, max: null },
+      ctr: { min: null, max: null },
+      backlinks: { min: null, max: null },
+      refdomains: { min: null, max: null },
+      inlinks: { min: null, max: null },
+      words: { min: null, max: null },
+      depth: { min: null, max: null },
+    });
+  }, []);
+
   // Multi-select filter state lives in local React state. Previously these
   // were URL search params, but router.push("?...") in Next.js 16 App Router
   // is treated as navigation - which kicks loading.tsx in and visually
@@ -361,6 +465,17 @@ export function WqaDataView({
     setSelectedLogicState(new Set());
     setSelectedOverride(new Set());
     setHealthFilter("all");
+    setNumericRanges({
+      sessions: { min: null, max: null },
+      conversions: { min: null, max: null },
+      impressions: { min: null, max: null },
+      ctr: { min: null, max: null },
+      backlinks: { min: null, max: null },
+      refdomains: { min: null, max: null },
+      inlinks: { min: null, max: null },
+      words: { min: null, max: null },
+      depth: { min: null, max: null },
+    });
   }, []);
 
   // URL deep-linking - hydrate filter state from search params on mount,
@@ -548,6 +663,14 @@ export function WqaDataView({
       }
       if (healthFilter !== "all" && healthZoneOf(r) !== healthFilter)
         return false;
+      for (const def of NUMERIC_FILTERS) {
+        const range = numericRanges[def.id];
+        if (range.min === null && range.max === null) continue;
+        const val = def.getter(r);
+        if (val === null) continue;
+        if (range.min !== null && val < range.min) return false;
+        if (range.max !== null && val > range.max) return false;
+      }
       if (!q) return true;
       return (
         (r.url ?? "").toLowerCase().includes(q) ||
@@ -575,6 +698,7 @@ export function WqaDataView({
     selectedStatuses,
     selectedLogic,
     selectedOverride,
+    numericRanges,
   ]);
 
   // Reset to first page whenever the filter or sort changes so the user
@@ -590,6 +714,7 @@ export function WqaDataView({
     selectedStatuses,
     selectedLogic,
     selectedOverride,
+    numericRanges,
   ]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
@@ -723,7 +848,12 @@ export function WqaDataView({
           </button>
 
           <span className="ml-auto flex items-center gap-2">
-            <AddFiltersStub />
+            <AddFiltersPicker
+              ranges={numericRanges}
+              activeIds={activeRangeIds}
+              onChange={setRange}
+              onClearAll={clearAllRanges}
+            />
             <ColumnsPicker
               hidden={hiddenColumns}
               onToggle={toggleColumn}
@@ -741,6 +871,8 @@ export function WqaDataView({
           selectedLogic={selectedLogic}
           selectedOverride={selectedOverride}
           healthFilter={healthFilter}
+          numericRanges={numericRanges}
+          activeRangeIds={activeRangeIds}
           onRemoveAction={(a) => toggleAction(a)}
           onRemoveStatus={(s) => toggleStatus(s)}
           onRemoveLogic={(c) => {
@@ -750,6 +882,7 @@ export function WqaDataView({
           }}
           onRemoveOverride={(v) => toggleOverride(v)}
           onRemoveHealth={() => setHealthFilter("all")}
+          onRemoveRange={clearRange}
           onClearAll={clearAllFilters}
         />
 
@@ -1222,22 +1355,44 @@ function FilterDropdown({
   );
 }
 
-/** Stub for "Add more filters" — placeholder button surfacing the future
- *  filter-builder (range filters on Sessions, Impressions, etc.). The
- *  popover currently shows a coming-soon message; the four canonical
- *  filters are already exposed as primary toolbar dropdowns. */
-function AddFiltersStub() {
+/** Real Add filters picker. Popover with min/max inputs for each numeric
+ *  dimension (Sessions / Impressions / CTR / Backlinks / Refdomains /
+ *  Inlinks / Words / Depth). A row passes only if its value falls within
+ *  every configured range. Blank inputs mean "no bound on that side".
+ *  Rows with null values pass through (don't penalize missing data). */
+function AddFiltersPicker({
+  ranges,
+  activeIds,
+  onChange,
+  onClearAll,
+}: {
+  ranges: Record<NumericFilterId, NumericRange>;
+  activeIds: NumericFilterId[];
+  onChange: (id: NumericFilterId, next: NumericRange) => void;
+  onClearAll: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const activeCount = activeIds.length;
   return (
     <div className="relative inline-block">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border border-dashed border-border bg-card hover:border-foreground/30 text-muted-foreground"
-        title="Build column-level filters (coming soon)"
+        className={
+          "inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded border bg-card hover:border-foreground/30 " +
+          (activeCount > 0
+            ? "border-foreground/30 text-foreground"
+            : "border-border text-muted-foreground")
+        }
+        title="Numeric range filters"
       >
         <span aria-hidden>+</span>
-        <span>Add filters</span>
+        <span>
+          Add filters
+          {activeCount > 0 && (
+            <span className="ml-1 tabular-nums opacity-80">{activeCount}</span>
+          )}
+        </span>
       </button>
       {open && (
         <>
@@ -1246,13 +1401,68 @@ function AddFiltersStub() {
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute right-0 z-50 mt-1 bg-card border rounded-md shadow-lg p-3 min-w-[260px] text-[11px]">
-            <div className="font-semibold mb-1">Column filters</div>
-            <p className="text-muted-foreground leading-snug">
-              Coming soon: numeric range filters on Sessions, Impressions, CTR,
-              Backlinks, Refdomains, Inlinks, Words, and Depth. The four
-              primary axes (Action, Status, Logic, Override) are already in
-              the toolbar above.
+          <div className="absolute right-0 z-50 mt-1 bg-card border rounded-md shadow-lg p-3 min-w-[320px] max-h-[420px] overflow-y-auto text-[11px]">
+            <div className="flex items-center justify-between border-b pb-2 mb-2">
+              <span className="font-semibold">Numeric range filters</span>
+              {activeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  className="text-[10.5px] text-muted-foreground hover:text-foreground underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {NUMERIC_FILTERS.map((def) => {
+                const range = ranges[def.id];
+                const parse = (raw: string): number | null => {
+                  const v = raw.trim();
+                  if (v === "") return null;
+                  const n = Number(v);
+                  return Number.isFinite(n) ? n : null;
+                };
+                return (
+                  <div
+                    key={def.id}
+                    className="grid grid-cols-[1fr_auto_auto] items-center gap-2"
+                  >
+                    <label className="text-foreground">
+                      {def.label}
+                      {def.hint && (
+                        <span className="ml-1 text-[10px] text-muted-foreground">
+                          ({def.hint})
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="min"
+                      value={range.min ?? ""}
+                      onChange={(e) =>
+                        onChange(def.id, { ...range, min: parse(e.target.value) })
+                      }
+                      className="w-[72px] text-[11px] px-1.5 py-0.5 border rounded bg-card outline-none focus:border-foreground/40 tabular-nums"
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="max"
+                      value={range.max ?? ""}
+                      onChange={(e) =>
+                        onChange(def.id, { ...range, max: parse(e.target.value) })
+                      }
+                      className="w-[72px] text-[11px] px-1.5 py-0.5 border rounded bg-card outline-none focus:border-foreground/40 tabular-nums"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground/80 mt-2 leading-snug">
+              Leave a field blank for no bound on that side. URLs with no
+              recorded value on a dimension stay visible.
             </p>
           </div>
         </>
@@ -1363,11 +1573,14 @@ function ActiveFilterStrip({
   selectedLogic,
   selectedOverride,
   healthFilter,
+  numericRanges,
+  activeRangeIds,
   onRemoveAction,
   onRemoveStatus,
   onRemoveLogic,
   onRemoveOverride,
   onRemoveHealth,
+  onRemoveRange,
   onClearAll,
 }: {
   selectedActions: Set<Action7>;
@@ -1375,11 +1588,14 @@ function ActiveFilterStrip({
   selectedLogic: Set<LogicCode>;
   selectedOverride: Set<OverrideFilter>;
   healthFilter: HealthZone | "all";
+  numericRanges: Record<NumericFilterId, NumericRange>;
+  activeRangeIds: NumericFilterId[];
   onRemoveAction: (a: Action7) => void;
   onRemoveStatus: (s: WqaStatus) => void;
   onRemoveLogic: (c: LogicCode) => void;
   onRemoveOverride: (v: OverrideFilter) => void;
   onRemoveHealth: () => void;
+  onRemoveRange: (id: NumericFilterId) => void;
   onClearAll: () => void;
 }) {
   const total =
@@ -1387,7 +1603,8 @@ function ActiveFilterStrip({
     selectedStatuses.size +
     selectedLogic.size +
     selectedOverride.size +
-    (healthFilter !== "all" ? 1 : 0);
+    (healthFilter !== "all" ? 1 : 0) +
+    activeRangeIds.length;
   if (total === 0) return null;
   return (
     <div className="px-4 py-2 border-b bg-muted/20 flex items-center gap-1.5 flex-wrap text-[11px]">
@@ -1430,6 +1647,27 @@ function ActiveFilterStrip({
           onRemove={onRemoveHealth}
         />
       )}
+      {activeRangeIds.map((id) => {
+        const def = NUMERIC_FILTERS.find((d) => d.id === id);
+        const r = numericRanges[id];
+        if (!def) return null;
+        const fmt = (n: number) => n.toLocaleString();
+        const tag =
+          r.min !== null && r.max !== null
+            ? `${fmt(r.min)}-${fmt(r.max)}`
+            : r.min !== null
+              ? `≥ ${fmt(r.min)}`
+              : r.max !== null
+                ? `≤ ${fmt(r.max)}`
+                : "";
+        return (
+          <ActivePill
+            key={`r:${id}`}
+            label={`${def.label} ${tag}`}
+            onRemove={() => onRemoveRange(id)}
+          />
+        );
+      })}
       <button
         type="button"
         onClick={onClearAll}
