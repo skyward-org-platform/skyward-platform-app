@@ -26,6 +26,7 @@ export const BRAND_DNA_SUBNAV: SubnavItem[] = [
   { slug: "brand-terms",       label: "Brand Terms",       section: "brand_terms",     countable: true },
   { slug: "proof",             label: "Proof",             section: "proof",           countable: true },
   { slug: "site-structure",    label: "Site Structure",    section: "site_structure" },
+  { slug: "competitors",       label: "Competitors",       section: "competitors" },
   { slug: "commercial-policy", label: "Commercial Policy", section: "goals" },
   { slug: "audiences",         label: "Audiences",         section: "future_audience", countable: true },
   { slug: "personas",          label: "Personas",          section: "personas",        countable: true },

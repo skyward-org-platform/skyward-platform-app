@@ -65,10 +65,12 @@ const getProperty = cache(async (slug: string): Promise<PropertyRow | null> => {
   return data as unknown as PropertyRow | null;
 });
 
-async function getHeroMetrics(_slug: string, propertyId: string) {
+async function getHeroMetrics(slug: string, propertyId: string) {
   // Pages count + optimize count + BrandDNA filled count.
-  // Three small reads in parallel; service-role client bypasses RLS.
-  const [pagesRes, optimizeRes, dnaRes] = await Promise.all([
+  // Four reads in parallel; service-role client bypasses RLS. The
+  // competitors fetch hops to the BQ-backed Python API since that's
+  // the source of truth for that section per the Phase 0 SOP.
+  const [pagesRes, optimizeRes, dnaRes, hasCompetitors] = await Promise.all([
     supabase
       .from("page")
       .select("id", { count: "exact", head: true })
@@ -82,18 +84,41 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
       .from("brand_dna_section")
       .select("section")
       .eq("property_id", propertyId),
+    fetchHasCompetitors(slug),
   ]);
-  // Brand DNA: count non-empty sections (have body OR have content keys).
-  // The denominator is 12 (the strategist-facing section count from screen 5).
+  // Brand DNA: count non-empty sections from brand_dna_section, PLUS 1 if
+  // BQ Meta has any competitor rows for this property. Denominator is 12
+  // (the strategist-facing section count from COMPLETENESS_SECTIONS).
   const sections = (dnaRes.data ?? []) as { section: string }[];
-  // Drop the legacy 'competitors' section — BQ Meta is canonical for that.
-  const filled = sections.filter((s) => s.section !== "competitors").length;
+  const supabaseFilled = sections.filter(
+    (s) => s.section !== "competitors",
+  ).length;
+  const filled = supabaseFilled + (hasCompetitors ? 1 : 0);
   return {
     pages: pagesRes.count ?? 0,
     optimize: optimizeRes.count ?? 0,
     brandDnaFilled: filled,
     brandDnaTotal: 12,
+    hasCompetitors,
   };
+}
+
+// Lightweight competitor presence check. The full competitors API
+// returns the row payload; here we only need to know whether at least
+// one exists, so we read the 'count' field from the response. If the
+// fetch fails (auth, BQ outage), default to false so the metric doesn't
+// flicker as filled on transient errors.
+async function fetchHasCompetitors(slug: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${apiBase()}/api/properties/${slug}/competitors`, {
+      next: { revalidate: 300 },
+    });
+    if (!r.ok) return false;
+    const j = (await r.json()) as { count?: number };
+    return (j.count ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 // Per-phase gate states for the property hero strip. Each phase resolves
@@ -171,7 +196,8 @@ async function getPhaseGates(
   let phase6HasData = false;
   let phase6Detail = "Property must be active with a primary domain to set up tracking.";
 
-  // Pull all of the Supabase counts in parallel + BQ wqa fetch.
+  // Pull all of the Supabase counts in parallel + BQ wqa fetch + the BQ-
+  // backed competitors signal (lives in Meta, not Supabase).
   try {
     const [
       brandDnaRes,
@@ -179,6 +205,7 @@ async function getPhaseGates(
       contentRowRes,
       auditDocRes,
       wqaRes,
+      hasCompetitors,
     ] = await Promise.all([
       supabase
         .from("brand_dna_section")
@@ -199,24 +226,32 @@ async function getPhaseGates(
       primaryDomain
         ? getWqaForDomain(primaryDomain, "dev")
         : Promise.resolve(null),
+      fetchHasCompetitors(slug),
     ]);
 
-    // Phase 0
+    // Phase 0 — count brand_dna_section rows with content + add 1 for
+    // competitors when BQ Meta has any. Matches the hero badge math.
     const dnaRows = (brandDnaRes.data ?? []) as {
       section: string;
       body: string | null;
       content: unknown;
     }[];
-    const filled = dnaRows.filter((r) => {
+    const supabaseFilled = dnaRows.filter((r) => {
       if (r.body && r.body.length > 0) return true;
       if (r.content && typeof r.content === "object") {
         return Object.keys(r.content as Record<string, unknown>).length > 0;
       }
       return false;
     }).length;
+    const filled = supabaseFilled + (hasCompetitors ? 1 : 0);
     if (filled > 0) {
       phase0HasData = true;
-      phase0Detail = `${filled} Brand DNA section${filled === 1 ? "" : "s"} populated.`;
+      const parts: string[] = [];
+      if (supabaseFilled > 0) {
+        parts.push(`${supabaseFilled} Brand DNA section${supabaseFilled === 1 ? "" : "s"}`);
+      }
+      if (hasCompetitors) parts.push("competitors");
+      phase0Detail = `${filled} of 12 populated (${parts.join(" + ")}).`;
     }
 
     // Phase 1 + Phase 2 (share the WQA BQ output signal)
