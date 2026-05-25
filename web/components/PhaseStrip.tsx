@@ -105,7 +105,7 @@ export function PhaseStrip({
       </div>
 
       {showLabels && (
-        <div className="flex gap-[3px] mt-1.5 text-[9px] text-slate-400 tracking-wider">
+        <div className="flex gap-[3px] mt-1.5">
           {PHASE_NAMES.map((name, i) => {
             const p = usePercent ? phases![i] : null;
             const pctLabel =
@@ -116,27 +116,31 @@ export function PhaseStrip({
                   : p.percent === null
                     ? "—"
                     : `${Math.round(p.percent)}%`;
+            const pctColor =
+              p === null
+                ? ""
+                : p.percent === null
+                  ? "text-slate-300"
+                  : p.percent >= 100
+                    ? "text-emerald-700 font-semibold"
+                    : "text-slate-700 font-medium";
             return (
-              <span
+              <div
                 key={name}
-                className="flex-1 text-center flex flex-col items-center"
+                className="flex-1 flex flex-col items-center leading-tight"
               >
-                <span>{name}</span>
+                <div className="text-[9px] text-slate-400 tracking-wider">
+                  {name}
+                </div>
                 {pctLabel !== null && (
-                  <span
-                    className={
-                      "tabular-nums text-[9px] mt-0.5 " +
-                      (p?.percent === null
-                        ? "text-slate-300"
-                        : p?.percent !== undefined && p.percent >= 100
-                          ? "text-slate-700 font-semibold"
-                          : "text-slate-500")
-                    }
+                  <div
+                    className={`tabular-nums text-[10px] mt-0.5 ${pctColor}`}
+                    title={p?.title}
                   >
                     {pctLabel}
-                  </span>
+                  </div>
                 )}
-              </span>
+              </div>
             );
           })}
         </div>
