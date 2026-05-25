@@ -17,24 +17,14 @@ import type { Competitor, CompetitorPriority } from "@/lib/competitors";
 
 const PRIORITIES: CompetitorPriority[] = ["high", "medium", "low"];
 
-const PRIORITY_TINT: Record<string, string> = {
-  high: "bg-rose-50 text-rose-700 border-rose-200",
-  medium: "bg-amber-50 text-amber-700 border-amber-200",
-  low: "bg-slate-50 text-slate-600 border-slate-200",
+// Per-priority tint applied to the row's select control so the color cue
+// lives on the control itself (avoids the redundant chip-next-to-dropdown
+// stack the previous iteration had).
+const PRIORITY_TINT: Record<CompetitorPriority, string> = {
+  high: "bg-rose-50 text-rose-800 border-rose-300 font-semibold",
+  medium: "bg-amber-50 text-amber-800 border-amber-300 font-medium",
+  low: "bg-slate-50 text-slate-700 border-slate-300",
 };
-
-function PriorityChip({ value }: { value: CompetitorPriority }) {
-  return (
-    <span
-      className={
-        "inline-flex items-center text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border " +
-        (PRIORITY_TINT[value] ?? "")
-      }
-    >
-      {value}
-    </span>
-  );
-}
 
 export function CompetitorsEditor({
   propertySlug,
@@ -330,17 +320,17 @@ function CompetitorRow({
           onChange={(e) =>
             onUpdatePriority(e.target.value as CompetitorPriority)
           }
-          className="text-[11px] px-1.5 py-0.5 border rounded bg-card cursor-pointer outline-none"
+          className={
+            "text-[11px] uppercase tracking-wider px-2 py-0.5 border rounded cursor-pointer outline-none " +
+            PRIORITY_TINT[c.priority]
+          }
         >
           {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
+            <option key={p} value={p} className="bg-card text-foreground">
               {p}
             </option>
           ))}
         </select>
-        <span className="ml-2">
-          <PriorityChip value={c.priority} />
-        </span>
       </td>
       <td className="px-3 py-2">
         <input
