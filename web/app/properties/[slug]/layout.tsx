@@ -129,6 +129,7 @@ type PhaseApprovalRow = {
 async function getPhaseGates(
   slug: string,
   primaryDomain: string | null,
+  propertyStatus: string | null,
   approvals: PhaseApprovalRow,
 ): Promise<PhaseGate[]> {
   // Phase 0 data signal: any brand_dna_section row exists with non-empty
@@ -136,17 +137,77 @@ async function getPhaseGates(
   // check both.
   let phase0HasData = false;
   let phase0Detail = "Brand DNA sections not started.";
+
+  // Phase 1 data signal: BQ wqa_pipeline_output has rows for this
+  // domain. Any rows means the pipeline ran successfully.
+  let phase1HasData = false;
+  let phase1Detail = "WQA pipeline has not run for this domain.";
+
+  // Phase 2 data signal: reuses Phase 1's BQ check. The wqa_output
+  // carries status_code / indexability / schema / performance signals
+  // that ARE the source data for the Tech SEO audit. Black here means
+  // "source data is there to audit against" not "checks have been
+  // recorded" (page_check_state is the analysis-output table for
+  // Phase 2 work, but doesn't gate readiness for analysis).
+  let phase2HasData = false;
+  let phase2Detail = "Tech SEO source data not available.";
+
+  // Phase 3 data signal: keyword_cluster count for the property.
+  let phase3HasData = false;
+  let phase3Detail = "No keyword clusters yet.";
+
+  // Phase 4 data signal: content_row count for the property.
+  let phase4HasData = false;
+  let phase4Detail = "No content rows yet.";
+
+  // Phase 5 data signal: audit_doc count for the property (initial
+  // backlink audit + link diffs live here).
+  let phase5HasData = false;
+  let phase5Detail = "No authority / link audit data yet.";
+
+  // Phase 6 data signal: property has a primary_domain set AND is
+  // active. Rank tracking + dashboard build require both. When we
+  // wire a tracking_setup_complete flag this will become more strict.
+  let phase6HasData = false;
+  let phase6Detail = "Property must be active with a primary domain to set up tracking.";
+
+  // Pull all of the Supabase counts in parallel + BQ wqa fetch.
   try {
-    const { data } = await supabase
-      .from("brand_dna_section")
-      .select("section, body, content, property!inner(slug)")
-      .eq("property.slug", slug);
-    const rows = (data ?? []) as {
+    const [
+      brandDnaRes,
+      keywordClusterRes,
+      contentRowRes,
+      auditDocRes,
+      wqaRes,
+    ] = await Promise.all([
+      supabase
+        .from("brand_dna_section")
+        .select("section, body, content, property!inner(slug)")
+        .eq("property.slug", slug),
+      supabase
+        .from("keyword_cluster")
+        .select("id, property!inner(slug)", { count: "exact", head: true })
+        .eq("property.slug", slug),
+      supabase
+        .from("content_row")
+        .select("id, property!inner(slug)", { count: "exact", head: true })
+        .eq("property.slug", slug),
+      supabase
+        .from("audit_doc")
+        .select("id, property!inner(slug)", { count: "exact", head: true })
+        .eq("property.slug", slug),
+      primaryDomain
+        ? getWqaForDomain(primaryDomain, "dev")
+        : Promise.resolve(null),
+    ]);
+
+    // Phase 0
+    const dnaRows = (brandDnaRes.data ?? []) as {
       section: string;
       body: string | null;
       content: unknown;
     }[];
-    const filled = rows.filter((r) => {
+    const filled = dnaRows.filter((r) => {
       if (r.body && r.body.length > 0) return true;
       if (r.content && typeof r.content === "object") {
         return Object.keys(r.content as Record<string, unknown>).length > 0;
@@ -157,25 +218,43 @@ async function getPhaseGates(
       phase0HasData = true;
       phase0Detail = `${filled} Brand DNA section${filled === 1 ? "" : "s"} populated.`;
     }
-  } catch {
-    // ignore
-  }
 
-  // Phase 1 data signal: BQ wqa_pipeline_output has rows for this
-  // domain. We don't gate on row count > some threshold; any rows means
-  // the pipeline has run successfully for this property.
-  let phase1HasData = false;
-  let phase1Detail = "WQA pipeline has not run for this domain.";
-  if (primaryDomain) {
-    try {
-      const wqa = await getWqaForDomain(primaryDomain, "dev");
-      if (wqa && "ok" in wqa && wqa.ok && wqa.rows.length > 0) {
-        phase1HasData = true;
-        phase1Detail = `${wqa.rows.length.toLocaleString()} URLs in WQA pipeline output.`;
-      }
-    } catch {
-      // ignore
+    // Phase 1 + Phase 2 (share the WQA BQ output signal)
+    if (wqaRes && "ok" in wqaRes && wqaRes.ok && wqaRes.rows.length > 0) {
+      phase1HasData = true;
+      phase1Detail = `${wqaRes.rows.length.toLocaleString()} URLs in WQA pipeline output.`;
+      phase2HasData = true;
+      phase2Detail = `${wqaRes.rows.length.toLocaleString()} URLs ready for Tech SEO audit (status, indexability, schema, CWV from WQA pipeline).`;
     }
+
+    // Phase 3
+    const clusterCount = keywordClusterRes.count ?? 0;
+    if (clusterCount > 0) {
+      phase3HasData = true;
+      phase3Detail = `${clusterCount.toLocaleString()} keyword cluster${clusterCount === 1 ? "" : "s"} in workspace.`;
+    }
+
+    // Phase 4
+    const contentCount = contentRowRes.count ?? 0;
+    if (contentCount > 0) {
+      phase4HasData = true;
+      phase4Detail = `${contentCount.toLocaleString()} content row${contentCount === 1 ? "" : "s"} in pipeline.`;
+    }
+
+    // Phase 5
+    const auditCount = auditDocRes.count ?? 0;
+    if (auditCount > 0) {
+      phase5HasData = true;
+      phase5Detail = `${auditCount} link / authority audit doc${auditCount === 1 ? "" : "s"} captured.`;
+    }
+
+    // Phase 6 — proxy until a dedicated tracking_setup field lands
+    if (primaryDomain && (propertyStatus ?? "").toLowerCase() === "active") {
+      phase6HasData = true;
+      phase6Detail = `Property active with primary domain set. Rank tracker + dashboard setup can begin.`;
+    }
+  } catch {
+    // ignore - keep defaults so the strip still renders
   }
 
   const make = (
@@ -203,11 +282,11 @@ async function getPhaseGates(
   return [
     make(approvals.phase_0_approved_at, approvals.phase_0_approved_by, phase0HasData, phase0Detail),
     make(approvals.phase_1_approved_at, approvals.phase_1_approved_by, phase1HasData, phase1Detail),
-    make(approvals.phase_2_approved_at, approvals.phase_2_approved_by, false, "Tech SEO data source not wired yet."),
-    make(approvals.phase_3_approved_at, approvals.phase_3_approved_by, false, "Keyword cluster data source not wired yet."),
-    make(approvals.phase_4_approved_at, approvals.phase_4_approved_by, false, "Content pipeline data source not wired yet."),
-    make(approvals.phase_5_approved_at, approvals.phase_5_approved_by, false, "Authority data source not wired yet."),
-    make(approvals.phase_6_approved_at, approvals.phase_6_approved_by, false, "Tracking setup signal not wired yet."),
+    make(approvals.phase_2_approved_at, approvals.phase_2_approved_by, phase2HasData, phase2Detail),
+    make(approvals.phase_3_approved_at, approvals.phase_3_approved_by, phase3HasData, phase3Detail),
+    make(approvals.phase_4_approved_at, approvals.phase_4_approved_by, phase4HasData, phase4Detail),
+    make(approvals.phase_5_approved_at, approvals.phase_5_approved_by, phase5HasData, phase5Detail),
+    make(approvals.phase_6_approved_at, approvals.phase_6_approved_by, phase6HasData, phase6Detail),
   ];
 }
 
@@ -314,7 +393,7 @@ export default async function PropertyLayout({
     await Promise.all([
       getProjectTypes(slug),
       getHeroMetrics(slug, prop.id),
-      getPhaseGates(slug, prop.primary_domain, prop as PhaseApprovalRow),
+      getPhaseGates(slug, prop.primary_domain, prop.status, prop as PhaseApprovalRow),
     ]);
 
   const tabs = buildTabs(slug, projectTypes, metrics, projectCount);
