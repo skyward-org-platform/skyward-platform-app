@@ -1,88 +1,30 @@
-// Seed Keywords — starting keywords for the SEO research pipeline. Field
-// set drawn from operations/process-library/.../keyword_research_intake_
-// template.xlsx (keyword · category · seed_category) plus intent for the
-// classification step. Stored under brand_dna_section.section =
-// 'seed_keywords' for V1.2; long term these flow through BigQuery for
-// expansion.
+// Seed Keywords - Brand DNA Phase 0 Tab 6 (per intake SOP).
+// Supabase property_seed_keyword is the source of truth (operator
+// owns). BigQuery SEOPipeline.seed_keywords is the legacy intake-form
+// upload from Adam's pipeline; one-shot import via the button.
 
-import { supabase } from "@/lib/supabase";
-import { getSectionHistory } from "@/lib/section-history";
-import { SectionHistoryPanel } from "@/components/SectionHistoryPanel";
+import { getPropertyBySlug } from "@/lib/property";
 import {
-  TableSectionEditor,
-  type Column,
-  type Row,
-} from "@/components/TableSectionEditor";
+  getSeedKeywordsForProperty,
+  type SeedKeyword,
+} from "@/lib/seed-keywords";
+import { apiBase } from "@/lib/api-base";
+import { SeedKeywordsEditor } from "@/components/SeedKeywordsEditor";
 
-const COLUMNS: Column[] = [
-  { key: "keyword", label: "Keyword", kind: "text", placeholder: "e.g. hood cleaning utah county" },
-  {
-    key: "category",
-    label: "Category",
-    kind: "text",
-    placeholder: "Service/product grouping",
-    width: "180px",
-  },
-  {
-    key: "seed_category",
-    label: "Source",
-    kind: "select",
-    options: ["persona", "client", "competitor", "manual"],
-    width: "130px",
-  },
-  {
-    key: "intent",
-    label: "Intent",
-    kind: "select",
-    options: ["informational", "commercial", "transactional", "navigational"],
-    width: "150px",
-  },
-  {
-    key: "priority",
-    label: "Priority",
-    kind: "select",
-    options: ["high", "medium", "low"],
-    width: "110px",
-  },
-];
+type BqProbeResult = { count: number };
 
-const NEW_ROW: Row = {
-  keyword: "",
-  category: "",
-  seed_category: "manual",
-  intent: "commercial",
-  priority: "medium",
-};
-
-type Section = { id: string; content: Record<string, unknown> | null };
-
-async function getSeedKeywords(slug: string): Promise<{
-  section: Section | null;
-  rows: Row[];
-}> {
-  const { data: prop } = await supabase
-    .from("property")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-  if (!prop) return { section: null, rows: [] };
-  const { data } = await supabase
-    .from("brand_dna_section")
-    .select("id, content")
-    .eq("property_id", prop.id)
-    .eq("section", "seed_keywords")
-    .maybeSingle();
-  const section = (data as Section | null) ?? null;
-  let rows: Row[] = [];
-  if (section?.content) {
-    const v = section.content["items"];
-    if (Array.isArray(v)) {
-      rows = (v as unknown[]).filter(
-        (x): x is Row => typeof x === "object" && x !== null,
-      );
-    }
+async function probeBqSourceCount(slug: string): Promise<number> {
+  try {
+    const r = await fetch(
+      `${apiBase()}/api/properties/${slug}/seed-keywords/bq-source`,
+      { next: { revalidate: 300 } },
+    );
+    if (!r.ok) return 0;
+    const j = (await r.json()) as BqProbeResult;
+    return j.count ?? 0;
+  } catch {
+    return 0;
   }
-  return { section, rows };
 }
 
 export default async function SeedKeywordsPage({
@@ -91,31 +33,46 @@ export default async function SeedKeywordsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const history = await getSectionHistory(slug, "seed_keywords");
-  const { rows } = await getSeedKeywords(slug);
+  const property = await getPropertyBySlug(slug);
+  if (!property) {
+    return (
+      <div className="px-8 py-6 text-[12px] text-muted-foreground">
+        Property not found.
+      </div>
+    );
+  }
+  const [seedKeywords, bqSourceCount] = await Promise.all([
+    getSeedKeywordsForProperty(property.id),
+    probeBqSourceCount(slug),
+  ]);
+  const showImportButton = seedKeywords.length === 0 && bqSourceCount > 0;
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl">
+    <div className="px-8 py-6 max-w-6xl">
       <header className="mb-5">
-        <h1 className="text-xl font-semibold tracking-tight">Seed Keywords</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Starting keywords for the research pipeline — feeds suggestions /
-          related / ideas expansion. Aim for 5–15 seeds per category, sourced
-          from personas, the existing site, and competitors. ×{rows.length} row
-          {rows.length === 1 ? "" : "s"}.
+        <h2 className="text-lg font-semibold tracking-tight">Seed Keywords</h2>
+        <p className="text-[12px] text-muted-foreground mt-1 leading-snug max-w-3xl">
+          Starting keywords for the SEO research pipeline. The Phase 3 cluster
+          builder expands these into thousands of related keywords. Aim for
+          20-100+ seeds across a mix of head terms, long-tail, locations, and
+          intents. Add, remove, or update entries below.
         </p>
       </header>
 
-      <TableSectionEditor
-        sectionKey="seed_keywords"
-        contentKey="items"
-        initialRows={rows}
-        columns={COLUMNS}
+      <SeedKeywordsEditor
         propertySlug={slug}
-        addLabel="+ Add seed keyword"
-        newRowTemplate={NEW_ROW}
+        initialSeedKeywords={seedKeywords as SeedKeyword[]}
+        bqSourceCount={bqSourceCount}
+        showImportButton={showImportButton}
       />
-      <SectionHistoryPanel snapshots={history} />
+
+      <aside className="mt-6 text-[10.5px] text-muted-foreground leading-relaxed max-w-3xl">
+        <strong className="text-foreground">Source of truth:</strong> Supabase{" "}
+        <span className="font-mono">property_seed_keyword</span>. BigQuery{" "}
+        <span className="font-mono">SEOPipeline.seed_keywords</span> is the
+        legacy intake-form upload; rows can be imported via the button above
+        (one-shot) when this list is empty.
+      </aside>
     </div>
   );
 }

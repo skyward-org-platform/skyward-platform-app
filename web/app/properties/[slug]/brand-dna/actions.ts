@@ -19,6 +19,11 @@ import {
   normalizeCompetitorDomain,
   type CompetitorPriority,
 } from "@/lib/competitors";
+import {
+  normalizeSeedKeyword,
+  type SeedKeywordIntent,
+  type SeedKeywordPriority,
+} from "@/lib/seed-keywords";
 
 type Ok = { ok: true; sectionId: string };
 type Err = { ok: false; error: string };
@@ -255,6 +260,177 @@ export async function importCompetitorsFromBqMeta(
   const { error } = await supabase.from("property_competitor").insert(newRows);
   if (error) return { ok: false, error: error.message };
   revalidateCompetitors(propertySlug);
+  return {
+    ok: true,
+    imported: newRows.length,
+    skipped: inserts.length - newRows.length,
+  };
+}
+
+// ─── Seed keyword CRUD ─────────────────────────────────────────────────────
+// Operator-owned via property_seed_keyword. BQ SEOPipeline.seed_keywords
+// is the legacy seed via the importSeedKeywordsFromBq action.
+
+type SeedKwOk = { ok: true };
+type SeedKwErr = { ok: false; error: string };
+
+function revalidateSeedKeywords(propertySlug: string) {
+  updateTag(CACHE_TAGS.brandDna);
+  revalidatePath(`/properties/${propertySlug}/brand-dna/seed-keywords`);
+  revalidatePath(`/properties/${propertySlug}`, "layout");
+}
+
+export async function addSeedKeyword(
+  propertySlug: string,
+  rawKeyword: string,
+  fields: {
+    category: string | null;
+    seedCategory: string | null;
+    intent: SeedKeywordIntent | null;
+    priority: SeedKeywordPriority;
+  },
+): Promise<SeedKwOk | SeedKwErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const keyword = normalizeSeedKeyword(rawKeyword);
+  if (!keyword) return { ok: false, error: "Keyword cannot be empty." };
+  const propertyId = await resolvePropertyId(propertySlug);
+  if (!propertyId) return { ok: false, error: "Property not found." };
+
+  const operator = getOperator();
+  const { error } = await supabase.from("property_seed_keyword").insert({
+    property_id: propertyId,
+    keyword,
+    category: fields.category?.trim() || null,
+    seed_category: fields.seedCategory?.trim() || null,
+    intent: fields.intent,
+    priority: fields.priority,
+    source: "operator",
+    created_by: operator,
+    updated_by: operator,
+  });
+  if (error) {
+    if (error.code === "23505") {
+      return {
+        ok: false,
+        error: `"${keyword}" is already in the seed keyword list.`,
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  revalidateSeedKeywords(propertySlug);
+  return { ok: true };
+}
+
+export async function updateSeedKeyword(
+  propertySlug: string,
+  seedId: string,
+  patch: {
+    category?: string | null;
+    seedCategory?: string | null;
+    intent?: SeedKeywordIntent | null;
+    priority?: SeedKeywordPriority;
+  },
+): Promise<SeedKwOk | SeedKwErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const update: Record<string, unknown> = { updated_by: getOperator() };
+  if (patch.category !== undefined) {
+    update.category = patch.category?.trim() || null;
+  }
+  if (patch.seedCategory !== undefined) {
+    update.seed_category = patch.seedCategory?.trim() || null;
+  }
+  if (patch.intent !== undefined) update.intent = patch.intent;
+  if (patch.priority !== undefined) update.priority = patch.priority;
+  const { error } = await supabase
+    .from("property_seed_keyword")
+    .update(update)
+    .eq("id", seedId);
+  if (error) return { ok: false, error: error.message };
+  revalidateSeedKeywords(propertySlug);
+  return { ok: true };
+}
+
+export async function removeSeedKeyword(
+  propertySlug: string,
+  seedId: string,
+): Promise<SeedKwOk | SeedKwErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const { error } = await supabase
+    .from("property_seed_keyword")
+    .delete()
+    .eq("id", seedId);
+  if (error) return { ok: false, error: error.message };
+  revalidateSeedKeywords(propertySlug);
+  return { ok: true };
+}
+
+export async function importSeedKeywordsFromBq(
+  propertySlug: string,
+): Promise<{ ok: true; imported: number; skipped: number } | SeedKwErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  const propertyId = await resolvePropertyId(propertySlug);
+  if (!propertyId) return { ok: false, error: "Property not found." };
+
+  type BqRow = {
+    keyword: string;
+    category: string | null;
+    seed_category: string | null;
+    source: string | null;
+    project_id: string | null;
+  };
+  let bqRows: BqRow[] = [];
+  try {
+    const r = await fetch(
+      `${apiBase()}/api/properties/${propertySlug}/seed-keywords/bq-source`,
+      { cache: "no-store" },
+    );
+    if (!r.ok) return { ok: false, error: `BQ fetch failed (${r.status}).` };
+    const j = (await r.json()) as { seed_keywords: BqRow[] };
+    bqRows = j.seed_keywords ?? [];
+  } catch (e) {
+    return { ok: false, error: `BQ fetch error: ${(e as Error).message}` };
+  }
+  if (bqRows.length === 0) return { ok: true, imported: 0, skipped: 0 };
+
+  const operator = getOperator();
+  const inserts = bqRows
+    .map((r) => ({
+      property_id: propertyId,
+      keyword: normalizeSeedKeyword(r.keyword ?? ""),
+      category: r.category?.trim() || null,
+      seed_category: r.seed_category?.trim() || null,
+      // BQ has no intent / priority - default to commercial / medium so the
+      // operator can re-prioritize in the editor.
+      intent: "commercial" as SeedKeywordIntent,
+      priority: "medium" as SeedKeywordPriority,
+      source: "bq_import" as const,
+      bq_project_id: r.project_id ?? null,
+      created_by: operator,
+      updated_by: operator,
+    }))
+    .filter((r) => r.keyword.length > 0);
+
+  const { data: existing } = await supabase
+    .from("property_seed_keyword")
+    .select("keyword")
+    .eq("property_id", propertyId);
+  const existingKeywords = new Set(
+    (existing ?? []).map((r: { keyword: string }) => r.keyword),
+  );
+  const newRows = inserts.filter((r) => !existingKeywords.has(r.keyword));
+  if (newRows.length === 0) {
+    revalidateSeedKeywords(propertySlug);
+    return { ok: true, imported: 0, skipped: inserts.length };
+  }
+  const { error } = await supabase
+    .from("property_seed_keyword")
+    .insert(newRows);
+  if (error) return { ok: false, error: error.message };
+  revalidateSeedKeywords(propertySlug);
   return {
     ok: true,
     imported: newRows.length,
