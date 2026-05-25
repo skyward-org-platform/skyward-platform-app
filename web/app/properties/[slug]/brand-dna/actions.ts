@@ -385,7 +385,7 @@ export async function importSeedKeywordsFromBq(
   let bqRows: BqRow[] = [];
   try {
     const r = await fetch(
-      `${apiBase()}/api/properties/${propertySlug}/seed-keywords/bq-source`,
+      `${apiBase()}/api/properties/${propertySlug}/seed-keywords-bq`,
       { cache: "no-store" },
     );
     if (!r.ok) return { ok: false, error: `BQ fetch failed (${r.status}).` };

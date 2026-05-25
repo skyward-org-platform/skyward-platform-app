@@ -1,13 +1,12 @@
-"""Vercel Python function: GET /api/properties/<slug>/seed-keywords/bq-source
+"""Vercel Python function: GET /api/properties/<slug>/seed-keywords-bq
 
 Returns seed keywords from BigQuery SEOPipeline.seed_keywords for any
 project linked to this property via Meta.projects -> Meta.project_domains
--> Meta.domains. Used by the Brand DNA Seed Keywords import action -
-this endpoint is read-only and only fires when the operator clicks the
-'Import from BQ' button.
+-> Meta.domains. Used by the Brand DNA Seed Keywords import action.
 
-The Supabase property_seed_keyword table is the canonical store going
-forward. This endpoint is the seed/import bridge.
+Filename mirrors the competitors.py flat-path precedent. The earlier
+nested 'seed-keywords/bq-source.py' layout did not deploy reliably as
+a Vercel function and the probe was returning count=0.
 """
 from __future__ import annotations
 
@@ -127,7 +126,7 @@ def _seed_keywords_for_domains(domains: list[str]) -> list[dict]:
     return [_row_to_json(r) for r in df.to_dict(orient="records")]
 
 
-_SLUG_RE = re.compile(r"/api/properties/([^/]+)/seed-keywords/bq-source/?$")
+_SLUG_RE = re.compile(r"/api/properties/([^/]+)/seed-keywords-bq/?$")
 
 
 class handler(BaseHTTPRequestHandler):

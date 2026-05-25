@@ -16,8 +16,8 @@ type BqProbeResult = { count: number };
 async function probeBqSourceCount(slug: string): Promise<number> {
   try {
     const r = await fetch(
-      `${apiBase()}/api/properties/${slug}/seed-keywords/bq-source`,
-      { next: { revalidate: 300 } },
+      `${apiBase()}/api/properties/${slug}/seed-keywords-bq`,
+      { cache: "no-store" },
     );
     if (!r.ok) return 0;
     const j = (await r.json()) as BqProbeResult;
