@@ -14,7 +14,7 @@ export const READ_TOOLS: ToolDef[] = [
   {
     name: "read_wqa_urls",
     description:
-      "Query the WQA pipeline output for URLs matching filter criteria. Filters: action ('Optimize'|'Restore'|'Redirect'|'Consolidate'|'Remove'|'Keep'|'Investigate'), status_code_min/max, min_sessions, min_impressions, min_backlinks, min_refdomains, has_backlinks (bool), is_indexable (bool), limit (default 100, max 500). Returns each URL with status_code, title, sessions, impressions, refdomains, backlinks, indexability.",
+      "Query the WQA pipeline output for URLs matching filter criteria. Filters: action ('Optimize'|'Restore'|'Redirect'|'Consolidate'|'Remove'|'Keep'|'Investigate'), status_code_min/max, min_sessions, min_impressions, min_backlinks, min_refdomains, has_backlinks (bool), is_indexable (bool), limit (default 200, max 2000 - use a high limit when the operator asks about totals or 'all'). Returns each URL with status_code, title, sessions, impressions, refdomains, backlinks, indexability.",
     input_schema: {
       type: "object",
       properties: {

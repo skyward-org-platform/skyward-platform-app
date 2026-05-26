@@ -9,7 +9,7 @@
 // click-to-edit JSON flow — this action is separate so the form pages don't
 // need to await a server-side row creation before they render.
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
@@ -73,8 +73,8 @@ export async function upsertBrandDnaField(
     if (insertErr || !created) {
       return { ok: false, error: insertErr?.message ?? "Insert failed." };
     }
-    updateTag(CACHE_TAGS.brandDna);
-    updateTag(CACHE_TAGS.signals);
+    revalidateTag(CACHE_TAGS.brandDna);
+    revalidateTag(CACHE_TAGS.signals);
     revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
     return { ok: true, sectionId: created.id };
   }
@@ -92,8 +92,8 @@ export async function upsertBrandDnaField(
     })
     .eq("id", existing.id);
   if (updErr) return { ok: false, error: updErr.message };
-  updateTag(CACHE_TAGS.brandDna);
-  updateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.brandDna);
+  revalidateTag(CACHE_TAGS.signals);
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
   return { ok: true, sectionId: existing.id };
 }
@@ -115,7 +115,7 @@ async function resolvePropertyId(slug: string): Promise<string | null> {
 }
 
 function revalidateCompetitors(propertySlug: string) {
-  updateTag(CACHE_TAGS.brandDna);
+  revalidateTag(CACHE_TAGS.brandDna);
   // Same three-path coverage as seed keywords - the Overview reads
   // hasCompetitors() directly so needs its own path bust.
   revalidatePath(`/properties/${propertySlug}/brand-dna`);
@@ -278,7 +278,7 @@ type SeedKwOk = { ok: true };
 type SeedKwErr = { ok: false; error: string };
 
 function revalidateSeedKeywords(propertySlug: string) {
-  updateTag(CACHE_TAGS.brandDna);
+  revalidateTag(CACHE_TAGS.brandDna);
   // Three explicit paths because the Brand DNA Overview reads
   // hasSeedKeywords() directly (no fetch tag), so a tag bust alone
   // doesn't catch it. Each path covers a different surface:

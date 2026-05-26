@@ -14,7 +14,7 @@
 //   2. page_execution + page_check_state mutations — Execution / Audit
 //      drawer + audit tabs use these. Untouched by P2 (orthogonal table).
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireWriteToken } from "@/lib/auth";
 import { getOperator } from "@/lib/operator";
 import { apiBase } from "@/lib/api-base";
@@ -47,7 +47,7 @@ async function resolveProperty(slug: string): Promise<{ id: string } | Err> {
 function bust(slug: string) {
   // Bust both the per-route cache and the coarse wqa-decisions tag so
   // unstable_cache readers (e.g. getWqaDecisions) re-fetch on next render.
-  updateTag(CACHE_TAGS.wqaDecisions);
+  revalidateTag(CACHE_TAGS.wqaDecisions);
   revalidatePath(`/properties/${slug}/pages`);
 }
 

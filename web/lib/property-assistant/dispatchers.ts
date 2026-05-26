@@ -345,7 +345,7 @@ async function readWqaUrls(
     return true;
   });
 
-  const limit = Math.min(numOrNull(input.limit) ?? 100, 500);
+  const limit = Math.min(numOrNull(input.limit) ?? 200, 2000);
   const trimmed = rows.slice(0, limit).map((r) => ({
     url: r.url,
     status_code: r.status_code,
