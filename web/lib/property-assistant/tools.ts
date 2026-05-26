@@ -246,4 +246,123 @@ export const WRITE_SINGLE_TOOLS: ToolDef[] = [
   },
 ];
 
-export const ALL_TOOLS: ToolDef[] = [...READ_TOOLS, ...WRITE_SINGLE_TOOLS];
+export const BULK_TOOLS: ToolDef[] = [
+  {
+    name: "bulk_set_wqa_action",
+    description:
+      "Set action on MULTIPLE URLs. Generates an Apply card the operator clicks to confirm. Use when the operator wants to change ≥2 URLs at once.",
+    input_schema: {
+      type: "object",
+      properties: {
+        urls: { type: "array", items: { type: "string" } },
+        action: { type: "string" },
+        reason: {
+          type: "string",
+          description: "One-line justification shown in the proposal card",
+        },
+      },
+      required: ["urls", "action", "reason"],
+    },
+    category: "bulk-write",
+  },
+  {
+    name: "bulk_set_wqa_status",
+    description: "Set status on MULTIPLE URLs. Generates an Apply card.",
+    input_schema: {
+      type: "object",
+      properties: {
+        urls: { type: "array", items: { type: "string" } },
+        status: { type: "string" },
+        reason: { type: "string" },
+      },
+      required: ["urls", "status", "reason"],
+    },
+    category: "bulk-write",
+  },
+  {
+    name: "bulk_clear_action_override",
+    description:
+      "Revert N URLs back to the pipeline-derived action by deleting their wqa_decision rows. Apply card required.",
+    input_schema: {
+      type: "object",
+      properties: {
+        urls: { type: "array", items: { type: "string" } },
+        reason: { type: "string" },
+      },
+      required: ["urls", "reason"],
+    },
+    category: "bulk-write",
+  },
+  {
+    name: "bulk_add_seed_keywords",
+    description:
+      "Add N seed keywords at once. items: array of {keyword, category?, seed_category?, intent?, priority?}.",
+    input_schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              keyword: { type: "string" },
+              category: { type: "string" },
+              seed_category: { type: "string" },
+              intent: { type: "string" },
+              priority: { type: "string" },
+            },
+            required: ["keyword"],
+          },
+        },
+        reason: { type: "string" },
+      },
+      required: ["items", "reason"],
+    },
+    category: "bulk-write",
+  },
+  {
+    name: "bulk_add_competitors",
+    description:
+      "Add N competitors at once. items: array of {domain, priority, notes?}.",
+    input_schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              domain: { type: "string" },
+              priority: { type: "string" },
+              notes: { type: "string" },
+            },
+            required: ["domain", "priority"],
+          },
+        },
+        reason: { type: "string" },
+      },
+      required: ["items", "reason"],
+    },
+    category: "bulk-write",
+  },
+  {
+    name: "approve_phase",
+    description:
+      "Approve a phase gate (0-6). Downstream phases will start consuming this phase's data. Generates an Apply card because the effect propagates.",
+    input_schema: {
+      type: "object",
+      properties: {
+        phase: { type: "number", description: "0-6" },
+        reason: { type: "string" },
+      },
+      required: ["phase", "reason"],
+    },
+    category: "bulk-write",
+  },
+];
+
+export const ALL_TOOLS: ToolDef[] = [
+  ...READ_TOOLS,
+  ...WRITE_SINGLE_TOOLS,
+  ...BULK_TOOLS,
+];
