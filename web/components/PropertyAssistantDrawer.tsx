@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { applyPropertyAssistantProposal } from "@/app/properties/[slug]/property-assistant-actions";
 
 type ToolUseRecord = {
   id: string;
@@ -15,9 +16,24 @@ type ToolUseRecord = {
   result?: { ok: boolean; error?: string; data?: unknown };
 };
 
+type ProposalRecord = {
+  id: string;
+  tool: string;
+  input: Record<string, unknown>;
+  summary: string;
+  count: number;
+  state: "pending" | "applying" | "applied" | "error";
+  result?: string;
+};
+
 type Message =
   | { role: "user"; text: string }
-  | { role: "assistant"; text: string; toolUses?: ToolUseRecord[] };
+  | {
+      role: "assistant";
+      text: string;
+      toolUses?: ToolUseRecord[];
+      proposals?: ProposalRecord[];
+    };
 
 export function PropertyAssistantDrawer({
   open,
@@ -64,7 +80,7 @@ export function PropertyAssistantDrawer({
     setMessages((curr) => [
       ...curr,
       { role: "user", text },
-      { role: "assistant", text: "", toolUses: [] },
+      { role: "assistant", text: "", toolUses: [], proposals: [] },
     ]);
     setInput("");
     setError(null);
@@ -137,6 +153,22 @@ export function PropertyAssistantDrawer({
                       }
                     : t,
                 ),
+              }));
+            } else if (payload.event === "proposal") {
+              mutateLastAssistant((m) => ({
+                ...m,
+                proposals: [
+                  ...(m.proposals ?? []),
+                  {
+                    id: String(payload.id),
+                    tool: String(payload.proposal.tool),
+                    input:
+                      (payload.proposal.input as Record<string, unknown>) ?? {},
+                    summary: String(payload.proposal.summary ?? ""),
+                    count: Number(payload.proposal.count ?? 0),
+                    state: "pending",
+                  },
+                ],
               }));
             } else if (payload.event === "error") {
               setError(payload.message ?? "Stream error");
@@ -236,6 +268,37 @@ export function PropertyAssistantDrawer({
                       ))}
                     </ul>
                   )}
+                  {m.proposals && m.proposals.length > 0 && (
+                    <div className="mt-2 space-y-2 w-[90%]">
+                      {m.proposals.map((p) => (
+                        <ProposalCard
+                          key={p.id}
+                          proposal={p}
+                          propertySlug={propertySlug}
+                          onUpdate={(state, result) => {
+                            setMessages((msgs) => {
+                              const copy = [...msgs];
+                              for (const msg of copy) {
+                                if (msg.role !== "assistant" || !msg.proposals)
+                                  continue;
+                                const i = msg.proposals.findIndex(
+                                  (x) => x.id === p.id,
+                                );
+                                if (i >= 0) {
+                                  msg.proposals[i] = {
+                                    ...msg.proposals[i],
+                                    state,
+                                    result,
+                                  };
+                                }
+                              }
+                              return copy;
+                            });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -282,4 +345,68 @@ function renderToolLine(t: ToolUseRecord): string {
   if (!t.result) return `→ ${t.name}…`;
   if (t.result.ok) return `✓ ${t.name}`;
   return `✗ ${t.name}: ${t.result.error ?? "failed"}`;
+}
+
+function ProposalCard({
+  proposal,
+  propertySlug,
+  onUpdate,
+}: {
+  proposal: ProposalRecord;
+  propertySlug: string;
+  onUpdate: (state: ProposalRecord["state"], result?: string) => void;
+}) {
+  const handleApply = async () => {
+    onUpdate("applying");
+    const res = await applyPropertyAssistantProposal(propertySlug, {
+      tool: proposal.tool,
+      input: proposal.input,
+      summary: proposal.summary,
+      count: proposal.count,
+    });
+    if (res.ok) {
+      onUpdate("applied", res.summary);
+    } else {
+      onUpdate("error", res.error);
+    }
+  };
+  const handleDiscard = () => onUpdate("error", "Discarded by operator.");
+
+  return (
+    <div className="border rounded-md px-3 py-2 bg-card text-[11px]">
+      <div className="font-semibold mb-1 text-[11.5px]">
+        Proposal: {proposal.tool}
+      </div>
+      <div className="text-muted-foreground leading-snug mb-2">
+        {proposal.summary}
+      </div>
+      {proposal.state === "pending" && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleApply}
+            className="px-2 py-1 bg-emerald-600 text-white rounded text-[11px] hover:bg-emerald-700"
+          >
+            Apply ({proposal.count})
+          </button>
+          <button
+            type="button"
+            onClick={handleDiscard}
+            className="px-2 py-1 border rounded text-[11px] hover:bg-muted/50"
+          >
+            Discard
+          </button>
+        </div>
+      )}
+      {proposal.state === "applying" && (
+        <div className="text-muted-foreground italic">Applying…</div>
+      )}
+      {proposal.state === "applied" && (
+        <div className="text-emerald-700">✓ {proposal.result}</div>
+      )}
+      {proposal.state === "error" && (
+        <div className="text-rose-700">✗ {proposal.result}</div>
+      )}
+    </div>
+  );
 }
