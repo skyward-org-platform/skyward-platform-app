@@ -47,7 +47,7 @@ async function resolveProperty(slug: string): Promise<{ id: string } | Err> {
 function bust(slug: string) {
   // Bust both the per-route cache and the coarse wqa-decisions tag so
   // unstable_cache readers (e.g. getWqaDecisions) re-fetch on next render.
-  revalidateTag(CACHE_TAGS.wqaDecisions);
+  revalidateTag(CACHE_TAGS.wqaDecisions, "default");
   revalidatePath(`/properties/${slug}/pages`);
 }
 

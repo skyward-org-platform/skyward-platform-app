@@ -23,7 +23,7 @@ export async function snoozeSignal(signalId: string): Promise<Ok | Err> {
     snoozed_at: new Date().toISOString(),
   });
   if (error) return { ok: false, error: error.message };
-  revalidateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.signals, "default");
   revalidatePath("/signals");
   revalidatePath("/", "layout");
   return { ok: true };
@@ -37,7 +37,7 @@ export async function unsnoozeSignal(signalId: string): Promise<Ok | Err> {
     .delete()
     .eq("signal_id", signalId);
   if (error) return { ok: false, error: error.message };
-  revalidateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.signals, "default");
   revalidatePath("/signals");
   revalidatePath("/", "layout");
   return { ok: true };

@@ -53,8 +53,8 @@ export async function updateBrandDnaBody(
     })
     .eq("id", sectionId);
   if (error) return { ok: false, error: error.message };
-  revalidateTag(CACHE_TAGS.brandDna);
-  revalidateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.brandDna, "default");
+  revalidateTag(CACHE_TAGS.signals, "default");
   // 'layout' so the sub-layout's count badges + every /brand-dna/[section]
   // child page see the new content on next render.
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");
@@ -88,8 +88,8 @@ export async function updateBrandDnaContentKey(
     })
     .eq("id", sectionId);
   if (error) return { ok: false, error: error.message };
-  revalidateTag(CACHE_TAGS.brandDna);
-  revalidateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.brandDna, "default");
+  revalidateTag(CACHE_TAGS.signals, "default");
   // 'layout' so the sub-layout's count badges + every /brand-dna/[section]
   // child page see the new content on next render.
   revalidatePath(`/properties/${propertySlug}/brand-dna`, "layout");

@@ -41,7 +41,7 @@ export async function updateAuditAction(
   }
   const { error } = await supabase.from("page").update(patch).eq("id", pageId);
   if (error) return { ok: false, error: error.message };
-  revalidateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.signals, "default");
   revalidatePath(`/properties/${propertySlug}/pages`);
   revalidatePath(`/properties/${propertySlug}`);
   revalidatePath("/activity");
@@ -79,7 +79,7 @@ export async function updateAuditTarget(
     })
     .eq("id", pageId);
   if (error) return { ok: false, error: error.message };
-  revalidateTag(CACHE_TAGS.signals);
+  revalidateTag(CACHE_TAGS.signals, "default");
   revalidatePath(`/properties/${propertySlug}/pages`);
   revalidatePath(`/properties/${propertySlug}`);
   revalidatePath("/activity");
