@@ -12,7 +12,54 @@ import { recordLlmCall } from "@/lib/llm-usage";
 import { ALL_TOOLS } from "@/lib/property-assistant/tools";
 import { dispatchToolCall } from "@/lib/property-assistant/dispatchers";
 import { buildSystemPrompt } from "@/lib/property-assistant/system-prompt";
-import type { RouteContext } from "@/lib/property-assistant/types";
+import type { ProposalPayload, RouteContext } from "@/lib/property-assistant/types";
+
+const TOOLS_BY_NAME = new Map(ALL_TOOLS.map((t) => [t.name, t]));
+
+function summarizeProposal(
+  name: string,
+  input: Record<string, unknown>,
+): { summary: string; count: number } {
+  if (name === "bulk_set_wqa_action") {
+    const urls = (input.urls as string[]) ?? [];
+    return {
+      summary: `Set action to "${input.action}" on ${urls.length} URL${urls.length === 1 ? "" : "s"}. Reason: ${input.reason}`,
+      count: urls.length,
+    };
+  }
+  if (name === "bulk_set_wqa_status") {
+    const urls = (input.urls as string[]) ?? [];
+    return {
+      summary: `Set status to "${input.status}" on ${urls.length} URL${urls.length === 1 ? "" : "s"}. Reason: ${input.reason}`,
+      count: urls.length,
+    };
+  }
+  if (name === "bulk_clear_action_override") {
+    const urls = (input.urls as string[]) ?? [];
+    return {
+      summary: `Revert ${urls.length} URL${urls.length === 1 ? "" : "s"} to pipeline-derived action. Reason: ${input.reason}`,
+      count: urls.length,
+    };
+  }
+  if (name === "bulk_add_seed_keywords") {
+    const items = (input.items as unknown[]) ?? [];
+    return {
+      summary: `Add ${items.length} seed keyword${items.length === 1 ? "" : "s"}. Reason: ${input.reason}`,
+      count: items.length,
+    };
+  }
+  if (name === "bulk_add_competitors") {
+    const items = (input.items as unknown[]) ?? [];
+    return {
+      summary: `Add ${items.length} competitor${items.length === 1 ? "" : "s"}. Reason: ${input.reason}`,
+      count: items.length,
+    };
+  }
+  if (name === "approve_phase") {
+    return { summary: `Approve Phase ${input.phase}. Reason: ${input.reason}`, count: 1 };
+  }
+  return { summary: `Apply ${name}`, count: 0 };
+}
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 3000;
@@ -148,26 +195,51 @@ export async function POST(
           if (resp.stop_reason !== "tool_use") break;
 
           const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          let emittedProposal = false;
           for (const block of resp.content) {
             if (block.type !== "tool_use") continue;
-            const result = await dispatchToolCall(
-              block.name,
-              (block.input ?? {}) as Record<string, unknown>,
-              {
-                propertyId: prop.id,
-                propertySlug: slug,
-                primaryDomain: prop.primary_domain,
-              },
-            );
-            emit({ event: "tool_result", id: block.id, result });
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: block.id,
-              content: JSON.stringify(result),
-            });
+            const def = TOOLS_BY_NAME.get(block.name);
+            if (def?.category === "bulk-write") {
+              const { summary, count } = summarizeProposal(
+                block.name,
+                (block.input ?? {}) as Record<string, unknown>,
+              );
+              const proposal: ProposalPayload = {
+                tool: block.name,
+                input: (block.input ?? {}) as Record<string, unknown>,
+                summary,
+                count,
+              };
+              emit({ event: "proposal", id: block.id, proposal });
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: `Proposal "${block.name}" emitted to the operator for review. Wait for their decision before continuing.`,
+              });
+              emittedProposal = true;
+            } else {
+              const result = await dispatchToolCall(
+                block.name,
+                (block.input ?? {}) as Record<string, unknown>,
+                {
+                  propertyId: prop.id,
+                  propertySlug: slug,
+                  primaryDomain: prop.primary_domain,
+                },
+              );
+              emit({ event: "tool_result", id: block.id, result });
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: JSON.stringify(result),
+              });
+            }
           }
 
           messages.push({ role: "user", content: toolResults });
+
+          // After emitting a proposal, stop the loop and let the operator review.
+          if (emittedProposal) break;
         }
 
         emit({ event: "done" });
