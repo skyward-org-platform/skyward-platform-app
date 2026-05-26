@@ -110,4 +110,140 @@ export const READ_TOOLS: ToolDef[] = [
   },
 ];
 
-export const ALL_TOOLS: ToolDef[] = [...READ_TOOLS];
+export const WRITE_SINGLE_TOOLS: ToolDef[] = [
+  {
+    name: "set_wqa_action",
+    description:
+      "Set the operator-override action on ONE URL. Use Action7: Optimize, Restore, Redirect, Consolidate, Remove, Keep, Investigate.",
+    input_schema: {
+      type: "object",
+      properties: { url: { type: "string" }, action: { type: "string" } },
+      required: ["url", "action"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "set_wqa_status",
+    description: "Set status on ONE URL. Values: Open, In Progress, Done.",
+    input_schema: {
+      type: "object",
+      properties: { url: { type: "string" }, status: { type: "string" } },
+      required: ["url", "status"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "set_wqa_target_url",
+    description: "Set redirect destination URL on ONE source URL.",
+    input_schema: {
+      type: "object",
+      properties: { url: { type: "string" }, target_url: { type: "string" } },
+      required: ["url", "target_url"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "set_wqa_logic_notes",
+    description: "Set free-text logic notes on ONE URL.",
+    input_schema: {
+      type: "object",
+      properties: { url: { type: "string" }, notes: { type: "string" } },
+      required: ["url", "notes"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "update_brand_field",
+    description:
+      "Update a single field on a Brand DNA section. section is the enum key, field is the JSON key inside content, value is the new value.",
+    input_schema: {
+      type: "object",
+      properties: {
+        section: { type: "string" },
+        field: { type: "string" },
+        value: {},
+      },
+      required: ["section", "field", "value"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "add_competitor",
+    description: "Add a single competitor. priority: high|medium|low.",
+    input_schema: {
+      type: "object",
+      properties: {
+        domain: { type: "string" },
+        priority: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["domain", "priority"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "remove_competitor",
+    description: "Remove a competitor by domain.",
+    input_schema: {
+      type: "object",
+      properties: { domain: { type: "string" } },
+      required: ["domain"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "add_seed_keyword",
+    description:
+      "Add ONE seed keyword. priority: high|medium|low; intent: informational|commercial|transactional|navigational.",
+    input_schema: {
+      type: "object",
+      properties: {
+        keyword: { type: "string" },
+        category: { type: "string" },
+        seed_category: { type: "string" },
+        intent: { type: "string" },
+        priority: { type: "string" },
+      },
+      required: ["keyword"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "remove_seed_keyword",
+    description: "Remove ONE seed keyword by its exact keyword string.",
+    input_schema: {
+      type: "object",
+      properties: { keyword: { type: "string" } },
+      required: ["keyword"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "add_brain_entry",
+    description:
+      "Add a Project Brain entry capturing knowledge from the conversation. type: issue|working|research|preference|strategy|insight. confidence: 0.0-1.0.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type: { type: "string" },
+        title: { type: "string" },
+        body: { type: "string" },
+        confidence: { type: "number" },
+      },
+      required: ["type", "title", "body"],
+    },
+    category: "single-write",
+  },
+  {
+    name: "update_mission",
+    description: "Overwrite the property's strategic mission body.",
+    input_schema: {
+      type: "object",
+      properties: { body: { type: "string" } },
+      required: ["body"],
+    },
+    category: "single-write",
+  },
+];
+
+export const ALL_TOOLS: ToolDef[] = [...READ_TOOLS, ...WRITE_SINGLE_TOOLS];

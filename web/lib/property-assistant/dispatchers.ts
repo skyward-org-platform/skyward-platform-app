@@ -7,9 +7,35 @@
 // status_code / sessions / impressions / backlinks come from the row dump.
 
 import { supabase } from "@/lib/supabase";
-import { getMission } from "@/lib/property-mission";
+import { getMission, upsertMission } from "@/lib/property-mission";
 import { getWqaForDomain, type WqaRow } from "@/lib/wqa";
-import { getWqaDecisions } from "@/lib/wqa-decisions";
+import {
+  getWqaDecisions,
+  type Action7,
+  type WqaStatus,
+} from "@/lib/wqa-decisions";
+import { getOperator } from "@/lib/operator";
+import { normalizeCompetitorDomain } from "@/lib/competitors";
+import {
+  normalizeSeedKeyword,
+  type SeedKeywordIntent,
+  type SeedKeywordPriority,
+} from "@/lib/seed-keywords";
+import type { CompetitorPriority } from "@/lib/competitors";
+import {
+  setAction,
+  setStatus,
+  setTargetUrl,
+  setLogicNotes,
+} from "@/app/properties/[slug]/pages/wqa-actions";
+import {
+  upsertBrandDnaField,
+  addCompetitor,
+  removeCompetitor,
+  addSeedKeyword,
+  removeSeedKeyword,
+} from "@/app/properties/[slug]/brand-dna/actions";
+import { createBrainEntry } from "@/app/properties/[slug]/project-brain/actions";
 import type { ToolResult } from "./types";
 
 export type DispatchContext = {
@@ -47,6 +73,148 @@ export async function dispatchToolCall(
         return await readPageEmbeddingMatch(input, ctx);
       case "read_recent_activity":
         return await readRecentActivity(input);
+
+      // ─── single-write tools (Phase B) ──────────────────────────────────
+      case "set_wqa_action": {
+        const url = String(input.url);
+        const action = String(input.action) as Action7;
+        const res = await setAction(ctx.propertySlug, url, action as never);
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { url, action } };
+      }
+      case "set_wqa_status": {
+        const url = String(input.url);
+        const status = String(input.status) as WqaStatus;
+        const res = await setStatus(ctx.propertySlug, url, status as never);
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { url, status } };
+      }
+      case "set_wqa_target_url": {
+        const url = String(input.url);
+        const target_url = String(input.target_url);
+        const res = await setTargetUrl(ctx.propertySlug, url, target_url);
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { url, target_url } };
+      }
+      case "set_wqa_logic_notes": {
+        const url = String(input.url);
+        const notes = String(input.notes);
+        const res = await setLogicNotes(ctx.propertySlug, url, notes);
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { url, notes } };
+      }
+      case "update_brand_field": {
+        const section = String(input.section);
+        const field = String(input.field);
+        const value = input.value;
+        const res = await upsertBrandDnaField(
+          ctx.propertySlug,
+          section,
+          field,
+          value,
+        );
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { section, field, sectionId: res.sectionId } };
+      }
+      case "add_competitor": {
+        const domain = String(input.domain);
+        const priority = String(input.priority) as CompetitorPriority;
+        const notes =
+          typeof input.notes === "string" ? (input.notes as string) : null;
+        const res = await addCompetitor(
+          ctx.propertySlug,
+          domain,
+          priority,
+          notes,
+        );
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { domain, priority } };
+      }
+      case "remove_competitor": {
+        const domain = normalizeCompetitorDomain(String(input.domain));
+        const { data: row, error: lookupErr } = await supabase
+          .from("property_competitor")
+          .select("id")
+          .eq("property_id", ctx.propertyId)
+          .eq("domain", domain)
+          .maybeSingle();
+        if (lookupErr) return { ok: false, error: lookupErr.message };
+        if (!row) {
+          return { ok: false, error: `Competitor not found: ${domain}` };
+        }
+        const res = await removeCompetitor(
+          ctx.propertySlug,
+          (row as { id: string }).id,
+        );
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { domain } };
+      }
+      case "add_seed_keyword": {
+        const keyword = String(input.keyword);
+        const category =
+          typeof input.category === "string" ? (input.category as string) : null;
+        const seedCategory =
+          typeof input.seed_category === "string"
+            ? (input.seed_category as string)
+            : null;
+        const intent =
+          typeof input.intent === "string"
+            ? ((input.intent as string) as SeedKeywordIntent)
+            : null;
+        const priority = (typeof input.priority === "string"
+          ? (input.priority as string)
+          : "medium") as SeedKeywordPriority;
+        const res = await addSeedKeyword(ctx.propertySlug, keyword, {
+          category,
+          seedCategory,
+          intent,
+          priority,
+        });
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { keyword, intent, priority } };
+      }
+      case "remove_seed_keyword": {
+        const keyword = normalizeSeedKeyword(String(input.keyword));
+        const { data: row, error: lookupErr } = await supabase
+          .from("property_seed_keyword")
+          .select("id")
+          .eq("property_id", ctx.propertyId)
+          .eq("keyword", keyword)
+          .maybeSingle();
+        if (lookupErr) return { ok: false, error: lookupErr.message };
+        if (!row) {
+          return { ok: false, error: `Seed keyword not found: ${keyword}` };
+        }
+        const res = await removeSeedKeyword(
+          ctx.propertySlug,
+          (row as { id: string }).id,
+        );
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { keyword } };
+      }
+      case "add_brain_entry": {
+        const type = String(input.type);
+        const title = String(input.title);
+        const body = String(input.body);
+        const confidence =
+          typeof input.confidence === "number" ? input.confidence : null;
+        const res = await createBrainEntry(ctx.propertySlug, {
+          type,
+          title,
+          body,
+          source: "ai:property-assistant",
+          confidence,
+        });
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { type, title } };
+      }
+      case "update_mission": {
+        const body = String(input.body);
+        const res = await upsertMission(ctx.propertyId, body, getOperator());
+        if (!res.ok) return { ok: false, error: res.error };
+        return { ok: true, data: { body_len: body.length } };
+      }
+
       default:
         return { ok: false, error: `Unknown tool: ${name}` };
     }
