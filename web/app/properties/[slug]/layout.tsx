@@ -12,6 +12,7 @@ import { StatusPill, statusVariantFrom } from "@/components/StatusPill";
 import { getWqaForDomain } from "@/lib/wqa";
 import { hasCompetitors } from "@/lib/competitors";
 import { hasSeedKeywords } from "@/lib/seed-keywords";
+import { PropertyAssistantButton } from "@/components/PropertyAssistantButton";
 import { approvePhase } from "./actions";
 
 type Project = {
@@ -540,6 +541,8 @@ export default async function PropertyLayout({
       </div>
 
       {children}
+
+      <PropertyAssistantButton propertySlug={slug} />
     </div>
   );
 }
