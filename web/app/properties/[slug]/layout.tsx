@@ -395,6 +395,7 @@ function buildTabs(
     tabs.push({ kind: "tab", href: `/properties/${slug}/keywords`, label: "Keywords" });
     tabs.push({ kind: "tab", href: `/properties/${slug}/content`, label: "Content" });
     tabs.push({ kind: "tab", href: `/properties/${slug}/authority`, label: "Authority" });
+    tabs.push({ kind: "tab", href: `/properties/${slug}/tracking`, label: "Tracking" });
   }
 
   // Cluster: meta tabs
