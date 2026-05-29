@@ -83,18 +83,27 @@ export function BulkActionBar({
   };
 
   const handleVerify = () => {
-    if (!confirm(`Verify ${count} URL${count === 1 ? "" : "s"}? This follows each row's redirect chain and flips status to Done when the final response is 2xx/3xx.`)) return;
+    if (!confirm(`Verify ${count} URL${count === 1 ? "" : "s"}? Each row's SOURCE URL is fetched; if it actually lands on the configured target_url, status flips to Done.`)) return;
     startTransition(async () => {
       const res = await bulkVerifyTargetUrls(propertySlug, Array.from(urls));
       if (!res.ok) {
         flash({ ok: false, message: res.error });
         return;
       }
-      const parts = [`${res.succeeded}/${res.total} verified`];
-      if (res.flippedToDone > 0) parts.push(`${res.flippedToDone} → Done`);
+      const parts: string[] = [`${res.matched}/${res.total} matched`];
+      if (res.mismatched > 0) parts.push(`${res.mismatched} mismatch`);
       if (res.failed > 0) parts.push(`${res.failed} failed`);
       if (res.skipped > 0) parts.push(`${res.skipped} skipped (no target)`);
-      flash({ ok: res.failed === 0, message: parts.join(", ") });
+      flash({
+        ok: res.mismatched === 0 && res.failed === 0,
+        message: parts.join(", "),
+      });
+      if (res.mismatches.length > 0) {
+        // Print mismatches to the console so operator can copy/paste
+        // without losing the toolbar flash.
+        // eslint-disable-next-line no-console
+        console.warn("Verify mismatches (source actually redirects elsewhere):", res.mismatches);
+      }
       onClear();
       window.location.reload();
     });

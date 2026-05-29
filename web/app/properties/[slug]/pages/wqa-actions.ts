@@ -161,17 +161,41 @@ export async function setTargetUrl(
 }
 
 // ─── verifyTargetUrl ──────────────────────────────────────────────────────
-// Live HTTP check against the target. Returns the chain + final status.
-// On success, optionally flips status → Done.
+// Live HTTP check. Fetches the SOURCE URL and follows the redirect chain,
+// then compares the actual final URL to the configured target_url:
+//
+//   match + 2xx/3xx       → status → Done    (live site implements the redirect)
+//   mismatch + 2xx/3xx    → status unchanged (live site redirects, but to a
+//                            different URL than configured — flag the drift)
+//   4xx/5xx               → status unchanged (broken or blocked)
+//
+// `matched` and `actualDestination` let the UI distinguish "the live site
+// does what we configured" from "the live site does something else."
 export type VerifyResult =
   | {
       ok: true;
-      finalUrl: string;
+      configuredTarget: string;
+      actualDestination: string;
       finalStatus: number;
       chain: { url: string; status: number }[];
+      matched: boolean;
       flippedStatusToDone: boolean;
     }
   | { ok: false; error: string; chain?: { url: string; status: number }[] };
+
+/** Normalize URLs for the source/target comparison. Trailing slash and
+ *  case-insensitive scheme/host are noise; path case is content-meaningful. */
+function normalizeUrlForCompare(u: string): string {
+  try {
+    const parsed = new URL(u);
+    parsed.hash = "";
+    let path = parsed.pathname;
+    if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+    return `${parsed.protocol}//${parsed.host.toLowerCase()}${path}${parsed.search}`;
+  } catch {
+    return u;
+  }
+}
 
 export async function verifyTargetUrl(
   slug: string, url: string, flipStatusOnSuccess: boolean,
@@ -182,7 +206,7 @@ export async function verifyTargetUrl(
   if ("ok" in prop && prop.ok === false) return prop;
   const propertyId = (prop as { id: string }).id;
 
-  // Read the current target_url for this row
+  // Read the configured target_url for this row
   const { data: row } = await supabase
     .from("wqa_decision")
     .select("target_url")
@@ -190,35 +214,45 @@ export async function verifyTargetUrl(
     .eq("url", url)
     .single();
   if (!row?.target_url) return { ok: false, error: "No target_url set on this row" };
+  const configuredTarget: string = row.target_url;
 
-  // Call the Next route handler that does the live HTTP check
-  const verifyEndpoint = `${apiBase()}/api/verify-url?target=${encodeURIComponent(row.target_url)}`;
+  // Fetch the SOURCE URL via the verify endpoint, follow the chain.
+  // This tells us where the live site actually sends visitors, vs where
+  // the operator has configured the destination.
+  const verifyEndpoint = `${apiBase()}/api/verify-url?target=${encodeURIComponent(url)}`;
   let chain: { url: string; status: number }[] = [];
-  let finalUrl = row.target_url;
+  let actualDestination = url;
   let finalStatus = 0;
   try {
     const resp = await fetch(verifyEndpoint);
     if (!resp.ok) return { ok: false, error: `verify endpoint returned ${resp.status}` };
     const body = await resp.json();
     chain = body.chain ?? [];
-    finalUrl = body.finalUrl ?? row.target_url;
+    actualDestination = body.finalUrl ?? url;
     finalStatus = body.finalStatus ?? 0;
+    if (!body.ok && body.error) {
+      return { ok: false, error: body.error, chain };
+    }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 
-  // Stamp last_implementation_check_at on the row + optionally flip status.
-  // The row already exists (we just read its target_url above), so use plain
-  // UPDATE — an upsert here would attempt INSERT-with-conflict and fail
-  // Postgres' NOT NULL check on `action` (validated before conflict resolution).
-  const success = finalStatus >= 200 && finalStatus < 400;
+  const reachable = finalStatus >= 200 && finalStatus < 400;
+  const matched = reachable && normalizeUrlForCompare(actualDestination) === normalizeUrlForCompare(configuredTarget);
+  const shouldFlip = flipStatusOnSuccess && reachable && matched;
+
+  // Stamp last_implementation_check_at + optionally flip status. The row
+  // already exists (we just read it), so plain UPDATE — an upsert here
+  // would attempt INSERT-with-conflict and fail Postgres' NOT NULL on
+  // `action` (validated before conflict resolution).
   try {
+    const nowIso = new Date().toISOString();
     const patch: Record<string, unknown> = {
-      last_implementation_check_at: new Date().toISOString(),
+      last_implementation_check_at: nowIso,
       decided_by: getOperator(),
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
     };
-    if (flipStatusOnSuccess && success) patch.status = "Done";
+    if (shouldFlip) patch.status = "Done";
     const { error } = await supabase
       .from("wqa_decision")
       .update(patch)
@@ -232,10 +266,12 @@ export async function verifyTargetUrl(
 
   return {
     ok: true,
-    finalUrl,
+    configuredTarget,
+    actualDestination,
     finalStatus,
     chain,
-    flippedStatusToDone: flipStatusOnSuccess && success,
+    matched,
+    flippedStatusToDone: shouldFlip,
   };
 }
 
@@ -548,11 +584,13 @@ export async function bulkSetStatus(
   return { ok: true, updated: data?.length ?? 0 };
 }
 
-/** Bulk-verify the target_url on N rows. For each row that has a
- *  target_url set, follows the redirect chain via /api/verify-url and
- *  (when 2xx/3xx) flips wqa_decision.status to Done. Rows without a
- *  target_url are skipped. HTTP fetches run in parallel with a small
- *  concurrency cap so the live origins aren't overwhelmed. */
+/** Bulk-verify N rows. For each row with a target_url, fetches the
+ *  SOURCE URL via /api/verify-url, captures the actual final URL, and
+ *  compares to the configured target_url:
+ *    - source reaches target_url cleanly → status → Done (matched)
+ *    - source reaches a different live URL → flag as mismatch, no flip
+ *    - source 4xx/5xx → fail, no flip
+ *  Rows without a target_url are skipped. Concurrency 5. */
 export async function bulkVerifyTargetUrls(
   slug: string,
   urls: string[],
@@ -560,10 +598,12 @@ export async function bulkVerifyTargetUrls(
   | {
       ok: true;
       total: number;
-      succeeded: number;
+      matched: number;
+      mismatched: number;
       failed: number;
       skipped: number;
       flippedToDone: number;
+      mismatches: { url: string; configured: string; actual: string }[];
       failures: { url: string; error: string }[];
     }
   | BulkErr
@@ -571,13 +611,12 @@ export async function bulkVerifyTargetUrls(
   const authed = await requireWriteToken();
   if (!authed.ok) return authed;
   if (urls.length === 0) {
-    return { ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0, flippedToDone: 0, failures: [] };
+    return { ok: true, total: 0, matched: 0, mismatched: 0, failed: 0, skipped: 0, flippedToDone: 0, mismatches: [], failures: [] };
   }
   const prop = await resolveProperty(slug);
   if ("ok" in prop && prop.ok === false) return prop;
   const propertyId = (prop as { id: string }).id;
 
-  // Pull the target_url for every selected row in one query
   const { data: rows, error: readErr } = await supabase
     .from("wqa_decision")
     .select("url, target_url")
@@ -591,13 +630,13 @@ export async function bulkVerifyTargetUrls(
   }
   const skipped = urls.length - targets.size;
 
-  // Verify with bounded concurrency
   const CONCURRENCY = 5;
   const base = apiBase();
   const operator = getOperator();
   const nowIso = new Date().toISOString();
 
-  const successUrls: string[] = [];
+  const matchedUrls: string[] = [];
+  const mismatches: { url: string; configured: string; actual: string }[] = [];
   const failures: { url: string; error: string }[] = [];
 
   const queue = Array.from(targets.entries());
@@ -605,9 +644,9 @@ export async function bulkVerifyTargetUrls(
     while (queue.length > 0) {
       const next = queue.shift();
       if (!next) break;
-      const [sourceUrl, targetUrl] = next;
+      const [sourceUrl, configuredTarget] = next;
       try {
-        const resp = await fetch(`${base}/api/verify-url?target=${encodeURIComponent(targetUrl)}`);
+        const resp = await fetch(`${base}/api/verify-url?target=${encodeURIComponent(sourceUrl)}`);
         if (!resp.ok) {
           failures.push({ url: sourceUrl, error: `endpoint ${resp.status}` });
           continue;
@@ -618,10 +657,15 @@ export async function bulkVerifyTargetUrls(
           continue;
         }
         const finalStatus: number = body.finalStatus ?? 0;
-        if (finalStatus >= 200 && finalStatus < 400) {
-          successUrls.push(sourceUrl);
-        } else {
+        const actualDestination: string = body.finalUrl ?? sourceUrl;
+        if (finalStatus < 200 || finalStatus >= 400) {
           failures.push({ url: sourceUrl, error: `final status ${finalStatus}` });
+          continue;
+        }
+        if (normalizeUrlForCompare(actualDestination) === normalizeUrlForCompare(configuredTarget)) {
+          matchedUrls.push(sourceUrl);
+        } else {
+          mismatches.push({ url: sourceUrl, configured: configuredTarget, actual: actualDestination });
         }
       } catch (e) {
         failures.push({ url: sourceUrl, error: e instanceof Error ? e.message : String(e) });
@@ -630,10 +674,8 @@ export async function bulkVerifyTargetUrls(
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
 
-  // Stamp last_implementation_check_at on every verified row + flip status
-  // to Done on the successful ones. Two UPDATEs (one per status bucket)
-  // beats N round-trips and avoids the upsert/NOT-NULL trap on `action`.
-  if (successUrls.length > 0) {
+  // Three UPDATE batches: matched (→ Done), mismatched (stamp only), failed (stamp only).
+  if (matchedUrls.length > 0) {
     const { error: upErr } = await supabase
       .from("wqa_decision")
       .update({
@@ -643,10 +685,14 @@ export async function bulkVerifyTargetUrls(
         updated_at: nowIso,
       })
       .eq("property_id", propertyId)
-      .in("url", successUrls);
+      .in("url", matchedUrls);
     if (upErr) return { ok: false, error: upErr.message };
   }
-  if (failures.length > 0) {
+  const stampOnly = [
+    ...mismatches.map((m) => m.url),
+    ...failures.map((f) => f.url),
+  ];
+  if (stampOnly.length > 0) {
     const { error: upErr } = await supabase
       .from("wqa_decision")
       .update({
@@ -655,7 +701,7 @@ export async function bulkVerifyTargetUrls(
         updated_at: nowIso,
       })
       .eq("property_id", propertyId)
-      .in("url", failures.map((f) => f.url));
+      .in("url", stampOnly);
     if (upErr) return { ok: false, error: upErr.message };
   }
   bust(slug);
@@ -663,10 +709,12 @@ export async function bulkVerifyTargetUrls(
   return {
     ok: true,
     total: targets.size,
-    succeeded: successUrls.length,
+    matched: matchedUrls.length,
+    mismatched: mismatches.length,
     failed: failures.length,
     skipped,
-    flippedToDone: successUrls.length,
+    flippedToDone: matchedUrls.length,
+    mismatches,
     failures,
   };
 }

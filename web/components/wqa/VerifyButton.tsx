@@ -16,6 +16,7 @@
 // operator can read it after the dropdown closes.
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { verifyTargetUrl } from "@/app/properties/[slug]/pages/wqa-actions";
 
 export function VerifyButton({
@@ -37,8 +38,10 @@ export function VerifyButton({
   /** "compact" trims padding for use in dense table rows. */
   size?: "default" | "compact";
 }) {
+  const router = useRouter();
   const [pending, start] = useTransition();
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState<{ text: string; tone: "ok" | "warn" | "err" } | null>(null);
+  const [actualDest, setActualDest] = useState<string | null>(null);
   const padding = size === "compact" ? "px-1.5 py-0.5" : "px-2 py-1";
   const btnCls = `text-[11px] ${padding} rounded border bg-foreground text-background disabled:opacity-50`;
   return (
@@ -51,6 +54,7 @@ export function VerifyButton({
         disabled={disabled || pending}
         onClick={() => {
           setResult(null);
+          setActualDest(null);
           start(async () => {
             const r = await verifyTargetUrl(
               propertySlug,
@@ -58,13 +62,25 @@ export function VerifyButton({
               flipStatusOnSuccess,
             );
             if (!r.ok) {
-              setResult(`✗ ${r.error}`);
+              setResult({ text: `✗ ${r.error}`, tone: "err" });
             } else {
               const hops = r.chain.length;
-              const flipped = r.flippedStatusToDone ? " → Done" : "";
-              setResult(
-                `${r.finalStatus}${flipped} (${hops} hop${hops === 1 ? "" : "s"})`,
-              );
+              if (r.matched) {
+                const flipped = r.flippedStatusToDone ? " → Done" : "";
+                setResult({
+                  text: `✓ ${r.finalStatus}${flipped} (${hops} hop${hops === 1 ? "" : "s"})`,
+                  tone: "ok",
+                });
+              } else {
+                setResult({
+                  text: `≠ goes to a different URL (${hops} hop${hops === 1 ? "" : "s"})`,
+                  tone: "warn",
+                });
+                setActualDest(r.actualDestination);
+              }
+              // Refresh RSC so the parent table / drawer reflect the new
+              // last_implementation_check_at + status without a manual reload.
+              router.refresh();
             }
           });
         }}
@@ -78,8 +94,32 @@ export function VerifyButton({
         {pending ? "Verifying…" : "Verify"}
       </button>
       {result && (
-        <span className="text-[10.5px] font-mono" title={result}>
-          {result}
+        <span
+          className={
+            "text-[10.5px] font-mono " +
+            (result.tone === "ok"
+              ? "text-emerald-700"
+              : result.tone === "warn"
+                ? "text-amber-700"
+                : "text-rose-700")
+          }
+          title={actualDest ? `actual: ${actualDest}` : result.text}
+        >
+          {result.text}
+          {actualDest && (
+            <>
+              {" "}
+              <a
+                href={actualDest}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {actualDest.replace(/^https?:\/\//, "")}
+              </a>
+            </>
+          )}
         </span>
       )}
     </div>
