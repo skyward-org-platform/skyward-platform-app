@@ -548,6 +548,129 @@ export async function bulkSetStatus(
   return { ok: true, updated: data?.length ?? 0 };
 }
 
+/** Bulk-verify the target_url on N rows. For each row that has a
+ *  target_url set, follows the redirect chain via /api/verify-url and
+ *  (when 2xx/3xx) flips wqa_decision.status to Done. Rows without a
+ *  target_url are skipped. HTTP fetches run in parallel with a small
+ *  concurrency cap so the live origins aren't overwhelmed. */
+export async function bulkVerifyTargetUrls(
+  slug: string,
+  urls: string[],
+): Promise<
+  | {
+      ok: true;
+      total: number;
+      succeeded: number;
+      failed: number;
+      skipped: number;
+      flippedToDone: number;
+      failures: { url: string; error: string }[];
+    }
+  | BulkErr
+> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  if (urls.length === 0) {
+    return { ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0, flippedToDone: 0, failures: [] };
+  }
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+
+  // Pull the target_url for every selected row in one query
+  const { data: rows, error: readErr } = await supabase
+    .from("wqa_decision")
+    .select("url, target_url")
+    .eq("property_id", propertyId)
+    .in("url", urls);
+  if (readErr) return { ok: false, error: readErr.message };
+
+  const targets = new Map<string, string>();
+  for (const r of rows ?? []) {
+    if (r.target_url) targets.set(r.url, r.target_url);
+  }
+  const skipped = urls.length - targets.size;
+
+  // Verify with bounded concurrency
+  const CONCURRENCY = 5;
+  const base = apiBase();
+  const operator = getOperator();
+  const nowIso = new Date().toISOString();
+
+  const successUrls: string[] = [];
+  const failures: { url: string; error: string }[] = [];
+
+  const queue = Array.from(targets.entries());
+  async function worker() {
+    while (queue.length > 0) {
+      const next = queue.shift();
+      if (!next) break;
+      const [sourceUrl, targetUrl] = next;
+      try {
+        const resp = await fetch(`${base}/api/verify-url?target=${encodeURIComponent(targetUrl)}`);
+        if (!resp.ok) {
+          failures.push({ url: sourceUrl, error: `endpoint ${resp.status}` });
+          continue;
+        }
+        const body = await resp.json();
+        if (!body.ok) {
+          failures.push({ url: sourceUrl, error: body.error ?? "verify failed" });
+          continue;
+        }
+        const finalStatus: number = body.finalStatus ?? 0;
+        if (finalStatus >= 200 && finalStatus < 400) {
+          successUrls.push(sourceUrl);
+        } else {
+          failures.push({ url: sourceUrl, error: `final status ${finalStatus}` });
+        }
+      } catch (e) {
+        failures.push({ url: sourceUrl, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
+
+  // Stamp last_implementation_check_at on every verified row + flip status
+  // to Done on the successful ones. Two UPDATEs (one per status bucket)
+  // beats N round-trips and avoids the upsert/NOT-NULL trap on `action`.
+  if (successUrls.length > 0) {
+    const { error: upErr } = await supabase
+      .from("wqa_decision")
+      .update({
+        status: "Done",
+        last_implementation_check_at: nowIso,
+        decided_by: operator,
+        updated_at: nowIso,
+      })
+      .eq("property_id", propertyId)
+      .in("url", successUrls);
+    if (upErr) return { ok: false, error: upErr.message };
+  }
+  if (failures.length > 0) {
+    const { error: upErr } = await supabase
+      .from("wqa_decision")
+      .update({
+        last_implementation_check_at: nowIso,
+        decided_by: operator,
+        updated_at: nowIso,
+      })
+      .eq("property_id", propertyId)
+      .in("url", failures.map((f) => f.url));
+    if (upErr) return { ok: false, error: upErr.message };
+  }
+  bust(slug);
+
+  return {
+    ok: true,
+    total: targets.size,
+    succeeded: successUrls.length,
+    failed: failures.length,
+    skipped,
+    flippedToDone: successUrls.length,
+    failures,
+  };
+}
+
 /** Bulk-clear the operator action override - the wqa_decision rows are
  *  deleted so the rows fall back to the pipeline-derived action.
  *  Existing status / logic_notes on those rows are lost; intentional, the

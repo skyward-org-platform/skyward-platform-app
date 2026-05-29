@@ -11,6 +11,7 @@ import {
   bulkClearActionOverride,
   bulkSetAction,
   bulkSetStatus,
+  bulkVerifyTargetUrls,
 } from "@/app/properties/[slug]/pages/wqa-actions";
 
 const ACTION7_VALUES: Action7[] = [
@@ -81,6 +82,24 @@ export function BulkActionBar({
     });
   };
 
+  const handleVerify = () => {
+    if (!confirm(`Verify ${count} URL${count === 1 ? "" : "s"}? This follows each row's redirect chain and flips status to Done when the final response is 2xx/3xx.`)) return;
+    startTransition(async () => {
+      const res = await bulkVerifyTargetUrls(propertySlug, Array.from(urls));
+      if (!res.ok) {
+        flash({ ok: false, message: res.error });
+        return;
+      }
+      const parts = [`${res.succeeded}/${res.total} verified`];
+      if (res.flippedToDone > 0) parts.push(`${res.flippedToDone} → Done`);
+      if (res.failed > 0) parts.push(`${res.failed} failed`);
+      if (res.skipped > 0) parts.push(`${res.skipped} skipped (no target)`);
+      flash({ ok: res.failed === 0, message: parts.join(", ") });
+      onClear();
+      window.location.reload();
+    });
+  };
+
   const handleClearOverride = () => {
     if (!confirm(`Revert ${count} URL${count === 1 ? "" : "s"} back to the pipeline-derived action?`)) return;
     startTransition(async () => {
@@ -115,6 +134,15 @@ export function BulkActionBar({
           disabled={pending}
           onPick={(v) => handleStatus(v as WqaStatus)}
         />
+        <button
+          type="button"
+          onClick={handleVerify}
+          disabled={pending}
+          className="px-2 py-0.5 rounded border border-background/30 hover:bg-background/10 disabled:opacity-40 text-[11px]"
+          title="Follow each row's redirect chain and stamp last verified"
+        >
+          Verify
+        </button>
         <button
           type="button"
           onClick={handleClearOverride}
