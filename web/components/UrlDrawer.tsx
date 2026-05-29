@@ -43,11 +43,13 @@ import {
 } from "@/lib/wqa-decisions";
 import {
   clearDrift,
+  getVerificationHistory,
   setCheckStatus,
   setExecutionField,
   setExecutionStatus,
   setLogicNotes,
   setTargetUrl,
+  type VerificationEventRow,
 } from "@/app/properties/[slug]/pages/wqa-actions";
 import { VerifyButton } from "@/components/wqa/VerifyButton";
 import {
@@ -307,14 +309,21 @@ function UrlDrawerView({
         overrideAction={overrideAction}
       />
       {showTargetSection && (
-        <TargetUrlSection
-          propertySlug={propertySlug}
-          url={row.url}
-          displayedAction={displayedAction}
-          targetUrl={targetUrl}
-          pipelineTargetUrl={pipelineTargetUrl}
-          lastImplementationCheckAt={lastImplementationCheckAt}
-        />
+        <>
+          <TargetUrlSection
+            propertySlug={propertySlug}
+            url={row.url}
+            displayedAction={displayedAction}
+            targetUrl={targetUrl}
+            pipelineTargetUrl={pipelineTargetUrl}
+            lastImplementationCheckAt={lastImplementationCheckAt}
+          />
+          <VerificationHistorySection
+            propertySlug={propertySlug}
+            url={row.url}
+            targetUrl={targetUrl}
+          />
+        </>
       )}
       <Phase2Section
         row={row}
@@ -503,7 +512,6 @@ function TargetUrlSection({
   displayedAction,
   targetUrl,
   pipelineTargetUrl,
-  lastImplementationCheckAt,
 }: {
   propertySlug: string;
   url: string;
@@ -525,22 +533,159 @@ function TargetUrlSection({
             pipelineTarget={pipelineTargetUrl}
           />
         </Field>
-        <Field label="Last verified">
-          <span className="text-[11.5px] font-mono">
-            {lastImplementationCheckAt
-              ? new Date(lastImplementationCheckAt).toLocaleString()
-              : "never"}
-          </span>
-        </Field>
-        <div className="pt-1">
-          <VerifyButton
-            propertySlug={propertySlug}
-            url={url}
-            disabled={!targetUrl}
-          />
-        </div>
       </div>
     </Section>
+  );
+}
+
+// ─── VerificationHistorySection ──────────────────────────────────────────
+// Fetches the last 5 verification_event rows for the open URL on drawer
+// open. Renders newest-first with kind chip + relative date + final status
+// + actual destination. Verify button lives underneath so the operator can
+// re-run a check without leaving the drawer.
+
+function VerificationHistorySection({
+  propertySlug,
+  url,
+  targetUrl,
+}: {
+  propertySlug: string;
+  url: string;
+  targetUrl: string | null;
+}) {
+  const [events, setEvents] = useState<VerificationEventRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEvents(null);
+    setError(null);
+    (async () => {
+      const res = await getVerificationHistory(propertySlug, url, 5);
+      if (cancelled) return;
+      if (!res.ok) setError(res.error);
+      else setEvents(res.events);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [propertySlug, url]);
+
+  return (
+    <Section title="Verification history">
+      {error && (
+        <div className="text-[11px] text-rose-700" title={error}>
+          ! {error}
+        </div>
+      )}
+      {events === null && !error && (
+        <div className="text-[11px] text-muted-foreground italic">Loading…</div>
+      )}
+      {events !== null && events.length === 0 && (
+        <div className="text-[11px] text-muted-foreground italic">
+          No verification runs yet.
+        </div>
+      )}
+      {events !== null && events.length > 0 && (
+        <ul className="space-y-1.5">
+          {events.map((e) => (
+            <VerificationHistoryRow key={e.id} event={e} />
+          ))}
+        </ul>
+      )}
+      <div className="pt-2.5">
+        <VerifyButton
+          propertySlug={propertySlug}
+          url={url}
+          disabled={!targetUrl}
+        />
+      </div>
+    </Section>
+  );
+}
+
+const KIND_CHIP_TINT: Record<
+  VerificationEventRow["kind"],
+  string
+> = {
+  matched: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  mismatch: "bg-amber-50 text-amber-800 border-amber-200",
+  failed: "bg-rose-50 text-rose-800 border-rose-200",
+};
+
+const KIND_LABEL: Record<VerificationEventRow["kind"], string> = {
+  matched: "✓ matched",
+  mismatch: "≠ mismatch",
+  failed: "✗ failed",
+};
+
+function drawerRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const diffMs = Date.now() - then;
+  const sec = Math.round(diffMs / 1000);
+  if (sec < 5) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.round(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function VerificationHistoryRow({ event }: { event: VerificationEventRow }) {
+  const dt = new Date(event.verified_at);
+  const isoLabel = Number.isNaN(dt.getTime()) ? event.verified_at : dt.toLocaleString();
+  return (
+    <li className="text-[11px] border rounded-md bg-muted/20 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="font-mono tabular-nums text-muted-foreground text-[10.5px]">
+          {isoLabel}
+        </span>
+        <span className="text-muted-foreground text-[10.5px]">·</span>
+        <span className="text-muted-foreground text-[10.5px]">
+          {drawerRelativeTime(event.verified_at)}
+        </span>
+        <span className="text-muted-foreground text-[10.5px]">·</span>
+        <span
+          className={
+            "inline-flex items-center text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border " +
+            KIND_CHIP_TINT[event.kind]
+          }
+        >
+          {KIND_LABEL[event.kind]}
+        </span>
+        {event.final_status !== null && (
+          <>
+            <span className="text-muted-foreground text-[10.5px]">·</span>
+            <span className="text-muted-foreground text-[10.5px] tabular-nums">
+              final {event.final_status}
+            </span>
+          </>
+        )}
+      </div>
+      {event.actual_destination && (
+        <div className="mt-1 break-all">
+          <span className="text-muted-foreground text-[10px]">actual: </span>
+          <a
+            href={event.actual_destination}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-[10.5px] hover:underline text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {event.actual_destination}
+          </a>
+        </div>
+      )}
+      {event.error_message && (
+        <div className="mt-1 text-[10.5px] text-rose-800 font-mono break-all">
+          {event.error_message}
+        </div>
+      )}
+    </li>
   );
 }
 

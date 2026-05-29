@@ -25,13 +25,14 @@ import { ACTION_TINT, triageRow, type TriageAction } from "@/lib/wqa-triage";
 import { toAction7, type Action7 } from "@/lib/wqa-decisions";
 import { buildCtx } from "@/lib/wqa-checks";
 import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
-import type { TriagedRow } from "@/components/wqa/types";
+import type { IndexStateEntry, TriagedRow } from "@/components/wqa/types";
 import type { DecisionRow } from "@/lib/wqa-decisions";
 import type { PageExecutionRow } from "@/lib/page-execution";
 import {
   checkStateKey,
   type PageCheckStateRow,
 } from "@/lib/page-check-state";
+import type { PageIndexStateRow } from "@/lib/page-index-state";
 
 type SubTab =
   | "overview"
@@ -78,6 +79,7 @@ export function WqaTabs({
   decisions,
   executions,
   checkStates,
+  indexState = [],
 }: {
   propertySlug: string;
   propertyId: string | null;
@@ -91,6 +93,7 @@ export function WqaTabs({
   decisions: DecisionRow[];
   executions: PageExecutionRow[];
   checkStates: PageCheckStateRow[];
+  indexState?: PageIndexStateRow[];
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -167,6 +170,16 @@ export function WqaTabs({
     }
     return m;
   }, [checkStates]);
+
+  // Trim PageIndexStateRow → IndexStateEntry so the per-tab type stays
+  // narrow. Map keys are URLs; tabs index by row.url.
+  const indexByUrl = useMemo(() => {
+    const m = new Map<string, IndexStateEntry>();
+    for (const r of indexState) {
+      m.set(r.url, { in_index: r.in_index, checked_at: r.checked_at });
+    }
+    return m;
+  }, [indexState]);
 
   // Triage category proxy: most reliable signal we have today is the SF
   // page "type" field. T5/T7 medians don't need a precise category — just
@@ -279,6 +292,8 @@ export function WqaTabs({
         dataset={dataset}
         message={message}
         execByUrl={execByUrl}
+        decisionByUrl={decisionByUrl}
+        indexByUrl={indexByUrl}
         decisions={decisions}
         onOpenDrawer={(url) => setDrawerUrl(url)}
       />
@@ -343,6 +358,8 @@ function Body({
   dataset,
   message,
   execByUrl,
+  decisionByUrl,
+  indexByUrl,
   decisions,
   onOpenDrawer,
 }: {
@@ -356,6 +373,8 @@ function Body({
   dataset: string;
   message?: string;
   execByUrl: Map<string, PageExecutionRow>;
+  decisionByUrl: Map<string, DecisionRow>;
+  indexByUrl: Map<string, IndexStateEntry>;
   decisions: DecisionRow[];
   onOpenDrawer: (url: string) => void;
 }) {
@@ -410,7 +429,15 @@ function Body({
   // up into the Investigate tab, and legacy "Leave as 404" / "Non-*"
   // rows wouldn't accidentally appear under any per-action tab.
   const rows = triaged.filter((r) => displayedAction7(r) === action);
-  const props = { rows, all: triaged, propertySlug, onOpenDrawer, execByUrl };
+  const props = {
+    rows,
+    all: triaged,
+    propertySlug,
+    onOpenDrawer,
+    execByUrl,
+    decisionByUrl,
+    indexByUrl,
+  };
   switch (action) {
     case "Optimize":
       return <OptimizeTab {...props} />;

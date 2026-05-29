@@ -157,6 +157,11 @@ export type DecisionRow = {
   last_implementation_check_at: string | null;
   decided_by: string;
   decided_at: string;
+  // Verification rollup (denormalized from verification_event for the
+  // main-table "Verified" chip). null when the row has never been verified.
+  last_verification_kind?: "matched" | "mismatch" | "failed" | null;
+  last_verification_final_status?: number | null;
+  last_verification_actual?: string | null;
 };
 
 // Full row shape — used by the new server actions + chip refactor (Chunk 3).
@@ -174,6 +179,11 @@ export type WqaDecisionRow = {
   decided_by: string;
   decided_at: string;
   updated_at: string;
+  // Verification rollup (denormalized from verification_event for the
+  // main-table "Verified" chip).
+  last_verification_kind?: "matched" | "mismatch" | "failed" | null;
+  last_verification_final_status?: number | null;
+  last_verification_actual?: string | null;
 };
 
 // ─── Reader ──────────────────────────────────────────────────────────────
@@ -190,7 +200,7 @@ async function fetchWqaDecisionsRaw(
   const { data } = await supabase
     .from("wqa_decision")
     .select(
-      "url, action, target_url, status, logic_notes, drift_reason, last_implementation_check_at, decided_by, decided_at",
+      "url, action, target_url, status, logic_notes, drift_reason, last_implementation_check_at, decided_by, decided_at, last_verification_kind, last_verification_final_status, last_verification_actual",
     )
     .eq("property_id", prop.id);
   return (data ?? []) as DecisionRow[];

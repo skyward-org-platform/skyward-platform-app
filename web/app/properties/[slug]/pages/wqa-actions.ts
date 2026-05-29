@@ -241,14 +241,38 @@ export async function verifyTargetUrl(
   const matched = reachable && normalizeUrlForCompare(actualDestination) === normalizeUrlForCompare(configuredTarget);
   const shouldFlip = flipStatusOnSuccess && reachable && matched;
 
-  // Stamp last_implementation_check_at + optionally flip status. The row
-  // already exists (we just read it), so plain UPDATE — an upsert here
-  // would attempt INSERT-with-conflict and fail Postgres' NOT NULL on
-  // `action` (validated before conflict resolution).
+  // Persist a verification_event row capturing this run. Event log is the
+  // source of truth for the drawer's history list — the rollup columns on
+  // wqa_decision are convenience denormalizations for the main-table chip.
+  const kind: "matched" | "mismatch" | "failed" =
+    !reachable ? "failed" : matched ? "matched" : "mismatch";
+  try {
+    await supabase.from("verification_event").insert({
+      property_id: propertyId,
+      url,
+      kind,
+      final_status: finalStatus,
+      actual_destination: actualDestination,
+      configured_target: configuredTarget,
+      chain,
+      verified_by: getOperator(),
+    });
+  } catch {
+    // Soft-fail: history insert failure must not block the wqa_decision
+    // rollup update below — operator can still verify the row.
+  }
+
+  // Stamp last_implementation_check_at + rollup columns + optionally flip
+  // status. The row already exists (we just read it), so plain UPDATE —
+  // an upsert here would attempt INSERT-with-conflict and fail Postgres'
+  // NOT NULL on `action` (validated before conflict resolution).
   try {
     const nowIso = new Date().toISOString();
     const patch: Record<string, unknown> = {
       last_implementation_check_at: nowIso,
+      last_verification_kind: kind,
+      last_verification_final_status: finalStatus,
+      last_verification_actual: actualDestination,
       decided_by: getOperator(),
       updated_at: nowIso,
     };
@@ -635,9 +659,16 @@ export async function bulkVerifyTargetUrls(
   const operator = getOperator();
   const nowIso = new Date().toISOString();
 
-  const matchedUrls: string[] = [];
-  const mismatches: { url: string; configured: string; actual: string }[] = [];
-  const failures: { url: string; error: string }[] = [];
+  type MatchedRow = { url: string; finalStatus: number; actual: string };
+  type MismatchRow = { url: string; configured: string; actual: string; finalStatus: number };
+  type FailureRow = { url: string; error: string; finalStatus: number | null };
+  const matchedRows: MatchedRow[] = [];
+  const mismatchRows: MismatchRow[] = [];
+  const failureRows: FailureRow[] = [];
+  // verification_event rows accumulated during the worker pass; flushed as
+  // a single batch insert afterwards so we don't pay N round-trips during
+  // the verify loop itself.
+  const events: Record<string, unknown>[] = [];
 
   const queue = Array.from(targets.entries());
   async function worker() {
@@ -648,39 +679,121 @@ export async function bulkVerifyTargetUrls(
       try {
         const resp = await fetch(`${base}/api/verify-url?target=${encodeURIComponent(sourceUrl)}`);
         if (!resp.ok) {
-          failures.push({ url: sourceUrl, error: `endpoint ${resp.status}` });
+          failureRows.push({ url: sourceUrl, error: `endpoint ${resp.status}`, finalStatus: null });
+          events.push({
+            property_id: propertyId,
+            url: sourceUrl,
+            kind: "failed",
+            final_status: null,
+            actual_destination: null,
+            configured_target: configuredTarget,
+            chain: null,
+            error_message: `endpoint ${resp.status}`,
+            verified_by: operator,
+          });
           continue;
         }
         const body = await resp.json();
         if (!body.ok) {
-          failures.push({ url: sourceUrl, error: body.error ?? "verify failed" });
+          const errMsg = body.error ?? "verify failed";
+          failureRows.push({ url: sourceUrl, error: errMsg, finalStatus: body.finalStatus ?? null });
+          events.push({
+            property_id: propertyId,
+            url: sourceUrl,
+            kind: "failed",
+            final_status: body.finalStatus ?? null,
+            actual_destination: null,
+            configured_target: configuredTarget,
+            chain: body.chain ?? null,
+            error_message: errMsg,
+            verified_by: operator,
+          });
           continue;
         }
         const finalStatus: number = body.finalStatus ?? 0;
         const actualDestination: string = body.finalUrl ?? sourceUrl;
+        const chain = body.chain ?? null;
         if (finalStatus < 200 || finalStatus >= 400) {
-          failures.push({ url: sourceUrl, error: `final status ${finalStatus}` });
+          failureRows.push({ url: sourceUrl, error: `final status ${finalStatus}`, finalStatus });
+          events.push({
+            property_id: propertyId,
+            url: sourceUrl,
+            kind: "failed",
+            final_status: finalStatus,
+            actual_destination: actualDestination,
+            configured_target: configuredTarget,
+            chain,
+            error_message: `final status ${finalStatus}`,
+            verified_by: operator,
+          });
           continue;
         }
         if (normalizeUrlForCompare(actualDestination) === normalizeUrlForCompare(configuredTarget)) {
-          matchedUrls.push(sourceUrl);
+          matchedRows.push({ url: sourceUrl, finalStatus, actual: actualDestination });
+          events.push({
+            property_id: propertyId,
+            url: sourceUrl,
+            kind: "matched",
+            final_status: finalStatus,
+            actual_destination: actualDestination,
+            configured_target: configuredTarget,
+            chain,
+            verified_by: operator,
+          });
         } else {
-          mismatches.push({ url: sourceUrl, configured: configuredTarget, actual: actualDestination });
+          mismatchRows.push({ url: sourceUrl, configured: configuredTarget, actual: actualDestination, finalStatus });
+          events.push({
+            property_id: propertyId,
+            url: sourceUrl,
+            kind: "mismatch",
+            final_status: finalStatus,
+            actual_destination: actualDestination,
+            configured_target: configuredTarget,
+            chain,
+            verified_by: operator,
+          });
         }
       } catch (e) {
-        failures.push({ url: sourceUrl, error: e instanceof Error ? e.message : String(e) });
+        const errMsg = e instanceof Error ? e.message : String(e);
+        failureRows.push({ url: sourceUrl, error: errMsg, finalStatus: null });
+        events.push({
+          property_id: propertyId,
+          url: sourceUrl,
+          kind: "failed",
+          final_status: null,
+          actual_destination: null,
+          configured_target: configuredTarget,
+          chain: null,
+          error_message: errMsg,
+          verified_by: operator,
+        });
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
 
-  // Three UPDATE batches: matched (→ Done), mismatched (stamp only), failed (stamp only).
-  if (matchedUrls.length > 0) {
+  // Flush event log first; soft-fail so a history outage can't block the
+  // rollup updates the operator just paid for.
+  if (events.length > 0) {
+    try {
+      await supabase.from("verification_event").insert(events);
+    } catch {
+      // history persistence is best-effort
+    }
+  }
+
+  // Bucket UPDATE for matched (→ Done) handles status flip + the shared
+  // "matched" rollup. The per-row UPDATE pass after fills the variable
+  // rollup fields (final_status / actual destination) since those differ
+  // per row. 41 rows = 41 quick UPDATEs; acceptable at this volume.
+  if (matchedRows.length > 0) {
+    const matchedUrls = matchedRows.map((m) => m.url);
     const { error: upErr } = await supabase
       .from("wqa_decision")
       .update({
         status: "Done",
         last_implementation_check_at: nowIso,
+        last_verification_kind: "matched",
         decided_by: operator,
         updated_at: nowIso,
       })
@@ -688,32 +801,98 @@ export async function bulkVerifyTargetUrls(
       .in("url", matchedUrls);
     if (upErr) return { ok: false, error: upErr.message };
   }
-  const stampOnly = [
-    ...mismatches.map((m) => m.url),
-    ...failures.map((f) => f.url),
-  ];
-  if (stampOnly.length > 0) {
+  if (mismatchRows.length > 0) {
+    const mismatchUrls = mismatchRows.map((m) => m.url);
     const { error: upErr } = await supabase
       .from("wqa_decision")
       .update({
         last_implementation_check_at: nowIso,
+        last_verification_kind: "mismatch",
         decided_by: operator,
         updated_at: nowIso,
       })
       .eq("property_id", propertyId)
-      .in("url", stampOnly);
+      .in("url", mismatchUrls);
     if (upErr) return { ok: false, error: upErr.message };
   }
+  if (failureRows.length > 0) {
+    const failureUrls = failureRows.map((f) => f.url);
+    const { error: upErr } = await supabase
+      .from("wqa_decision")
+      .update({
+        last_implementation_check_at: nowIso,
+        last_verification_kind: "failed",
+        decided_by: operator,
+        updated_at: nowIso,
+      })
+      .eq("property_id", propertyId)
+      .in("url", failureUrls);
+    if (upErr) return { ok: false, error: upErr.message };
+  }
+  // Per-row updates for the variable rollup fields (final_status, actual).
+  // Promise.all over 41 rows is fast enough at this volume. PostgrestFilterBuilder
+  // is thenable but not strictly a Promise — wrap with an async IIFE so TS
+  // is happy.
+  const perRowUpdates: Promise<unknown>[] = [];
+  for (const m of matchedRows) {
+    perRowUpdates.push(
+      (async () =>
+        supabase
+          .from("wqa_decision")
+          .update({
+            last_verification_final_status: m.finalStatus,
+            last_verification_actual: m.actual,
+          })
+          .eq("property_id", propertyId)
+          .eq("url", m.url))(),
+    );
+  }
+  for (const m of mismatchRows) {
+    perRowUpdates.push(
+      (async () =>
+        supabase
+          .from("wqa_decision")
+          .update({
+            last_verification_final_status: m.finalStatus,
+            last_verification_actual: m.actual,
+          })
+          .eq("property_id", propertyId)
+          .eq("url", m.url))(),
+    );
+  }
+  for (const f of failureRows) {
+    perRowUpdates.push(
+      (async () =>
+        supabase
+          .from("wqa_decision")
+          .update({
+            last_verification_final_status: f.finalStatus,
+            last_verification_actual: null,
+          })
+          .eq("property_id", propertyId)
+          .eq("url", f.url))(),
+    );
+  }
+  if (perRowUpdates.length > 0) {
+    await Promise.all(perRowUpdates);
+  }
   bust(slug);
+
+  const mismatches = mismatchRows.map((m) => ({
+    url: m.url,
+    configured: m.configured,
+    actual: m.actual,
+  }));
+  const failures = failureRows.map((f) => ({ url: f.url, error: f.error }));
 
   return {
     ok: true,
     total: targets.size,
-    matched: matchedUrls.length,
+    matched: matchedRows.length,
     mismatched: mismatches.length,
     failed: failures.length,
     skipped,
-    flippedToDone: matchedUrls.length,
+    flippedToDone: matchedRows.length,
     mismatches,
     failures,
   };
@@ -770,5 +949,92 @@ export async function suggestRedirectDestination(
       ok: false,
       error: e instanceof Error ? e.message : String(e),
     };
+  }
+}
+
+// ─── getVerificationHistory ───────────────────────────────────────────────
+// Read-only fetch of the most recent N verification_event rows for a (slug,
+// url) pair. Powers the drawer's "Verification history" section. Sorted
+// most-recent first so the UI can render them oldest-at-bottom by reversing.
+
+export type VerificationEventRow = {
+  id: string;
+  verified_at: string;
+  kind: "matched" | "mismatch" | "failed";
+  final_status: number | null;
+  actual_destination: string | null;
+  configured_target: string | null;
+  error_message: string | null;
+  verified_by: string | null;
+};
+
+export async function getVerificationHistory(
+  slug: string,
+  url: string,
+  limit = 5,
+): Promise<
+  | { ok: true; events: VerificationEventRow[] }
+  | { ok: false; error: string }
+> {
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+  const { data, error } = await supabase
+    .from("verification_event")
+    .select(
+      "id, verified_at, kind, final_status, actual_destination, configured_target, error_message, verified_by",
+    )
+    .eq("property_id", propertyId)
+    .eq("url", url)
+    .order("verified_at", { ascending: false })
+    .limit(limit);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, events: (data ?? []) as VerificationEventRow[] };
+}
+
+// ─── bulkCheckIndexStatus ─────────────────────────────────────────────────
+// Operator-triggered Google index check via DataForSEO SERP. For each URL,
+// queries `site:<url>` and writes a page_index_state row keyed by
+// (property_id, url). DFS credentials live on the Vercel side, so this
+// action delegates to the local /api/check-index-status route handler
+// which performs the network calls + Supabase upserts.
+
+export type BulkIndexCheckResult = {
+  ok: true;
+  total: number;
+  indexed: number;
+  notIndexed: number;
+  errors: { url: string; error: string }[];
+};
+
+export async function bulkCheckIndexStatus(
+  slug: string,
+  urls: string[],
+): Promise<BulkIndexCheckResult | BulkErr> {
+  const authed = await requireWriteToken();
+  if (!authed.ok) return authed;
+  if (urls.length === 0) {
+    return { ok: true, total: 0, indexed: 0, notIndexed: 0, errors: [] };
+  }
+  const prop = await resolveProperty(slug);
+  if ("ok" in prop && prop.ok === false) return prop;
+  const propertyId = (prop as { id: string }).id;
+  try {
+    const resp = await fetch(`${apiBase()}/api/check-index-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId, urls }),
+    });
+    if (!resp.ok) {
+      return { ok: false, error: `endpoint ${resp.status}` };
+    }
+    const body = await resp.json();
+    if (!body.ok) {
+      return { ok: false, error: body.error ?? "index check failed" };
+    }
+    bust(slug);
+    return body as BulkIndexCheckResult;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }

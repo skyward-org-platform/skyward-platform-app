@@ -7,6 +7,7 @@ import { getWqaForDomain } from "@/lib/wqa";
 import { getWqaDecisions } from "@/lib/wqa-decisions";
 import { getExecutionByUrl } from "@/lib/page-execution";
 import { getCheckStateByUrlCheck } from "@/lib/page-check-state";
+import { getIndexStateByUrl } from "@/lib/page-index-state";
 import { PagesView } from "@/components/PagesView";
 
 export default async function PagesTab({
@@ -24,16 +25,17 @@ export default async function PagesTab({
     : null;
   const decisions = await getWqaDecisions(slug);
 
-  // Fetch the operator-side overlays (page_execution + page_check_state) so
-  // the drawer can render status/owner/due/check-status without a second
-  // round-trip. Both reads are property-scoped and return Maps the client
-  // can index in O(1).
-  const [executions, checkStates] = propertyId
+  // Fetch the operator-side overlays (page_execution + page_check_state +
+  // page_index_state) so the drawer + Redirect tab can render without a
+  // second round-trip. All reads are property-scoped and return Maps the
+  // client can index in O(1).
+  const [executions, checkStates, indexState] = propertyId
     ? await Promise.all([
         getExecutionByUrl(propertyId),
         getCheckStateByUrlCheck(propertyId),
+        getIndexStateByUrl(propertyId),
       ])
-    : [new Map(), new Map()];
+    : [new Map(), new Map(), new Map()];
 
   const wqaPayload =
     wqa && "ok" in wqa && wqa.ok
@@ -58,6 +60,7 @@ export default async function PagesTab({
       decisions={decisions}
       executions={Array.from(executions.values())}
       checkStates={Array.from(checkStates.values())}
+      indexState={Array.from(indexState.values())}
     />
   );
 }

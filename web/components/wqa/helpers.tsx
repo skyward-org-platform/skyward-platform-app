@@ -113,6 +113,27 @@ export const THR = "text-right px-2 py-2 font-medium";
 export const TD = "px-2 py-1.5";
 export const TDR = "px-2 py-1.5 text-right tabular-nums";
 
+/** Wraps a column header label with a native browser tooltip (title attr)
+ *  + cursor-help on hover. Tasteful: no extra `?` glyph; the dotted
+ *  underline + cursor change signals to the operator that more info is
+ *  available on hover. */
+export function HeaderTip({
+  label,
+  tip,
+}: {
+  label: string;
+  tip: string;
+}) {
+  return (
+    <span
+      className="cursor-help decoration-dotted underline-offset-[3px] underline decoration-muted-foreground/40"
+      title={tip}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function ThinHeaderRow({ cells }: { cells: { label: string; right?: boolean; min?: string }[] }) {
   return (
     <thead className="sticky top-0 bg-muted/80 backdrop-blur text-[10px] uppercase tracking-wider text-muted-foreground z-10">

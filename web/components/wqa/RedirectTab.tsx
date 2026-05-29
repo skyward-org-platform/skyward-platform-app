@@ -6,13 +6,14 @@
 // single SSL toggle or systemic change.
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { EmptyTab, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
+import { EmptyTab, HeaderTip, TabHeader, TableShell, UrlCell, fmtN } from "@/components/wqa/helpers";
 import { WqaActionChip } from "@/components/wqa/WqaActionChip";
 import { VerifyButton } from "@/components/wqa/VerifyButton";
 import { BulkActionBar } from "@/components/wqa/BulkActionBar";
 import { useBulkSelection } from "@/components/wqa/useBulkSelection";
 import { toAction7 } from "@/lib/wqa-decisions";
-import type { ActionTabProps, TriagedRow } from "@/components/wqa/types";
+import type { DecisionRow } from "@/lib/wqa-decisions";
+import type { ActionTabProps, IndexStateEntry, TriagedRow } from "@/components/wqa/types";
 import {
   setExecutionField,
   suggestRedirectDestination,
@@ -84,7 +85,14 @@ const PRIORITY_BAND = {
   Low: "bg-muted text-muted-foreground",
 } as const;
 
-export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: ActionTabProps) {
+export function RedirectTab({
+  rows,
+  propertySlug,
+  onOpenDrawer,
+  execByUrl,
+  decisionByUrl,
+  indexByUrl,
+}: ActionTabProps) {
   if (rows.length === 0) {
     return <EmptyTab message="No URLs are tagged Redirect." />;
   }
@@ -129,6 +137,7 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
           propertySlug={propertySlug}
           urls={selection.selected}
           onClear={selection.clear}
+          showIndexCheck
         />
       )}
 
@@ -172,18 +181,42 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                         className="cursor-pointer"
                       />
                     </th>
-                    <th className="text-left px-3 py-2 font-medium min-w-[440px]">Source URL</th>
-                    <th className="text-left px-2 py-2 font-medium">Action</th>
-                    <th className="text-left px-2 py-2 font-medium min-w-[320px]">
-                      Destination URL
+                    <th className="text-left px-3 py-2 font-medium min-w-[440px]">
+                      <HeaderTip label="Source URL" tip="The URL on this property that needs redirecting." />
                     </th>
-                    <th className="text-left px-2 py-2 font-medium">Verify</th>
-                    <th className="text-right px-2 py-2 font-medium">Status</th>
-                    <th className="text-right px-2 py-2 font-medium">Sessions</th>
-                    <th className="text-right px-2 py-2 font-medium">Refs</th>
-                    <th className="text-right px-2 py-2 font-medium">BLs</th>
-                    <th className="text-left px-2 py-2 font-medium min-w-[420px]">Suggested destinations</th>
-                    <th className="text-left px-2 py-2 font-medium min-w-[220px]">Triage logic</th>
+                    <th className="text-left px-2 py-2 font-medium">
+                      <HeaderTip label="Action" tip="SOP v5 Action7 decision (Optimize / Restore / Redirect / Consolidate / Remove / Keep / Investigate). Click to override." />
+                    </th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[320px]">
+                      <HeaderTip label="Destination URL" tip="Operator-configured redirect target. Editable inline; saves on blur." />
+                    </th>
+                    <th className="text-left px-2 py-2 font-medium">
+                      <HeaderTip label="Verify" tip="Fetches the source URL, follows its redirect chain, and compares the actual final URL to the configured destination. Flips status to Done on match." />
+                    </th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[200px]">
+                      <HeaderTip label="Verified" tip="Latest verification result and timestamp. Hover the chip for the actual destination on mismatches." />
+                    </th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[140px]">
+                      <HeaderTip label="Indexed" tip="Google index status of the source URL. Red = still indexed (bad; redirected URLs should drop out). Green = not indexed. Grey = not checked yet." />
+                    </th>
+                    <th className="text-right px-2 py-2 font-medium">
+                      <HeaderTip label="Status" tip="HTTP status code from the last Screaming Frog crawl of the source URL." />
+                    </th>
+                    <th className="text-right px-2 py-2 font-medium">
+                      <HeaderTip label="Sessions" tip="GA4 sessions over the trailing 12 months for this source URL." />
+                    </th>
+                    <th className="text-right px-2 py-2 font-medium">
+                      <HeaderTip label="Refs" tip="Referring domains — count of unique root domains backlinking the source URL (Ahrefs)." />
+                    </th>
+                    <th className="text-right px-2 py-2 font-medium">
+                      <HeaderTip label="BLs" tip="Backlinks — total inbound link count to the source URL (Ahrefs)." />
+                    </th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[420px]">
+                      <HeaderTip label="Suggested destinations" tip="Cosine-similarity matches from page_embedding on this property. Click to populate Destination URL." />
+                    </th>
+                    <th className="text-left px-2 py-2 font-medium min-w-[220px]">
+                      <HeaderTip label="Triage logic" tip="SOP v5 decision rationale + any operator override note." />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,6 +301,22 @@ export function RedirectTab({ rows, propertySlug, onOpenDrawer, execByUrl }: Act
                             propertySlug={propertySlug}
                             url={r.row.url}
                             size="compact"
+                          />
+                        </td>
+                        <td
+                          className="px-2 py-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <VerifiedCell
+                            decision={decisionByUrl?.get(r.row.url) ?? null}
+                          />
+                        </td>
+                        <td
+                          className="px-2 py-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <IndexedCell
+                            entry={indexByUrl?.get(r.row.url) ?? null}
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
@@ -501,4 +550,128 @@ function InlineSuggestions({
       })}
     </div>
   );
+}
+
+// ─── VerifiedCell ────────────────────────────────────────────────────────
+// Renders the verification rollup chip for the main table. Reads
+// last_verification_* and last_implementation_check_at from the wqa_decision
+// row. Mirrors the per-kind palette the drawer history uses so the visual
+// language stays consistent (emerald=matched, amber=mismatch, rose=failed).
+
+function VerifiedCell({ decision }: { decision: DecisionRow | null }) {
+  if (!decision || !decision.last_verification_kind) {
+    return (
+      <span className="text-[10.5px] text-muted-foreground italic">never</span>
+    );
+  }
+  const kind = decision.last_verification_kind;
+  const at = decision.last_implementation_check_at;
+  const rel = at ? relativeTime(at) : "";
+
+  if (kind === "matched") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center w-fit text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+          ✓ matched
+        </span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          {rel}
+        </span>
+      </div>
+    );
+  }
+  if (kind === "mismatch") {
+    const actual = decision.last_verification_actual ?? null;
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center w-fit text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+          ≠ mismatch
+        </span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          {rel}
+        </span>
+        {actual && (
+          <a
+            href={actual}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-[10px] text-amber-800 hover:underline break-all"
+            title={`actual destination: ${actual}`}
+          >
+            {actual.replace(/^https?:\/\//, "")}
+          </a>
+        )}
+      </div>
+    );
+  }
+  // failed
+  const status = decision.last_verification_final_status;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="inline-flex items-center w-fit text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200">
+        ✗ failed{status ? ` (${status})` : ""}
+      </span>
+      <span className="text-[10px] text-muted-foreground tabular-nums">
+        {rel}
+      </span>
+    </div>
+  );
+}
+
+// ─── IndexedCell ─────────────────────────────────────────────────────────
+// Reads the page_index_state snapshot. Three states:
+//   - in_index = true   → rose chip (bad for a redirected URL — should
+//                          have dropped out of Google by now)
+//   - in_index = false  → emerald chip (clean)
+//   - null              → muted dash (never checked)
+
+function IndexedCell({ entry }: { entry: IndexStateEntry | null }) {
+  if (!entry || entry.in_index === null) {
+    return (
+      <span className="text-[10.5px] text-muted-foreground italic">—</span>
+    );
+  }
+  const rel = relativeTime(entry.checked_at);
+  if (entry.in_index) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center w-fit text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200">
+          INDEXED
+        </span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          {rel}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="inline-flex items-center w-fit text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+        NOT IN INDEX
+      </span>
+      <span className="text-[10px] text-muted-foreground tabular-nums">
+        {rel}
+      </span>
+    </div>
+  );
+}
+
+// ─── relativeTime ────────────────────────────────────────────────────────
+// Tiny inline helper. Renders "just now" / "5m ago" / "2h ago" / "3d ago" /
+// otherwise the ISO date. Keeps the bundle clean (no date-fns).
+
+export function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const diffMs = Date.now() - then;
+  const sec = Math.round(diffMs / 1000);
+  if (sec < 5) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.round(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString();
 }

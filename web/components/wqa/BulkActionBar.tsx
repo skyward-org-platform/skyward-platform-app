@@ -8,6 +8,7 @@
 import { useState, useTransition } from "react";
 import type { Action7, WqaStatus } from "@/lib/wqa-decisions";
 import {
+  bulkCheckIndexStatus,
   bulkClearActionOverride,
   bulkSetAction,
   bulkSetStatus,
@@ -34,6 +35,7 @@ export function BulkActionBar({
   propertySlug,
   urls,
   onClear,
+  showIndexCheck = false,
 }: {
   propertySlug: string;
   /** Set of selected row keys (URLs). */
@@ -41,6 +43,9 @@ export function BulkActionBar({
   /** Called after a successful bulk apply so the parent can reset
    *  selection. Also called when the operator hits "Clear". */
   onClear: () => void;
+  /** Surface the "Check Index" button. Off by default; the Redirect tab
+   *  flips it on because index-state is meaningful for redirected URLs. */
+  showIndexCheck?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<Result | null>(null);
@@ -109,6 +114,30 @@ export function BulkActionBar({
     });
   };
 
+  const handleCheckIndex = () => {
+    if (!confirm(`Run Google site:URL check on ${count} URL${count === 1 ? "" : "s"}? Costs ~$0.001 per URL via DataForSEO.`)) return;
+    startTransition(async () => {
+      const res = await bulkCheckIndexStatus(propertySlug, Array.from(urls));
+      if (!res.ok) {
+        flash({ ok: false, message: res.error });
+        return;
+      }
+      const parts: string[] = [`${res.indexed}/${res.total} indexed`];
+      parts.push(`${res.notIndexed} not in index`);
+      if (res.errors.length > 0) parts.push(`${res.errors.length} errors`);
+      flash({
+        ok: res.errors.length === 0,
+        message: parts.join(", "),
+      });
+      if (res.errors.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn("Index check errors:", res.errors);
+      }
+      onClear();
+      window.location.reload();
+    });
+  };
+
   const handleClearOverride = () => {
     if (!confirm(`Revert ${count} URL${count === 1 ? "" : "s"} back to the pipeline-derived action?`)) return;
     startTransition(async () => {
@@ -152,6 +181,17 @@ export function BulkActionBar({
         >
           Verify
         </button>
+        {showIndexCheck && (
+          <button
+            type="button"
+            onClick={handleCheckIndex}
+            disabled={pending}
+            className="px-2 py-0.5 rounded border border-background/30 hover:bg-background/10 disabled:opacity-40 text-[11px]"
+            title="Run site:URL on Google via DataForSEO to see whether each URL is still indexed"
+          >
+            Check Index
+          </button>
+        )}
         <button
           type="button"
           onClick={handleClearOverride}

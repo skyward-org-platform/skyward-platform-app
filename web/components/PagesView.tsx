@@ -16,6 +16,7 @@ import type { WqaRow, WqaSiteSummary } from "@/lib/wqa";
 import type { DecisionRow } from "@/lib/wqa-decisions";
 import type { PageExecutionRow } from "@/lib/page-execution";
 import type { PageCheckStateRow } from "@/lib/page-check-state";
+import type { PageIndexStateRow } from "@/lib/page-index-state";
 
 type WqaPayload = {
   rows: WqaRow[];
@@ -37,6 +38,7 @@ export function PagesView({
   decisions,
   executions,
   checkStates,
+  indexState = [],
 }: {
   propertySlug: string;
   propertyId: string | null;
@@ -46,6 +48,7 @@ export function PagesView({
   decisions: DecisionRow[];
   executions: PageExecutionRow[];
   checkStates: PageCheckStateRow[];
+  indexState?: PageIndexStateRow[];
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -116,6 +119,7 @@ export function PagesView({
               decisions={decisions}
               executions={executions}
               checkStates={checkStates}
+              indexState={indexState}
             />
           ) : (
             <AuditModeShell
