@@ -207,15 +207,24 @@ export async function verifyTargetUrl(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 
-  // Stamp last_implementation_check_at on the row + optionally flip status
+  // Stamp last_implementation_check_at on the row + optionally flip status.
+  // The row already exists (we just read its target_url above), so use plain
+  // UPDATE — an upsert here would attempt INSERT-with-conflict and fail
+  // Postgres' NOT NULL check on `action` (validated before conflict resolution).
   const success = finalStatus >= 200 && finalStatus < 400;
   try {
-    await upsertWqaDecision({
-      property_id: propertyId, url,
+    const patch: Record<string, unknown> = {
       last_implementation_check_at: new Date().toISOString(),
-      ...(flipStatusOnSuccess && success ? { status: "Done" as WqaStatus } : {}),
       decided_by: getOperator(),
-    });
+      updated_at: new Date().toISOString(),
+    };
+    if (flipStatusOnSuccess && success) patch.status = "Done";
+    const { error } = await supabase
+      .from("wqa_decision")
+      .update(patch)
+      .eq("property_id", propertyId)
+      .eq("url", url);
+    if (error) throw new Error(error.message);
     bust(slug);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e), chain };
