@@ -206,13 +206,18 @@ export async function verifyTargetUrl(
   if ("ok" in prop && prop.ok === false) return prop;
   const propertyId = (prop as { id: string }).id;
 
-  // Read the configured target_url for this row
+  // Read the configured target_url from page_execution — that's the
+  // canonical source of truth the UI's Destination URL input edits via
+  // setExecutionField. (wqa_decision.target_url is a legacy column from
+  // an earlier schema; it's not what the operator sees or types into,
+  // so reading it here would surface stale data the moment the operator
+  // updates the destination in the table.)
   const { data: row } = await supabase
-    .from("wqa_decision")
+    .from("page_execution")
     .select("target_url")
     .eq("property_id", propertyId)
     .eq("url", url)
-    .single();
+    .maybeSingle();
   if (!row?.target_url) return { ok: false, error: "No target_url set on this row" };
   const configuredTarget: string = row.target_url;
 
@@ -641,8 +646,11 @@ export async function bulkVerifyTargetUrls(
   if ("ok" in prop && prop.ok === false) return prop;
   const propertyId = (prop as { id: string }).id;
 
+  // Read target_url from page_execution — canonical source of truth that
+  // the UI's Destination URL input edits via setExecutionField. See note
+  // on the same read in verifyTargetUrl.
   const { data: rows, error: readErr } = await supabase
-    .from("wqa_decision")
+    .from("page_execution")
     .select("url, target_url")
     .eq("property_id", propertyId)
     .in("url", urls);
