@@ -1,12 +1,14 @@
 "use client";
 
 // Confirm modal for the Authority "Run audit" affordance. Lets the operator
-// pick quick (~3K unit cap, metrics + top 100 RDs) vs full (~10K unit cap,
+// pick quick (3K unit cap, metrics + top 100 RDs) vs full (10K unit cap,
 // + 200 backlinks + 100 anchors) before kicking off runLinkAudit.
 //
-// Cost estimate assumes 1 Ahrefs unit ~= $0.0001 (rough; actual is
-// subscription-tier-dependent). We show "~$0.15 / ~$0.85" as guideposts;
-// the real number is reported back in the success flash from the server.
+// We surface UNIT caps only, not dollar estimates. Ahrefs unit pricing is
+// subscription-tier dependent and we don't have that wired in — operator
+// reads the Ahrefs dashboard for their per-unit cost and remaining
+// allowance. The actual units consumed is reported back in the success
+// flash from the server.
 
 import { useState } from "react";
 
@@ -46,21 +48,22 @@ export function RunAuditModal({
             current={mode}
             onChange={setMode}
             title="Quick"
-            sub="Metrics + top 100 RDs by DR. Hard cap 3,000 units (~$0.30)."
+            sub="Metrics + top 100 RDs by DR. Hard cap 3,000 units."
           />
           <ModeOption
             value="full"
             current={mode}
             onChange={setMode}
             title="Full"
-            sub="Quick + 200 backlinks + 100 anchors. Hard cap 10,000 units (~$1.00)."
+            sub="Quick + 200 backlinks + 100 anchors. Hard cap 10,000 units."
           />
         </div>
 
         <div className="text-[11px] text-muted-foreground mb-4 border-l-2 border-amber-300 pl-2 bg-amber-50/40 py-1">
-          Cost estimate assumes ~$0.0001 per unit. Actual cost is reported
-          after the run. The cap aborts the run mid-flight if exceeded; no
-          override.
+          Cap aborts the run mid-flight if exceeded; no override. Check your
+          Ahrefs dashboard for per-unit cost on your subscription tier and
+          remaining unit allowance. Actual units consumed report after the
+          run.
         </div>
 
         <div className="flex justify-end gap-2">

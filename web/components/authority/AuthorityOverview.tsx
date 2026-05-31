@@ -71,15 +71,14 @@ export function AuthorityOverview({
         setFlash({ kind: "err", message: res.error });
         return;
       }
-      const usd = (res.costUnits / 10000).toFixed(2);
       const toxicPct =
         res.liveRds > 0
           ? `${((res.spamRds / res.liveRds) * 100).toFixed(0)}%`
           : "—";
-      const partialNote = res.partial ? " (partial — cap hit)" : "";
+      const partialNote = res.partial ? " (partial, cap hit)" : "";
       setFlash({
         kind: "ok",
-        message: `Audit complete${partialNote}: ${res.liveRds} RDs, ${toxicPct} toxic, ${res.disavowAutoFlagged} disavow flagged. Cost: ${res.costUnits.toLocaleString()} units (~$${usd}).`,
+        message: `Audit complete${partialNote}: ${res.liveRds} RDs, ${toxicPct} toxic, ${res.disavowAutoFlagged} disavow flagged. Cost: ${res.costUnits.toLocaleString()} units.`,
       });
       router.refresh();
     });
