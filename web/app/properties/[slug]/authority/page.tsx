@@ -5,6 +5,10 @@ import {
   getDisavowEntries,
   getAuditDocs,
   computeAlerts,
+  getBacklinksByProperty,
+  getLinkProspectsByProperty,
+  getLatestLinkAudit,
+  getLinkAuditHistory,
 } from "@/lib/authority";
 import { AuthorityView } from "@/components/authority/AuthorityView";
 
@@ -28,11 +32,24 @@ export default async function AuthorityTab({
     return <div className="p-8 text-sm text-muted-foreground">Property not found.</div>;
   }
 
-  const [snapshots, refDomains, disavow, audits] = await Promise.all([
+  const [
+    snapshots,
+    refDomains,
+    disavow,
+    audits,
+    backlinks,
+    prospects,
+    latestAudit,
+    auditHistory,
+  ] = await Promise.all([
     getSiteSnapshots(prop.id),
     getReferringDomains(prop.id),
     getDisavowEntries(prop.id),
     getAuditDocs(prop.id),
+    getBacklinksByProperty(prop.id),
+    getLinkProspectsByProperty(prop.id),
+    getLatestLinkAudit(prop.id),
+    getLinkAuditHistory(prop.id, 20),
   ]);
   const alerts = computeAlerts(snapshots, refDomains, disavow);
 
@@ -47,6 +64,10 @@ export default async function AuthorityTab({
       disavow={disavow}
       audits={audits}
       alerts={alerts}
+      backlinks={backlinks}
+      prospects={prospects}
+      latestAudit={latestAudit}
+      auditHistory={auditHistory}
     />
   );
 }

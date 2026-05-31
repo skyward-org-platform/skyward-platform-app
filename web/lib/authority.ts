@@ -2,7 +2,27 @@ import { supabase } from "./supabase";
 
 export type RefDomainQuality = "Quality" | "Spam" | "Pending" | "Disavow";
 export type DisavowStatus = "Pending" | "In File" | "Confirmed by GSC";
+// New v2 lifecycle values (lowercase) live alongside the legacy union; rows
+// in disavow_entry can carry either spelling depending on which surface
+// wrote them. Components that filter by these new values use the raw
+// string literal, since the column is plain text in the DB.
 export type SnapshotSource = "dataforseo" | "ahrefs" | "manual";
+
+// ─── New Phase 5 v2 typed values ───────────────────────────────────────────
+export type RdStatus = "active" | "disavow_pending" | "disavowed";
+export type SpamSignal =
+  | "ahrefs_spam"
+  | "tld_spam"
+  | "attack_pattern"
+  | "manual";
+export type ProspectStatus =
+  | "pending"
+  | "contacted"
+  | "placed"
+  | "declined"
+  | "abandoned";
+export type ProspectPriority = "high" | "medium" | "low";
+export type LinkType = "followed" | "nofollow" | "sponsored" | "ugc" | "text";
 
 export type SiteSnapshot = {
   id: string;
@@ -36,6 +56,68 @@ export type ReferringDomainRow = {
   last_refreshed_at: string | null;
   updated_by: string;
   updated_at: string;
+  // New columns added for Phase 5 v2.
+  status: RdStatus;
+  spam_signal: SpamSignal | null;
+  tactic: string | null;
+  primary_target: string | null;
+  primary_anchor: string | null;
+  backlink_count: number;
+};
+
+export type BacklinkRow = {
+  id: string;
+  property_id: string;
+  source_url: string;
+  source_domain: string;
+  source_dr: number | null;
+  source_traffic: number | null;
+  target_url: string;
+  anchor: string | null;
+  link_type: string | null;
+  first_seen: string | null;
+  last_seen: string | null;
+  is_lost: boolean;
+  ahrefs_id: string | null;
+  ingested_at: string;
+};
+
+export type LinkProspectRow = {
+  id: string;
+  property_id: string;
+  domain: string;
+  dr: number | null;
+  url: string | null;
+  tactic: string | null;
+  status: ProspectStatus;
+  priority: ProspectPriority;
+  contact_name: string | null;
+  contact_email: string | null;
+  notes: string | null;
+  source: string | null;
+  competitor_referring: string | null;
+  placed_url: string | null;
+  last_contacted_at: string | null;
+  placed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export type LinkAuditRow = {
+  id: string;
+  property_id: string;
+  audited_at: string;
+  audited_by: string | null;
+  total_backlinks: number | null;
+  live_backlinks: number | null;
+  total_rds: number | null;
+  live_rds: number | null;
+  spam_rds: number | null;
+  toxic_pct: number | null;
+  topline_findings: Record<string, unknown> | null;
+  ahrefs_cost_units: number | null;
+  duration_ms: number | null;
 };
 
 export type DisavowEntryRow = {
@@ -43,7 +125,9 @@ export type DisavowEntryRow = {
   property_id: string;
   domain: string;
   reason: string | null;
-  status: DisavowStatus;
+  /** Free-form text column. Legacy values: "Pending" | "In File" |
+   *  "Confirmed by GSC". v2 values: "pending" | "approved" | "rejected". */
+  status: string;
   added_at: string;
   added_by: string;
   notes: string | null;
@@ -100,10 +184,97 @@ export async function getAuditDocs(propertyId: string): Promise<AuditDocRow[]> {
   return (data ?? []) as AuditDocRow[];
 }
 
+// ─── Phase 5 v2 readers ────────────────────────────────────────────────────
+
+export async function getBacklinksByProperty(
+  propertyId: string,
+): Promise<BacklinkRow[]> {
+  const { data, error } = await supabase
+    .from("backlink")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("source_dr", { ascending: false, nullsFirst: false });
+  if (error) throw new Error(`getBacklinksByProperty: ${error.message}`);
+  return (data ?? []) as BacklinkRow[];
+}
+
+export async function getReferringDomainsByProperty(
+  propertyId: string,
+): Promise<ReferringDomainRow[]> {
+  return getReferringDomains(propertyId);
+}
+
+export async function getLinkProspectsByProperty(
+  propertyId: string,
+  status?: ProspectStatus,
+): Promise<LinkProspectRow[]> {
+  let q = supabase
+    .from("link_prospect")
+    .select("*")
+    .eq("property_id", propertyId);
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q.order("created_at", { ascending: false });
+  if (error) throw new Error(`getLinkProspectsByProperty: ${error.message}`);
+  return (data ?? []) as LinkProspectRow[];
+}
+
+export async function getDisavowEntriesByProperty(
+  propertyId: string,
+  status?: string,
+): Promise<DisavowEntryRow[]> {
+  let q = supabase
+    .from("disavow_entry")
+    .select("*")
+    .eq("property_id", propertyId);
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q.order("added_at", { ascending: false });
+  if (error) throw new Error(`getDisavowEntriesByProperty: ${error.message}`);
+  return (data ?? []) as DisavowEntryRow[];
+}
+
+export async function getLatestLinkAudit(
+  propertyId: string,
+): Promise<LinkAuditRow | null> {
+  const { data, error } = await supabase
+    .from("link_audit")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("audited_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`getLatestLinkAudit: ${error.message}`);
+  return (data ?? null) as LinkAuditRow | null;
+}
+
+export async function getLinkAuditHistory(
+  propertyId: string,
+  limit = 10,
+): Promise<LinkAuditRow[]> {
+  const { data, error } = await supabase
+    .from("link_audit")
+    .select("*")
+    .eq("property_id", propertyId)
+    .order("audited_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`getLinkAuditHistory: ${error.message}`);
+  return (data ?? []) as LinkAuditRow[];
+}
+
 export type RefDomainUpdate = {
   id: string;
   updated_by: string;
-} & Partial<Pick<ReferringDomainRow, "quality" | "notes">>;
+} & Partial<
+  Pick<
+    ReferringDomainRow,
+    | "quality"
+    | "notes"
+    | "status"
+    | "tactic"
+    | "spam_signal"
+    | "primary_target"
+    | "primary_anchor"
+  >
+>;
 
 export async function updateReferringDomain(input: RefDomainUpdate): Promise<ReferringDomainRow> {
   const { id, updated_by, ...changes } = input;

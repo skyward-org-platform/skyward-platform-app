@@ -58,7 +58,11 @@ import {
   setClusterPriority,
   setClusterField,
 } from "@/app/properties/[slug]/keywords/actions";
-import { setRowField } from "@/app/properties/[slug]/content/actions";
+import {
+  setRowField,
+  getContentHistoryAction,
+} from "@/app/properties/[slug]/content/actions";
+import type { ContentRowHistory } from "@/lib/content-rows";
 import type { KeywordRow, KeywordStatus } from "@/lib/keywords";
 import type {
   ClusterRow,
@@ -1895,7 +1899,104 @@ function ContentDrawer({
           {r.post_publish_tasks ?? "—"}
         </pre>
       </Section>
+
+      <ContentHistorySection contentRowId={r.id} />
     </DrawerShell>
+  );
+}
+
+// ─── ContentHistorySection ───────────────────────────────────────────────
+// Fetches content_row_history (snapshot trigger output) on drawer open and
+// renders newest-first. Each snapshot is the row state *before* a tracked
+// change, so the timeline reads as the lifecycle progression — what moved,
+// who moved it, when (the "what's held up / published-then-disappeared" pain,
+// call 146940114).
+
+function ContentHistorySection({ contentRowId }: { contentRowId: string }) {
+  const [events, setEvents] = useState<ContentRowHistory[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEvents(null);
+    setError(null);
+    (async () => {
+      const res = await getContentHistoryAction(contentRowId, 20);
+      if (cancelled) return;
+      if (!res.ok) setError(res.error);
+      else setEvents(res.events);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentRowId]);
+
+  return (
+    <Section title="History">
+      {error && (
+        <div className="text-[11px] text-rose-700" title={error}>
+          ! {error}
+        </div>
+      )}
+      {events === null && !error && (
+        <div className="text-[11px] text-muted-foreground italic">Loading…</div>
+      )}
+      {events !== null && events.length === 0 && (
+        <div className="text-[11px] text-muted-foreground italic">
+          No changes recorded yet.
+        </div>
+      )}
+      {events !== null && events.length > 0 && (
+        <ul className="space-y-1.5">
+          {events.map((e) => (
+            <ContentHistoryRow key={e.id} event={e} />
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+function ContentHistoryRow({ event }: { event: ContentRowHistory }) {
+  const dt = new Date(event.snapshotted_at);
+  const isoLabel = Number.isNaN(dt.getTime())
+    ? event.snapshotted_at
+    : dt.toLocaleString();
+  // Compact summary of the snapshotted state.
+  const bits: string[] = [];
+  if (event.status) bits.push(event.status);
+  if (event.brief_status && event.brief_status !== "Not Started")
+    bits.push(`brief: ${event.brief_status}`);
+  if (event.writer) bits.push(`writer: ${event.writer}`);
+  if (event.sprint != null) bits.push(`sprint ${event.sprint}`);
+  return (
+    <li className="text-[11px] border rounded-md bg-muted/20 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="font-mono tabular-nums text-muted-foreground text-[10.5px]">
+          {isoLabel}
+        </span>
+        <span className="text-muted-foreground text-[10.5px]">·</span>
+        <span className="text-muted-foreground text-[10.5px]">
+          {drawerRelativeTime(event.snapshotted_at)}
+        </span>
+        {event.updated_by && (
+          <>
+            <span className="text-muted-foreground text-[10.5px]">·</span>
+            <span className="text-muted-foreground text-[10.5px]">
+              {event.updated_by}
+            </span>
+          </>
+        )}
+      </div>
+      {bits.length > 0 && (
+        <div className="mt-0.5 text-[11px] text-foreground">{bits.join("  ·  ")}</div>
+      )}
+      {event.feedback_notes && (
+        <div className="mt-0.5 text-[10.5px] text-muted-foreground italic truncate" title={event.feedback_notes}>
+          {event.feedback_notes}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -2187,7 +2288,13 @@ function RefDomainDrawer({
               <DisavowStatusEditor
                 slug={propertySlug}
                 domain={r.domain}
-                value={disavow.status}
+                value={
+                  (DISAVOW_STATUSES as readonly string[]).includes(
+                    disavow.status,
+                  )
+                    ? (disavow.status as "Pending" | "In File" | "Confirmed by GSC")
+                    : "Pending"
+                }
               />
             </Field>
             <Field label="Reason">

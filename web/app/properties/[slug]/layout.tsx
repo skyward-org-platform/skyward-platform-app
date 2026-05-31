@@ -79,6 +79,7 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
     dnaRes,
     competitorsFilled,
     seedKeywordsFilled,
+    latestLinkAuditRes,
   ] = await Promise.all([
     supabase
       .from("page")
@@ -95,6 +96,13 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
       .eq("property_id", propertyId),
     hasCompetitors(propertyId),
     hasSeedKeywords(propertyId),
+    supabase
+      .from("link_audit")
+      .select("live_rds")
+      .eq("property_id", propertyId)
+      .order("audited_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   // Brand DNA: count rows in brand_dna_section EXCEPT competitors and
   // seed_keywords (which live in their own tables now). Then add 1 each
@@ -108,6 +116,9 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
     supabaseFilled +
     (competitorsFilled ? 1 : 0) +
     (seedKeywordsFilled ? 1 : 0);
+  const liveRds =
+    (latestLinkAuditRes.data as { live_rds: number | null } | null)
+      ?.live_rds ?? null;
   return {
     pages: pagesRes.count ?? 0,
     optimize: optimizeRes.count ?? 0,
@@ -115,6 +126,7 @@ async function getHeroMetrics(_slug: string, propertyId: string) {
     brandDnaTotal: 11,
     hasCompetitors: competitorsFilled,
     hasSeedKeywords: seedKeywordsFilled,
+    authorityLiveRds: liveRds,
   };
 }
 
@@ -367,7 +379,12 @@ type Tab =
 function buildTabs(
   slug: string,
   projectTypes: Set<string>,
-  metrics: { pages: number; brandDnaFilled: number; brandDnaTotal: number },
+  metrics: {
+    pages: number;
+    brandDnaFilled: number;
+    brandDnaTotal: number;
+    authorityLiveRds: number | null;
+  },
   projectCount: number,
 ): Tab[] {
   const tabs: Tab[] = [
@@ -394,7 +411,12 @@ function buildTabs(
     tabs.push({ kind: "sep" });
     tabs.push({ kind: "tab", href: `/properties/${slug}/keywords`, label: "Keywords" });
     tabs.push({ kind: "tab", href: `/properties/${slug}/content`, label: "Content" });
-    tabs.push({ kind: "tab", href: `/properties/${slug}/authority`, label: "Authority" });
+    tabs.push({
+      kind: "tab",
+      href: `/properties/${slug}/authority`,
+      label: "Authority",
+      badge: metrics.authorityLiveRds ?? undefined,
+    });
     tabs.push({ kind: "tab", href: `/properties/${slug}/tracking`, label: "Tracking" });
   }
 
