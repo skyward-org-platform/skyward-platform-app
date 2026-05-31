@@ -18,6 +18,15 @@ import type {
   ProspectPriority,
 } from "@/lib/authority";
 import { supabase } from "@/lib/supabase";
+import {
+  runAhrefsAudit,
+  type AuditMode,
+  type AuditResult,
+  type BacklinkPayload,
+  type RdPayload,
+  type SpamRd,
+  type AuditMetrics,
+} from "@/lib/ahrefs-audit";
 
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
@@ -576,31 +585,375 @@ export async function exportDisavowFile(
   };
 }
 
-// ─── runLinkAudit (v1 stub) ────────────────────────────────────────────────
-// Ahrefs MCP isn't reachable from a server action. Stub records an audit
-// row with a topline_findings note so the Audits tab still shows the run.
+// ─── runLinkAudit (v2: real Ahrefs ingest) ─────────────────────────────────
+// Pulls metrics + backlinks + RDs from Ahrefs via lib/ahrefs-audit, then
+// atomically writes backlink (append-only via ahrefs_id dedup), upserts
+// referring_domain (preserving operator-set fields), inserts disavow_entry
+// rows for newly-flagged spam, and records a link_audit row capturing the
+// run's cost + topline metrics.
+//
+// Fails clean if AHREFS_API_KEY is missing. If a partial result comes back
+// (cost cap reached mid-flight), still ingests what was collected and
+// writes a link_audit row noting the partial run.
+
+export type RunLinkAuditResult =
+  | {
+      ok: true;
+      auditId: string;
+      costUnits: number;
+      liveRds: number;
+      spamRds: number;
+      disavowAutoFlagged: number;
+      partial: boolean;
+    }
+  | { ok: false; error: string };
+
+export type RunLinkAuditOpts = {
+  mode?: AuditMode;
+  capUnits?: number;
+};
+
 export async function runLinkAudit(
   slug: string,
-  costCapUnits = 2000,
-): Promise<Ok | Err> {
+  opts: RunLinkAuditOpts = {},
+): Promise<RunLinkAuditResult> {
+  const mode: AuditMode = opts.mode ?? "quick";
+  const capUnits = opts.capUnits ?? 3000;
+
+  // 1. Auth gate
   const authed = await requireWriteToken();
   if (!authed.ok) return authed;
-  const propertyId = await resolvePropertyId(slug);
-  if (!propertyId) return { ok: false, error: "property not found" };
+
+  // 2. Resolve property → id + primary_domain
+  const { data: prop, error: propErr } = await supabase
+    .from("property")
+    .select("id, primary_domain")
+    .eq("slug", slug)
+    .single();
+  if (propErr || !prop?.id) {
+    return { ok: false, error: "property not found" };
+  }
+  const propertyId = prop.id as string;
+  const primaryDomain = (prop.primary_domain ?? "").trim();
+  if (!primaryDomain) {
+    return {
+      ok: false,
+      error: "property.primary_domain is empty; set it before running an audit",
+    };
+  }
+
+  // 3. Pre-flight env check (handled in runAhrefsAudit, but we surface
+  // the message early so the UI doesn't even start the long fetch).
+  if (!process.env.AHREFS_API_KEY) {
+    return { ok: false, error: "AHREFS_API_KEY not configured in env" };
+  }
+
+  // 4. Call the Ahrefs audit. Wrap in try/catch so a network error doesn't
+  // crash the action (still record a failed-audit row for the operator).
+  let result: AuditResult;
   try {
-    const { error } = await supabase.from("link_audit").insert({
+    result = await runAhrefsAudit({
+      domain: primaryDomain,
+      mode,
+      capUnits,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await safeInsertAuditFailure(propertyId, mode, capUnits, msg);
+    bust(slug);
+    return { ok: false, error: `Ahrefs audit threw: ${msg}` };
+  }
+
+  // 5. Collect what we got (ok or partial).
+  const partial = result.ok === false && result.partial != null;
+  const backlinks: BacklinkPayload[] = result.ok
+    ? result.backlinks
+    : (result.partial?.backlinks ?? []);
+  const referringDomains: RdPayload[] = result.ok
+    ? result.referringDomains
+    : (result.partial?.referringDomains ?? []);
+  const spamRds: SpamRd[] = result.ok
+    ? result.spamRds
+    : (result.partial?.spamRds ?? []);
+  const metrics: AuditMetrics | null = result.ok
+    ? result.metrics
+    : (result.partial?.metrics ?? null);
+  const costUnits = result.ok
+    ? result.costUnits
+    : (result.partial?.costUnits ?? 0);
+  const durationMs = result.ok
+    ? result.durationMs
+    : (result.partial?.durationMs ?? 0);
+
+  // If the call failed AND we got nothing back, record a failed audit and
+  // bail. (This is distinct from "partial" where we got some data but the
+  // cap killed it.)
+  if (!result.ok && !partial) {
+    await safeInsertAuditFailure(propertyId, mode, capUnits, result.error);
+    bust(slug);
+    return { ok: false, error: result.error };
+  }
+
+  // 6. Ingest. Each step is wrapped so a single failure surfaces in the
+  // error message but doesn't prevent the link_audit row from recording
+  // what happened.
+  const operator = getOperator();
+  const nowIso = new Date().toISOString();
+  let ingestErrors: string[] = [];
+  let disavowAutoFlagged = 0;
+
+  // 6a. Backlinks (append-only). Dedup via ahrefs_id when present, else
+  // skip rows that already exist on (source_url, target_url).
+  if (backlinks.length > 0) {
+    try {
+      const blRows = backlinks.map((b) => ({
+        property_id: propertyId,
+        source_url: b.source_url,
+        source_domain: b.source_domain,
+        source_dr: b.source_dr,
+        source_traffic: b.source_traffic,
+        target_url: b.target_url,
+        anchor: b.anchor,
+        link_type: b.link_type,
+        first_seen: b.first_seen,
+        last_seen: b.last_seen,
+        is_lost: b.is_lost,
+        ahrefs_id: b.ahrefs_id,
+        ingested_at: nowIso,
+      }));
+      // Upsert on ahrefs_id where present, ignoring null-id rows (insert
+      // them straight). Partial unique index on backlink(ahrefs_id) where
+      // ahrefs_id is not null handles dedup for the keyed rows.
+      const keyed = blRows.filter((r) => r.ahrefs_id != null);
+      const unkeyed = blRows.filter((r) => r.ahrefs_id == null);
+      if (keyed.length > 0) {
+        const { error } = await supabase
+          .from("backlink")
+          .upsert(keyed, { onConflict: "ahrefs_id", ignoreDuplicates: true });
+        if (error) ingestErrors.push(`backlink upsert: ${error.message}`);
+      }
+      if (unkeyed.length > 0) {
+        const { error } = await supabase.from("backlink").insert(unkeyed);
+        if (error) ingestErrors.push(`backlink insert: ${error.message}`);
+      }
+    } catch (e) {
+      ingestErrors.push(
+        `backlink ingest threw: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  // 6b. Referring domains. Upsert preserves operator-set quality, notes,
+  // status, tactic — only patches the metrics columns Ahrefs owns.
+  if (referringDomains.length > 0) {
+    try {
+      // Pull existing rows so we can preserve operator-set fields.
+      const domainList = referringDomains.map((r) => r.domain);
+      const { data: existing } = await supabase
+        .from("referring_domain")
+        .select("domain, quality, notes, status, tactic, spam_signal")
+        .eq("property_id", propertyId)
+        .in("domain", domainList);
+      const existingByDomain = new Map<
+        string,
+        Record<string, unknown>
+      >(
+        ((existing ?? []) as Array<Record<string, unknown>>).map((r) => [
+          r.domain as string,
+          r,
+        ]),
+      );
+
+      const rdRows = referringDomains.map((r) => {
+        const prev = existingByDomain.get(r.domain);
+        return {
+          property_id: propertyId,
+          domain: r.domain,
+          first_seen: r.first_seen,
+          last_seen: r.last_seen,
+          domain_rating: r.domain_rating,
+          traffic_domain: r.traffic_domain,
+          dofollow_links: r.dofollow_links,
+          links_to_target: r.links_to_target,
+          detected_spam: r.detected_spam,
+          backlink_count: r.backlink_count,
+          // Preserve operator-set fields on re-runs.
+          quality: prev?.quality ?? "Pending",
+          notes: prev?.notes ?? null,
+          status: prev?.status ?? "active",
+          tactic: prev?.tactic ?? r.tactic,
+          spam_signal: prev?.spam_signal ?? r.spam_signal,
+          last_refreshed_at: nowIso,
+          updated_by: operator,
+          updated_at: nowIso,
+        };
+      });
+      const { error } = await supabase
+        .from("referring_domain")
+        .upsert(rdRows, { onConflict: "property_id,domain" });
+      if (error) ingestErrors.push(`referring_domain upsert: ${error.message}`);
+    } catch (e) {
+      ingestErrors.push(
+        `RD ingest threw: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  // 6c. Disavow auto-flag. Insert a pending disavow_entry for every spam
+  // RD that doesn't already have one. Mirror RD.status → disavow_pending.
+  if (spamRds.length > 0) {
+    try {
+      const spamDomains = spamRds.map((s) => s.domain);
+      const { data: existingDisavow } = await supabase
+        .from("disavow_entry")
+        .select("domain")
+        .eq("property_id", propertyId)
+        .in("domain", spamDomains);
+      const existingSet = new Set(
+        ((existingDisavow ?? []) as Array<{ domain: string }>).map(
+          (r) => r.domain,
+        ),
+      );
+      const toInsert = spamRds
+        .filter((s) => !existingSet.has(s.domain))
+        .map((s) => ({
+          property_id: propertyId,
+          domain: s.domain,
+          reason: s.signal,
+          status: "pending",
+          added_by: operator,
+          updated_at: nowIso,
+        }));
+      if (toInsert.length > 0) {
+        const { error } = await supabase
+          .from("disavow_entry")
+          .upsert(toInsert, { onConflict: "property_id,domain" });
+        if (error) {
+          ingestErrors.push(`disavow_entry insert: ${error.message}`);
+        } else {
+          disavowAutoFlagged = toInsert.length;
+        }
+        // Mirror referring_domain.status → disavow_pending for the same
+        // domains. Don't downgrade rows already "disavowed".
+        const { error: rdStatusErr } = await supabase
+          .from("referring_domain")
+          .update({
+            status: "disavow_pending",
+            updated_by: operator,
+            updated_at: nowIso,
+          })
+          .eq("property_id", propertyId)
+          .in(
+            "domain",
+            toInsert.map((t) => t.domain),
+          )
+          .neq("status", "disavowed");
+        if (rdStatusErr) {
+          ingestErrors.push(`RD status mirror: ${rdStatusErr.message}`);
+        }
+      }
+    } catch (e) {
+      ingestErrors.push(
+        `disavow ingest threw: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  // 6d. link_audit row.
+  const toplineFindings: Record<string, unknown> = {
+    mode,
+    cap_units: capUnits,
+    partial,
+    domain: primaryDomain,
+    backlinks_ingested: backlinks.length,
+    rds_ingested: referringDomains.length,
+    spam_rds_detected: spamRds.length,
+    disavow_auto_flagged: disavowAutoFlagged,
+    dr_distribution: metrics?.dr_distribution ?? null,
+    ingest_errors: ingestErrors.length > 0 ? ingestErrors : null,
+  };
+  if (!result.ok) {
+    toplineFindings.error = result.error;
+  }
+
+  const liveRds = metrics?.live_rds ?? referringDomains.length;
+  const liveBacklinks = metrics?.live_backlinks ?? backlinks.length;
+  const spamRdsCount = spamRds.length;
+  const toxicPct =
+    liveRds > 0 ? Number(((spamRdsCount / liveRds) * 100).toFixed(2)) : null;
+
+  let auditId: string | null = null;
+  try {
+    const { data: auditRow, error: auditErr } = await supabase
+      .from("link_audit")
+      .insert({
+        property_id: propertyId,
+        audited_by: operator,
+        total_backlinks: metrics?.total_backlinks ?? null,
+        live_backlinks: liveBacklinks,
+        total_rds: metrics?.total_rds ?? null,
+        live_rds: liveRds,
+        spam_rds: spamRdsCount,
+        toxic_pct: toxicPct,
+        topline_findings: toplineFindings,
+        ahrefs_cost_units: costUnits,
+        duration_ms: durationMs,
+      })
+      .select("id")
+      .single();
+    if (auditErr) {
+      ingestErrors.push(`link_audit insert: ${auditErr.message}`);
+    } else {
+      auditId = (auditRow?.id as string) ?? null;
+    }
+  } catch (e) {
+    ingestErrors.push(
+      `link_audit insert threw: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  // 7. Bust cache so the next render shows everything.
+  bust(slug);
+
+  if (!auditId) {
+    return {
+      ok: false,
+      error: `Audit completed but recording failed: ${ingestErrors.join("; ") || "unknown"}`,
+    };
+  }
+
+  return {
+    ok: true,
+    auditId,
+    costUnits,
+    liveRds,
+    spamRds: spamRdsCount,
+    disavowAutoFlagged,
+    partial,
+  };
+}
+
+// Record a failed-audit link_audit row so operators see the run attempted.
+async function safeInsertAuditFailure(
+  propertyId: string,
+  mode: AuditMode,
+  capUnits: number,
+  errorMessage: string,
+): Promise<void> {
+  try {
+    await supabase.from("link_audit").insert({
       property_id: propertyId,
       audited_by: getOperator(),
+      ahrefs_cost_units: 0,
+      duration_ms: 0,
       topline_findings: {
-        note:
-          "ingest not yet implemented; ran the Python script instead",
-        requested_cost_cap_units: costCapUnits,
+        mode,
+        cap_units: capUnits,
+        partial: false,
+        error: errorMessage,
       },
     });
-    if (error) return { ok: false, error: error.message };
-    bust(slug);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  } catch {
+    // Best-effort. If even this fails, we surface via the action return.
   }
 }

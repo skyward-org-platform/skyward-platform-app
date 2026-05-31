@@ -2,36 +2,63 @@
 
 // AuditsHistoryTab — history of link_audit rows. Each row captures an
 // ingest / audit run with topline findings rendered from the jsonb column.
-// Most recent first. Also surfaces a "Run audit" stub button.
+// Most recent first. "Run audit" opens the same confirm modal the Overview
+// tab uses.
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { LinkAuditRow } from "@/lib/authority";
 import { EmptyTab, TabHeader } from "@/components/wqa/helpers";
 import { runLinkAudit } from "@/app/properties/[slug]/authority/actions";
+import { RunAuditModal } from "./RunAuditModal";
+
+type Flash =
+  | { kind: "ok"; message: string }
+  | { kind: "err"; message: string }
+  | null;
 
 export function AuditsHistoryTab({
   audits,
   propertySlug,
+  primaryDomain,
 }: {
   audits: LinkAuditRow[];
   propertySlug: string;
+  primaryDomain?: string | null;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [flash, setFlash] = useState<Flash>(null);
 
-  function onRun() {
-    if (
-      !confirm(
-        "Record a link audit run? v1 is a stub (no Ahrefs ingest from server actions); use the Python ingest script for real data.",
-      )
-    )
-      return;
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 6000);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  function handleRun(mode: "quick" | "full") {
+    setModalOpen(false);
     startTransition(async () => {
-      const res = await runLinkAudit(propertySlug);
+      const res = await runLinkAudit(propertySlug, {
+        mode,
+        capUnits: mode === "full" ? 10000 : 3000,
+      });
       if (!res.ok) {
-        alert(`Audit run failed: ${res.error}`);
+        setFlash({ kind: "err", message: res.error });
         return;
       }
-      window.location.reload();
+      const usd = (res.costUnits / 10000).toFixed(2);
+      const toxicPct =
+        res.liveRds > 0
+          ? `${((res.spamRds / res.liveRds) * 100).toFixed(0)}%`
+          : "—";
+      const partialNote = res.partial ? " (partial — cap hit)" : "";
+      setFlash({
+        kind: "ok",
+        message: `Audit complete${partialNote}: ${res.liveRds} RDs, ${toxicPct} toxic, ${res.disavowAutoFlagged} disavow flagged. Cost: ${res.costUnits.toLocaleString()} units (~$${usd}).`,
+      });
+      router.refresh();
     });
   }
 
@@ -49,7 +76,7 @@ export function AuditsHistoryTab({
         rightSlot={
           <button
             type="button"
-            onClick={onRun}
+            onClick={() => setModalOpen(true)}
             disabled={pending}
             className="text-xs px-3 py-1.5 rounded border bg-foreground text-background disabled:opacity-50"
           >
@@ -58,14 +85,37 @@ export function AuditsHistoryTab({
         }
       />
 
+      {flash && (
+        <div
+          role="status"
+          className={
+            "text-xs border rounded-md px-3 py-2 mb-3 " +
+            (flash.kind === "ok"
+              ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+              : "bg-rose-50 border-rose-300 text-rose-900")
+          }
+        >
+          {flash.message}
+        </div>
+      )}
+
       {audits.length === 0 ? (
-        <EmptyTab message="No audit runs recorded yet. Run the ingest script or click Run audit." />
+        <EmptyTab message="No audit runs recorded yet. Click Run audit to pull from Ahrefs." />
       ) : (
         <div className="space-y-3">
           {audits.map((a) => (
             <AuditCard key={a.id} audit={a} />
           ))}
         </div>
+      )}
+
+      {modalOpen && (
+        <RunAuditModal
+          domain={primaryDomain ?? "(no primary_domain set)"}
+          onCancel={() => setModalOpen(false)}
+          onRun={handleRun}
+          pending={pending}
+        />
       )}
     </section>
   );

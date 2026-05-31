@@ -127,6 +127,7 @@ export function AuthorityView(props: AuthorityViewProps) {
           refDomains={props.refDomains}
           backlinks={props.backlinks}
           propertySlug={props.propertySlug}
+          primaryDomain={props.primaryDomain}
         />
       )}
       {view === "backlinks" && <BacklinksTab backlinks={props.backlinks} />}
@@ -153,6 +154,7 @@ export function AuthorityView(props: AuthorityViewProps) {
         <AuditsHistoryTab
           audits={props.auditHistory}
           propertySlug={props.propertySlug}
+          primaryDomain={props.primaryDomain}
         />
       )}
 

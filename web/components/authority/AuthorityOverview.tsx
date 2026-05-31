@@ -5,15 +5,22 @@
 //   - referring_domain rows (DR distribution, top 5 by DR)
 //   - backlink rows (dofollow %, top target pages)
 // If no link_audit row exists, surfaces a "Run audit" empty state.
+//
+// "Run audit" opens a confirm modal that lets the operator pick quick vs
+// full mode and shows a cost estimate. Calls runLinkAudit (server action)
+// then flashes a success/error chip + router.refresh() so the page renders
+// the freshly-written link_audit row.
 
 import type {
   BacklinkRow,
   LinkAuditRow,
   ReferringDomainRow,
 } from "@/lib/authority";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { runLinkAudit } from "@/app/properties/[slug]/authority/actions";
 import { DrPill } from "./DrPill";
+import { RunAuditModal } from "./RunAuditModal";
 
 const DR_BUCKETS: { label: string; min: number; max: number; tint: string }[] = [
   { label: "0-20", min: 0, max: 20, tint: "bg-slate-300" },
@@ -23,53 +30,91 @@ const DR_BUCKETS: { label: string; min: number; max: number; tint: string }[] = 
   { label: "81-100", min: 81, max: 100, tint: "bg-emerald-400" },
 ];
 
+type Flash =
+  | { kind: "ok"; message: string }
+  | { kind: "err"; message: string }
+  | null;
+
 export function AuthorityOverview({
   latestAudit,
   refDomains,
   backlinks,
   propertySlug,
+  primaryDomain,
 }: {
   latestAudit: LinkAuditRow | null;
   refDomains: ReferringDomainRow[];
   backlinks: BacklinkRow[];
   propertySlug: string;
+  primaryDomain?: string | null;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [flash, setFlash] = useState<Flash>(null);
+
+  // Auto-clear flash after 6s.
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 6000);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  function handleRun(mode: "quick" | "full") {
+    setModalOpen(false);
+    startTransition(async () => {
+      const res = await runLinkAudit(propertySlug, {
+        mode,
+        capUnits: mode === "full" ? 10000 : 3000,
+      });
+      if (!res.ok) {
+        setFlash({ kind: "err", message: res.error });
+        return;
+      }
+      const usd = (res.costUnits / 10000).toFixed(2);
+      const toxicPct =
+        res.liveRds > 0
+          ? `${((res.spamRds / res.liveRds) * 100).toFixed(0)}%`
+          : "—";
+      const partialNote = res.partial ? " (partial — cap hit)" : "";
+      setFlash({
+        kind: "ok",
+        message: `Audit complete${partialNote}: ${res.liveRds} RDs, ${toxicPct} toxic, ${res.disavowAutoFlagged} disavow flagged. Cost: ${res.costUnits.toLocaleString()} units (~$${usd}).`,
+      });
+      router.refresh();
+    });
+  }
 
   // Empty state — no audit row exists yet.
   if (!latestAudit) {
-    function onRun() {
-      if (
-        !confirm(
-          "Record a link audit run? v1 is a stub (no Ahrefs ingest from server actions); use the Python ingest script for real data.",
-        )
-      )
-        return;
-      startTransition(async () => {
-        const res = await runLinkAudit(propertySlug);
-        if (!res.ok) {
-          alert(`Audit run failed: ${res.error}`);
-          return;
-        }
-        window.location.reload();
-      });
-    }
     return (
-      <div className="border border-dashed rounded-lg p-8 bg-muted/30 text-center">
-        <div className="text-sm font-semibold mb-1">No link audit yet</div>
-        <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
-          Once an audit runs, this view shows live RDs, DR distribution, toxic
-          %, top RDs, and the most-linked target pages.
-        </p>
-        <button
-          type="button"
-          onClick={onRun}
-          disabled={pending}
-          className="text-xs px-3 py-1.5 rounded border bg-foreground text-background disabled:opacity-50"
-        >
-          {pending ? "Running…" : "Run audit"}
-        </button>
-      </div>
+      <>
+        <FlashChip flash={flash} />
+        <div className="border border-dashed rounded-lg p-8 bg-muted/30 text-center">
+          <div className="text-sm font-semibold mb-1">No link audit yet</div>
+          <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
+            Run an Ahrefs audit to populate live RDs, DR distribution, toxic
+            %, top RDs, and the most-linked target pages. Spam-flagged RDs
+            auto-create pending disavow entries.
+          </p>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            disabled={pending}
+            className="text-xs px-3 py-1.5 rounded border bg-foreground text-background disabled:opacity-50"
+          >
+            {pending ? "Running…" : "Run audit"}
+          </button>
+        </div>
+        {modalOpen && (
+          <RunAuditModal
+            domain={primaryDomain ?? "(no primary_domain set)"}
+            onCancel={() => setModalOpen(false)}
+            onRun={handleRun}
+            pending={pending}
+          />
+        )}
+      </>
     );
   }
 
@@ -131,6 +176,20 @@ export function AuthorityOverview({
 
   return (
     <div className="space-y-6">
+      <FlashChip flash={flash} />
+
+      {/* ─── Toolbar with re-run button ───────────────────────────────── */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          disabled={pending}
+          className="text-xs px-3 py-1.5 rounded border bg-foreground text-background disabled:opacity-50"
+        >
+          {pending ? "Running…" : "Run audit"}
+        </button>
+      </div>
+
       {/* ─── Scorecard ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Tile label="Live RDs" value={liveRds.toLocaleString()} />
@@ -239,6 +298,31 @@ export function AuthorityOverview({
         </span>{" "}
         by {latestAudit.audited_by ?? "unknown"}.
       </div>
+
+      {modalOpen && (
+        <RunAuditModal
+          domain={primaryDomain ?? "(no primary_domain set)"}
+          onCancel={() => setModalOpen(false)}
+          onRun={handleRun}
+          pending={pending}
+        />
+      )}
+    </div>
+  );
+}
+
+function FlashChip({ flash }: { flash: Flash }) {
+  if (!flash) return null;
+  const cls =
+    flash.kind === "ok"
+      ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+      : "bg-rose-50 border-rose-300 text-rose-900";
+  return (
+    <div
+      role="status"
+      className={`text-xs border rounded-md px-3 py-2 ${cls}`}
+    >
+      {flash.message}
     </div>
   );
 }
