@@ -129,6 +129,8 @@ export default async function Sidebar() {
         <SbHeading>Workspace</SbHeading>
         <SbItem href="/" icon="⌂" label="Dashboard" />
         <SbItem href="/clients" icon="◉" label="Clients" count={bqClientCount} />
+        <SbItem href="/content" icon="✎" label="Content" />
+        <SbItem href="/authority" icon="⛓" label="Authority" />
         <SbItem href="/activity" icon="≈" label="Activity" />
         <SbItem href="/signals" icon="⚡" label="Signals" count={signals} />
       </nav>
