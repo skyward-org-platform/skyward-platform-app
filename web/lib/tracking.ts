@@ -396,6 +396,155 @@ export function windowDeltas(
   };
 }
 
+// ─── Portfolio rollup (all properties) ─────────────────────────────────────
+
+export type TrackingPortfolioRow = {
+  property_id: string;
+  slug: string;
+  name: string;
+  status: string | null;
+  pipeline_phase: number | null;
+  client_name: string | null;
+  // Latest Ahrefs snapshot values (site-scope, source='ahrefs', scope_id IS NULL).
+  dr_current: number | null;
+  kws_current: number | null;
+  traffic_current: number | null;
+  rds_current: number | null;
+  // 30-day deltas (latest minus baseline closest to 30d ago).
+  dr_delta_30d: number | null;
+  kws_delta_30d: number | null;
+  traffic_delta_30d: number | null;
+  rds_delta_30d: number | null;
+  // Max(captured_date) for the latest snapshot.
+  last_snapshot_date: string | null;
+};
+
+type RawPortfolioSnapshotRow = {
+  property_id: string;
+  captured_date: string;
+  domain_rating: number | string | null;
+  referring_domains: number | null;
+  organic_keywords: number | null;
+  organic_traffic: number | null;
+};
+
+type RawPortfolioPropertyRow = {
+  id: string;
+  slug: string;
+  name: string;
+  status: string | null;
+  pipeline_phase: number | null;
+  client: { name: string | null } | null;
+};
+
+function toNumLoose(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** One-trip portfolio fetch. Pulls every property + every site-scope
+ *  Ahrefs snapshot in parallel, then derives a single row per property.
+ *  Empty rows (no snapshots) render with "—" placeholders. Delta logic
+ *  mirrors getAuthorityPortfolioSummary: pick the snapshot whose
+ *  captured_date is closest to (latest - 30d). Fall back to the oldest
+ *  historical row when only one prior exists. */
+export async function getTrackingPortfolioSummary(): Promise<
+  TrackingPortfolioRow[]
+> {
+  const [propsRes, snapsRes] = await Promise.all([
+    supabase
+      .from("property")
+      .select("id, slug, name, status, pipeline_phase, client:client_id(name)")
+      .order("name"),
+    supabase
+      .from("metric_snapshot")
+      .select(
+        "property_id, captured_date, domain_rating, referring_domains, organic_keywords, organic_traffic",
+      )
+      .eq("scope", "site")
+      .eq("source", "ahrefs")
+      .is("scope_id", null)
+      .order("captured_date", { ascending: false }),
+  ]);
+
+  const properties = (propsRes.data ?? []) as unknown as RawPortfolioPropertyRow[];
+  const snapshots = (snapsRes.data ?? []) as RawPortfolioSnapshotRow[];
+
+  // Group snapshots by property, already sorted DESC by captured_date.
+  const snapsByProperty = new Map<string, RawPortfolioSnapshotRow[]>();
+  for (const s of snapshots) {
+    const arr = snapsByProperty.get(s.property_id) ?? [];
+    arr.push(s);
+    snapsByProperty.set(s.property_id, arr);
+  }
+
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+  return properties.map((p): TrackingPortfolioRow => {
+    const propSnaps = snapsByProperty.get(p.id) ?? [];
+    const latest = propSnaps[0] ?? null;
+
+    // Baseline: snapshot closest to (latest - 30d), strictly older than latest.
+    // If none qualify but a prior exists, fall back to the oldest historical row.
+    let baseline: RawPortfolioSnapshotRow | null = null;
+    if (latest && propSnaps.length >= 2) {
+      const latestMs = Date.parse(latest.captured_date);
+      const target = latestMs - THIRTY_DAYS_MS;
+      let bestGap = Infinity;
+      for (let i = 1; i < propSnaps.length; i++) {
+        const cand = propSnaps[i];
+        const candMs = Date.parse(cand.captured_date);
+        if (!Number.isFinite(candMs)) continue;
+        const gap = Math.abs(candMs - target);
+        if (gap < bestGap) {
+          bestGap = gap;
+          baseline = cand;
+        }
+      }
+      if (baseline && baseline.captured_date === latest.captured_date) {
+        baseline = propSnaps[propSnaps.length - 1];
+        if (baseline.captured_date === latest.captured_date) baseline = null;
+      }
+    }
+
+    const dr = latest ? toNumLoose(latest.domain_rating) : null;
+    const kws = latest ? latest.organic_keywords : null;
+    const traffic = latest ? latest.organic_traffic : null;
+    const rds = latest ? latest.referring_domains : null;
+    const baseDr = baseline ? toNumLoose(baseline.domain_rating) : null;
+    const baseKws = baseline ? baseline.organic_keywords : null;
+    const baseTraffic = baseline ? baseline.organic_traffic : null;
+    const baseRds = baseline ? baseline.referring_domains : null;
+
+    return {
+      property_id: p.id,
+      slug: p.slug,
+      name: p.name,
+      status: p.status,
+      pipeline_phase: p.pipeline_phase,
+      client_name: p.client?.name ?? null,
+      dr_current: dr,
+      kws_current: kws,
+      traffic_current: traffic,
+      rds_current: rds,
+      dr_delta_30d:
+        dr !== null && baseDr !== null
+          ? Number((dr - baseDr).toFixed(1))
+          : null,
+      kws_delta_30d:
+        kws !== null && baseKws !== null ? kws - baseKws : null,
+      traffic_delta_30d:
+        traffic !== null && baseTraffic !== null
+          ? traffic - baseTraffic
+          : null,
+      rds_delta_30d:
+        rds !== null && baseRds !== null ? rds - baseRds : null,
+      last_snapshot_date: latest ? latest.captured_date : null,
+    };
+  });
+}
+
 /** Impression-weighted avg position over the last windowDays + prior. */
 export function avgPositionDeltas(snapshots: Snapshot[], windowDays: number): Headline {
   if (snapshots.length === 0) return { current: null, prior: null };
