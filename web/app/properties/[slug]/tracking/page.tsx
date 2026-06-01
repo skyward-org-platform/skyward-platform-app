@@ -8,6 +8,7 @@ import {
   getUrlSummaries,
   getKeywordSummaries,
   getAnnotations,
+  getAhrefsSiteSnapshots,
 } from "@/lib/tracking";
 import { TrackingTabs } from "@/components/tracking/TrackingTabs";
 import { SitewideView } from "@/components/tracking/SitewideView";
@@ -39,12 +40,13 @@ export default async function TrackingTab({
     );
   }
 
-  const [snapshots, urlSummaries, keywordSummaries, annotations] =
+  const [snapshots, urlSummaries, keywordSummaries, annotations, ahrefsSnapshots] =
     await Promise.all([
       getSiteSnapshots(prop.id, DAYS),
       getUrlSummaries(prop.id, DAYS, TOP_N),
       getKeywordSummaries(prop.id, DAYS, TOP_N),
       getAnnotations(prop.id, DAYS),
+      getAhrefsSiteSnapshots(prop.id, 12),
     ]);
 
   return (
@@ -63,6 +65,7 @@ export default async function TrackingTab({
             propertySlug={slug}
             snapshots={snapshots}
             annotations={annotations}
+            ahrefsSnapshots={ahrefsSnapshots}
           />
         }
         urls={<UrlsView rows={urlSummaries} annotations={annotations} />}

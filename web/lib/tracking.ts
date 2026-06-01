@@ -273,6 +273,57 @@ export async function getKeywordSummaries(
   return summaries.slice(0, topN);
 }
 
+// ── ahrefs site snapshots ──────────────────────────────────────────────
+
+export type AhrefsMetricSnapshot = {
+  captured_date: string; // ISO date (YYYY-MM-DD)
+  domain_rating: number | null;
+  referring_domains: number | null;
+  organic_keywords: number | null;
+  organic_traffic: number | null;
+  organic_traffic_value_cents: number | null;
+  backlinks_total: number | null;
+};
+
+type RawAhrefsRow = {
+  captured_date: string;
+  domain_rating: number | string | null;
+  referring_domains: number | null;
+  organic_keywords: number | null;
+  organic_traffic: number | null;
+  organic_traffic_value_cents: number | null;
+  backlinks_total: number | null;
+};
+
+/** Latest N site-scope Ahrefs snapshots ordered captured_date DESC.
+ *  Returns [] when no rows exist so the UI can short-circuit to empty state. */
+export async function getAhrefsSiteSnapshots(
+  propertyId: string,
+  limit = 12,
+): Promise<AhrefsMetricSnapshot[]> {
+  const { data, error } = await supabase
+    .from("metric_snapshot")
+    .select(
+      "captured_date, domain_rating, referring_domains, organic_keywords, organic_traffic, organic_traffic_value_cents, backlinks_total",
+    )
+    .eq("property_id", propertyId)
+    .eq("scope", "site")
+    .eq("source", "ahrefs")
+    .is("scope_id", null)
+    .order("captured_date", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return (data as RawAhrefsRow[]).map((r) => ({
+    captured_date: r.captured_date,
+    domain_rating: toNum(r.domain_rating),
+    referring_domains: r.referring_domains,
+    organic_keywords: r.organic_keywords,
+    organic_traffic: r.organic_traffic,
+    organic_traffic_value_cents: r.organic_traffic_value_cents,
+    backlinks_total: r.backlinks_total,
+  }));
+}
+
 // ── annotations ────────────────────────────────────────────────────────
 
 export async function getAnnotations(

@@ -11,10 +11,12 @@ import {
   avgPositionDeltas,
   type Snapshot,
   type Annotation,
+  type AhrefsMetricSnapshot,
 } from "@/lib/tracking";
 import { AnnotationBadge, annotationDotClass } from "./AnnotationBadge";
 import { AddAnnotationForm } from "./AddAnnotationForm";
 import { DeleteAnnotationButton } from "./DeleteAnnotationButton";
+import { AhrefsScorecards } from "./AhrefsScorecards";
 
 const DAYS = 90;
 const TILE_WINDOW = 30;
@@ -23,15 +25,23 @@ export function SitewideView({
   propertySlug,
   snapshots,
   annotations,
+  ahrefsSnapshots,
 }: {
   propertySlug: string;
   snapshots: Snapshot[];
   annotations: Annotation[];
+  ahrefsSnapshots: AhrefsMetricSnapshot[];
 }) {
   const hasData = snapshots.length > 0;
 
   return (
     <div className="space-y-6">
+      {/* Ahrefs scorecards (Phase 6 v1 — DR / RDs / kws / traffic) */}
+      <AhrefsScorecards
+        propertySlug={propertySlug}
+        snapshots={ahrefsSnapshots}
+      />
+
       {/* Headline tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <HeadlineTile
