@@ -316,10 +316,13 @@ def _from_dataforseo(profile: dict) -> dict:
     lat = profile.get("search_lat")
     lng = profile.get("search_lng")
     coord = f"{lat},{lng},60"
+    # The live endpoint matches by name via `filters`, not a top-level
+    # `title` field (title alone returns 0 items). Filter by name, then
+    # pick the exact listing by CID below.
+    name = profile.get("gbp_name") or ""
     body = [{
-        "title": profile.get("gbp_name"),
+        "filters": [["title", "like", f"%{name}%"]],
         "location_coordinate": coord,
-        "is_claimed": False,
         "limit": 5,
     }]
     req = urllib.request.Request(
