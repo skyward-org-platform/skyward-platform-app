@@ -212,7 +212,7 @@ def _from_jepto(profile: dict) -> dict:
 
     # 3. Recent reviews / answers / posts.
     reviews_df = run(f"""
-        SELECT reviewRating, reviewComment, reviewReply, reviewerName, date
+        SELECT starRating, reviewComment, reviewReply, reviewerDisplayName, date
         FROM {table}
         WHERE {date_filter} AND entityType = 'review' AND locationId = @loc
         ORDER BY date DESC LIMIT 10
@@ -224,7 +224,7 @@ def _from_jepto(profile: dict) -> dict:
         ORDER BY date DESC LIMIT 10
     """)
     posts_df = run(f"""
-        SELECT summary, callToAction, date
+        SELECT postSummary, postCallToAction, date
         FROM {table}
         WHERE {date_filter} AND entityType = 'localPost' AND locationId = @loc
         ORDER BY date DESC LIMIT 10
@@ -264,10 +264,10 @@ def _from_jepto(profile: dict) -> dict:
     for rr in reviews_df.to_dict(orient="records"):
         d = rr.get("date")
         reviews.append({
-            "rating": _num(rr.get("reviewRating")),
+            "rating": _num(rr.get("starRating")),
             "comment": rr.get("reviewComment"),
             "reply": rr.get("reviewReply"),
-            "reviewer": rr.get("reviewerName"),
+            "reviewer": rr.get("reviewerDisplayName"),
             "date": d.isoformat() if hasattr(d, "isoformat") else (d if d else None),
         })
 
@@ -280,8 +280,8 @@ def _from_jepto(profile: dict) -> dict:
     for pp in posts_df.to_dict(orient="records"):
         d = pp.get("date")
         posts.append({
-            "summary": pp.get("summary"),
-            "cta": pp.get("callToAction"),
+            "summary": pp.get("postSummary"),
+            "cta": pp.get("postCallToAction"),
             "date": d.isoformat() if hasattr(d, "isoformat") else (d if d else None),
         })
 
