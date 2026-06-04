@@ -418,6 +418,7 @@ function buildTabs(
       badge: metrics.authorityLiveRds ?? undefined,
     });
     tabs.push({ kind: "tab", href: `/properties/${slug}/tracking`, label: "Tracking" });
+    tabs.push({ kind: "tab", href: `/properties/${slug}/local-seo`, label: "Local SEO" });
   }
 
   // Cluster: meta tabs
