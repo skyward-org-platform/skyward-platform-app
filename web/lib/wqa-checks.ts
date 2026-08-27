@@ -8,25 +8,41 @@
 // page_check_state surface (see setCheckStatus / setCheckNotes server
 // actions).
 //
-// S-checks (S1..S12) are sitewide, not per-URL — they're defined here
-// for completeness so the Pages UI can render the full check catalog,
-// but `evaluateChecks` does not run them. Sitewide evaluation belongs
-// in a separate runner that hits robots.txt / sitemap.xml live.
+// S-checks (S1..S14) are sitewide, not per-URL. They're in the catalog
+// so the Pages UI can render all 55 checks, but `evaluateChecks` does not
+// run them. Sitewide evaluation belongs in a separate runner that hits
+// robots.txt / sitemap.xml live.
 
 import type { WqaRow } from "@/lib/wqa";
+// The thresholds and the check catalog are GENERATED from
+// skyward-seo-pipeline/checks/seo.yaml by checks/tools/generate.py. Do not
+// restate a threshold here: on 2026-08-25 the SOP moved and this file did not,
+// and four verdicts were wrong in production for a day. The predicates below are
+// the hand-written half; the numbers they compare against are not.
+import {
+  GENERATED_CHECKS,
+  META_MAX_CHARS,
+  META_MIN_CHARS,
+  TITLE_MAX_CHARS,
+  TITLE_MIN_CHARS,
+} from "@/lib/wqa-checks.generated";
 
 export type CheckCategory = "T" | "C" | "S";
 export type CheckKind = "active" | "blocked";
 export type KwDependency = "Fix Now" | "Fix Now, Revisit" | "Phase 3 Dependent";
 
 export type CheckDef = {
-  id: string; // T1..T20, C1..C20, S1..S12
+  id: string; // T1..T20, C1..C21, S1..S14
   category: CheckCategory;
+  /** Short UI label, carrying the live threshold where the check has one. */
   name: string;
+  /** The check's name in the SOP, without the threshold hint. */
+  sopName: string;
   action: string;
   kind: CheckKind;
   blockedReason: string | null;
   kwDependency: KwDependency;
+  priority: string;
 };
 
 export type CheckResult = {
@@ -48,113 +64,21 @@ export type Ctx = {
   titleToUrls: Map<string, number>;
 };
 
-// ─── kw_dependency (SOP) ───────────────────────────────────────────────────
-export function kwDependency(checkId: string): KwDependency {
-  if (["C2", "C4", "C5", "C7", "C13"].includes(checkId)) {
-    return "Phase 3 Dependent";
-  }
-  if (
-    ["C8", "C9", "C10", "C11", "C15", "C16", "C17", "C18", "C20"].includes(
-      checkId,
-    )
-  ) {
-    return "Fix Now, Revisit";
-  }
-  return "Fix Now";
-}
-
-// ─── CHECKS catalog ────────────────────────────────────────────────────────
-const T_DEFS: Array<
-  [string, string, string, CheckKind, string | null]
-> = [
-  ["T1", "Schema errors", "Fix Schema", "blocked", "Requires SF structured data report (contains_structured_data + validation_errors)"],
-  ["T2", "Missing schema", "Add Schema", "blocked", "Requires SF structured data report"],
-  ["T3", "Review star opportunity", "Add Product+AggregateRating", "blocked", "Requires SF structured data report to confirm absence"],
-  ["T4", "Orphan with value", "Add Internal Links", "active", null],
-  ["T5", "Under-linked", "Add Internal Links", "active", null],
-  ["T6", "Buried page (depth>=4)", "Improve Architecture", "active", null],
-  ["T7", "Over-linked underperformer", "Remove Internal Links", "active", null],
-  ["T8", "Indexable but not indexed", "Fix Indexation", "blocked", "Requires SF + GSC URL Inspection integration (indexed-in-Google column)"],
-  ["T9", "Noindex on valuable page", "Fix Indexation", "active", null],
-  ["T10", "Multiple canonicals", "Fix Multiple Canonicals", "blocked", "Requires SF canonical-tags multi-value field"],
-  ["T11", "Canonical mismatch", "Canonicalize", "active", null],
-  ["T12", "Not in sitemap", "Add to Sitemap", "active", null],
-  ["T13", "Blocked resources (JS/CSS)", "Fix Blocked Resources", "blocked", "Requires robots.txt + SF resources report"],
-  ["T14", "JS rendering required", "Verify JS Rendering", "active", null],
-  ["T15", "No issues found", "Leave As Is", "active", null],
-  ["T16", "Pages linking to broken pages", "Update Internal Links", "blocked", "Requires SF inlinks export to broken-URL set"],
-  ["T17", "HTTPS page linking to HTTP", "Fix Internal Links", "blocked", "Requires SF inlinks raw URL inspection"],
-  ["T18", "Missing social tags (OG/Twitter)", "Add Social Tags", "blocked", "Requires SF social-tags extract"],
-  ["T19", "IndexNow candidates", "Submit to IndexNow", "active", null],
-  ["T20", "Duplicate without canonical", "Add Canonical", "blocked", "Requires SF duplicate content report"],
-];
-
-const C_DEFS: Array<
-  [string, string, string, CheckKind, string | null]
-> = [
-  ["C1", "Revenue page losing traffic", "Refresh (URGENT)", "active", null],
-  ["C2", "Low engagement (sessions>50, dur<30s)", "Rewrite", "active", null],
-  ["C3", "Cannibalization (2+ pages same KW)", "Merge weaker into stronger", "active", null],
-  ["C4", "Thin content (<300 words, <10 sessions)", "Rewrite", "active", null],
-  ["C5", "Losing traffic (negative session %)", "Refresh or Rewrite", "active", null],
-  ["C6", "Ranking 3-10, SV>50", "Target with Links", "active", null],
-  ["C7", "Ranking 11-20, SV>50", "Refresh or Rewrite", "active", null],
-  ["C8", "Missing meta description", "Update Meta Description", "active", null],
-  ["C9", "Duplicate meta description", "Update Meta Description", "active", null],
-  ["C10", "Duplicate title", "Update Page Title", "active", null],
-  ["C11", "Title issues (length/stuffing)", "Update Page Title", "active", null],
-  ["C12", "Has refs but not ranking (rank>20)", "Target w/ Links + Refresh", "active", null],
-  ["C13", "Performing well (sess>50, words>1000)", "Leave As Is", "active", null],
-  ["C14", "No issues found", "Leave As Is", "active", null],
-  ["C15", "Meta description too long (>155)", "Shorten Meta Description", "active", null],
-  ["C16", "Meta description too short (<70)", "Expand Meta Description", "active", null],
-  ["C17", "Title too long (>65)", "Shorten Title", "active", null],
-  ["C18", "Title too short (<30)", "Expand Title", "active", null],
-  ["C19", "AI content detection (Ahrefs)", "Review Content Quality", "blocked", "Requires Ahrefs Site Audit AI-content signal"],
-  ["C20", "Page vs SERP title mismatch", "Improve Title Quality", "blocked", "Requires GSC URL Inspection API + SERP title comparison"],
-];
-
-const S_DEFS: Array<
-  [string, string, string, CheckKind, string | null]
-> = [
-  ["S1", "Robots.txt", "Fix robots.txt", "active", null],
-  ["S2", "Navigation (3-click reach, crawlable, mobile parity)", "Fix Navigation", "active", null],
-  ["S3", "XML Sitemap", "Fix Sitemap", "active", null],
-  ["S4", "HTTPS enforcement", "Fix HTTPS", "active", null],
-  ["S5", "Core Web Vitals", "Fix CWV (dev)", "blocked", "Requires PageSpeed / CWV integration"],
-  ["S6", "Schema sitewide", "Fix Schema", "blocked", "Requires SF structured data report"],
-  ["S7", "Duplicate content (SF reports)", "Resolve Duplicates", "blocked", "Requires SF duplicate content report"],
-  ["S8", "Orphan pages", "Add Links or Remove", "active", null],
-  ["S9", "Hreflang", "Fix Hreflang", "active", null],
-  ["S10", "Social tags (OG/Twitter)", "Add Social Tags", "blocked", "Requires SF social-tags extract"],
-  ["S11", "Pagination", "Fix Pagination", "active", null],
-  ["S12", "Platform Performance Ceiling", "Document Ceiling", "blocked", "Requires platform-level perf analysis"],
-];
-
-function toCheckDef(
-  category: CheckCategory,
-  defs: Array<[string, string, string, CheckKind, string | null]>,
-): CheckDef[] {
-  return defs.map(([id, name, action, kind, blockedReason]) => ({
-    id,
-    category,
-    name,
-    action,
-    kind,
-    blockedReason,
-    kwDependency: kwDependency(id),
-  }));
-}
-
-export const CHECKS: CheckDef[] = [
-  ...toCheckDef("T", T_DEFS),
-  ...toCheckDef("C", C_DEFS),
-  ...toCheckDef("S", S_DEFS),
-];
+// ─── check catalog ─────────────────────────────────────────────────────────
+// Generated from the registry. The ids, names, actions, blocked reasons,
+// priorities and keyword dependencies all come from checks/seo.yaml. This file
+// only decides how a row is tested, never what the check says it tests.
+export const CHECKS: CheckDef[] = GENERATED_CHECKS;
 
 export const CHECKS_BY_ID: Map<string, CheckDef> = new Map(
   CHECKS.map((c) => [c.id, c]),
 );
+
+/** Keyword dependency for a check id, from the registry. Unknown ids fall back
+ *  to "Fix Now" so a caller passing a stale id never crashes the drawer. */
+export function kwDependency(checkId: string): KwDependency {
+  return CHECKS_BY_ID.get(checkId)?.kwDependency ?? "Fix Now";
+}
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 function num(v: unknown): number {
@@ -361,10 +285,12 @@ function cCheck(
       break;
     }
     case "C4":
+      // Word count is a SCREEN, not the verdict. It surfaces the page for a
+      // human to judge on originality. See references/word-count-evidence-review-2026-08-25.md
       if (wordCount > 0 && wordCount < 300 && sessions < 10) {
         return {
           fail: true,
-          detail: `Word count=${Math.trunc(wordCount)} (<300); sessions=${Math.trunc(sessions)} (<10)`,
+          detail: `Word count=${Math.trunc(wordCount)} (<300); sessions=${Math.trunc(sessions)} (<10). Screen only — judge on originality, rewrite only if it adds nothing a shorter page could not`,
         };
       }
       break;
@@ -413,8 +339,8 @@ function cCheck(
     }
     case "C11": {
       if (title) {
-        if (title.length > 65) {
-          return { fail: true, detail: `Title length=${title.length} (>65 chars)` };
+        if (title.length > TITLE_MAX_CHARS) {
+          return { fail: true, detail: `Title length=${title.length} (>${TITLE_MAX_CHARS} chars)` };
         }
         const tokens = title.toLowerCase().match(/\b[a-z][a-z-]+\b/g) ?? [];
         const counts = new Map<string, number>();
@@ -449,23 +375,26 @@ function cCheck(
       }
       break;
     case "C15":
-      if (meta && meta.length > 155) {
-        return { fail: true, detail: `Meta length=${meta.length} (>155)` };
+      if (meta && meta.length > META_MAX_CHARS) {
+        return { fail: true, detail: `Meta length=${meta.length} (>${META_MAX_CHARS})` };
       }
       break;
     case "C16":
-      if (meta && meta.length > 0 && meta.length < 70) {
-        return { fail: true, detail: `Meta length=${meta.length} (<70)` };
+      if (meta && meta.length > 0 && meta.length < META_MIN_CHARS) {
+        return { fail: true, detail: `Meta length=${meta.length} (<${META_MIN_CHARS})` };
       }
       break;
     case "C17":
-      if (title && title.length > 65) {
-        return { fail: true, detail: `Title length=${title.length} (>65)` };
+      if (title && title.length > TITLE_MAX_CHARS) {
+        return { fail: true, detail: `Title length=${title.length} (>${TITLE_MAX_CHARS})` };
       }
       break;
     case "C18":
-      if (title && title.length < 30) {
-        return { fail: true, detail: `Title length=${title.length} (<30)` };
+      if (title && title.length < TITLE_MIN_CHARS) {
+        return {
+          fail: true,
+          detail: `Title length=${title.length} (<${TITLE_MIN_CHARS})`,
+        };
       }
       break;
     default:
