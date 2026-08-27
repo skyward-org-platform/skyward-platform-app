@@ -10,13 +10,13 @@
 // generated, and the half that needs a human is not.
 
 // ─── thresholds ────────────────────────────────────────────────────────────
-/** registry `title_max_chars`, used by C11, C17 */
+/** registry `title_max_chars`, used by C17 */
 export const TITLE_MAX_CHARS = 60;
 /** registry `title_min_chars`, used by C18 */
 export const TITLE_MIN_CHARS = 30;
-/** registry `meta_min_chars`, used by C16, C21 */
+/** registry `meta_min_chars`, used by C16 */
 export const META_MIN_CHARS = 100;
-/** registry `meta_max_chars`, used by C15, C21 */
+/** registry `meta_max_chars`, used by C15 */
 export const META_MAX_CHARS = 160;
 
 export type GeneratedCheckCategory = "T" | "C" | "S";
@@ -374,7 +374,7 @@ export const GENERATED_CHECKS: GeneratedCheckDef[] = [
   {
     id: "C11",
     category: "C",
-    name: "Title issues (length/stuffing)",
+    name: "Title issues (stuffing, CTR)",
     sopName: "Title issues",
     action: "Update Page Title",
     kind: "active",
@@ -488,7 +488,7 @@ export const GENERATED_CHECKS: GeneratedCheckDef[] = [
     sopName: "Meta description length bounds",
     action: "Fix Meta Description",
     kind: "blocked",
-    blockedReason: "Not implemented. C15 and C16 carry the over-160 and under-100 halves; C21 adds the missing-tag and multiple-tag cases",
+    blockedReason: "Not implemented. C8 already catches a missing meta description per URL; C21's remaining job is the multiple-tag case, which needs the rendered head rather than a crawl column",
     kwDependency: "Fix Now, Revisit",
     priority: "P2",
   },
