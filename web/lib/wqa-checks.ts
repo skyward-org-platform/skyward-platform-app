@@ -338,10 +338,10 @@ function cCheck(
       break;
     }
     case "C11": {
+      // Length is C17's, not this one's. Paul ruled on 2026-08-27: C11 and C17
+      // both fired on a long title, producing two findings and two tasks for one
+      // defect. C11 keeps quality (stuffing), C17 keeps length.
       if (title) {
-        if (title.length > TITLE_MAX_CHARS) {
-          return { fail: true, detail: `Title length=${title.length} (>${TITLE_MAX_CHARS} chars)` };
-        }
         const tokens = title.toLowerCase().match(/\b[a-z][a-z-]+\b/g) ?? [];
         const counts = new Map<string, number>();
         for (const w of tokens) counts.set(w, (counts.get(w) ?? 0) + 1);
